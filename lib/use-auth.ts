@@ -16,44 +16,58 @@ interface Profile {
   acpgbi_number: string | null
 }
 
+const supabase = createClient()
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
+    let cancelled = false
 
-    // Get initial session
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-      if (user) {
-        supabase.from('profiles').select('*').eq('id', user.id).single()
-          .then(({ data }) => setProfile(data))
-      }
-      setLoading(false)
-    })
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        const user = session?.user ?? null
+    async function getSession() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (cancelled) return
         setUser(user)
         if (user) {
           const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-          setProfile(data)
+          if (!cancelled) setProfile(data)
+        }
+      } catch (e) {
+        // Ignore AbortError
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    getSession()
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (cancelled) return
+        const u = session?.user ?? null
+        setUser(u)
+        if (u) {
+          try {
+            const { data } = await supabase.from('profiles').select('*').eq('id', u.id).single()
+            if (!cancelled) setProfile(data)
+          } catch (e) {}
         } else {
           setProfile(null)
         }
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
-    const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)

@@ -10,7 +10,7 @@ import {
   Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink,
 } from "lucide-react";
 
-import { mockUser } from "@/data/mockMembersData";
+import { useAuth } from "@/lib/use-auth";
 
 const navSections = [
   {
@@ -53,7 +53,8 @@ const navSections = [
 const MembersLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const initials = `${mockUser.firstName[0]}${mockUser.lastName[0]}`;
+  const { profile, signOut, isAdmin } = useAuth();
+  const initials = profile?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?';
 
   const isActive = (path: string, end?: boolean) => {
     if (end) return pathname === path;
@@ -72,7 +73,7 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Nav sections */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        {navSections.map((section) => (
+        {navSections.filter(s => s.label !== 'ADMIN' || isAdmin).map((section) => (
           <div key={section.label}>
             <p className="text-navy-foreground/40 text-[11px] font-semibold tracking-widest px-3 mb-2">
               {section.label}
@@ -130,7 +131,7 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
           <ArrowLeft size={18} />
           <span>Back to Site</span>
         </Link>
-        <button className="flex items-center gap-3 px-3 py-2.5 text-sm text-navy-foreground/60 hover:text-navy-foreground transition-colors rounded-lg hover:bg-navy-foreground/5 w-full">
+        <button onClick={signOut} className="flex items-center gap-3 px-3 py-2.5 text-sm text-navy-foreground/60 hover:text-navy-foreground transition-colors rounded-lg hover:bg-navy-foreground/5 w-full">
           <LogOut size={18} />
           <span>Logout</span>
         </button>
@@ -176,7 +177,7 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-foreground hidden sm:inline">
-              {mockUser.firstName} {mockUser.lastName}
+              {profile?.full_name || 'Member'}
             </span>
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-navy text-navy-foreground text-xs font-semibold">

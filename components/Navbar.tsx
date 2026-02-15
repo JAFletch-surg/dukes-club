@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
-
+import { useAuth } from "@/lib/use-auth";
 
 const navLinks = [
   { label: "Home", path: "/" },
@@ -12,13 +12,13 @@ const navLinks = [
   { label: "Events & Courses", path: "/events" },
   { label: "News & Blog", path: "/news" },
   { label: "Exams & Training", path: "/exams" },
-  
   { label: "Contact", path: "/contact" },
 ];
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { user, loading, signOut } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-navy/95 backdrop-blur-md border-b border-navy-foreground/10">
@@ -42,16 +42,31 @@ const Navbar = () => {
               {link.label}
             </Link>
           ))}
-          <Link href="/login">
-            <Button variant="hero" size="sm" className="ml-2">
-              Login
-            </Button>
-          </Link>
-          <Link href="/join">
-            <Button variant="gold" size="sm">
-              Join
-            </Button>
-          </Link>
+          {!loading && user ? (
+            <>
+              <Link href="/members">
+                <Button variant="hero" size="sm" className="ml-2">
+                  Members Area
+                </Button>
+              </Link>
+              <Button variant="gold" size="sm" onClick={signOut}>
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="hero" size="sm" className="ml-2">
+                  Login
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button variant="gold" size="sm">
+                  Join
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Toggle */}
@@ -80,16 +95,31 @@ const Navbar = () => {
               {link.label}
             </Link>
           ))}
-          <Link href="/login" onClick={() => setMobileOpen(false)}>
-            <Button variant="hero" size="sm" className="mt-2 w-full">
-              Login
-            </Button>
-          </Link>
-          <Link href="/join" onClick={() => setMobileOpen(false)}>
-            <Button variant="gold" size="sm" className="mt-2 w-full">
-              Join
-            </Button>
-          </Link>
+          {!loading && user ? (
+            <>
+              <Link href="/members" onClick={() => setMobileOpen(false)}>
+                <Button variant="hero" size="sm" className="mt-2 w-full">
+                  Members Area
+                </Button>
+              </Link>
+              <Button variant="gold" size="sm" className="mt-2 w-full" onClick={() => { signOut(); setMobileOpen(false); }}>
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" onClick={() => setMobileOpen(false)}>
+                <Button variant="hero" size="sm" className="mt-2 w-full">
+                  Login
+                </Button>
+              </Link>
+              <Link href="/register" onClick={() => setMobileOpen(false)}>
+                <Button variant="gold" size="sm" className="mt-2 w-full">
+                  Join
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </nav>

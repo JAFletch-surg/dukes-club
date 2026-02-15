@@ -1,5 +1,5 @@
 'use client'
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,18 +9,22 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Camera, Shield, Trash2, Bell, AlertTriangle } from "lucide-react";
-import { mockUser } from "@/data/mockMembersData";
+import { Camera, Shield, Trash2, Bell, AlertTriangle, Check, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/use-auth";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 
 const regions = [
-  "London", "South East", "South West", "East of England", "West Midlands",
-  "East Midlands", "North West", "North East", "Yorkshire & Humber", "Wales",
-  "Scotland", "Northern Ireland", "International",
+  "Mersey", "Wessex", "North East Thames", "North West", "Yorkshire",
+  "South West", "South Wales", "Scotland", "Republic of Ireland",
+  "East Anglia", "SE Thames", "Oxford", "Northern", "North West Thames",
+  "West Midlands", "North Wales", "East Midlands", "Northern Ireland",
 ];
 
 const trainingStages = [
-  "Medical Student", "Foundation Year", "Core Surgical Training", "ST3", "ST4", "ST5", "ST6", "ST7", "ST8",
-  "Post-CCT Fellow", "SAS Doctor", "Consultant", "Other",
+  "FY1", "FY2", "CT1", "CT2", "ST3", "ST4", "ST5", "ST6", "ST7", "ST8",
+  "Post-CCT", "Consultant", "SAS", "Academic", "Other",
 ];
 
 const subspecialtyOptions = [
@@ -29,17 +33,120 @@ const subspecialtyOptions = [
 ];
 
 const MemberProfile = () => {
-  const [directoryVisible, setDirectoryVisible] = useState(mockUser.directorySettings.visible);
-  const [settings, setSettings] = useState(mockUser.directorySettings);
-  const [notifications, setNotifications] = useState(mockUser.notifications);
-  const [selectedSubspecialties, setSelectedSubspecialties] = useState<string[]>(mockUser.subspecialties);
+  const { profile, user } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Form state
+  const [fullName, setFullName] = useState('');
+  const [hospital, setHospital] = useState('');
+  const [region, setRegion] = useState('');
+  const [trainingStage, setTrainingStage] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [acpgbiNumber, setAcpgbiNumber] = useState('');
+  const [subspecialties, setSubspecialties] = useState<string[]>([]);
+  const [directorySettings, setDirectorySettings] = useState({
+    visible: false,
+    show_email: false,
+    show_hospital: true,
+    show_region: true,
+    show_training_stage: true,
+    show_subspecialty_interests: true,
+    show_social_links: false,
+  });
+
+  // Load profile data
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setHospital((profile as any).hospital || '');
+      setRegion((profile as any).region || '');
+      setTrainingStage((profile as any).training_stage || '');
+      setTwitter((profile as any).social_twitter || '');
+      setLinkedin((profile as any).social_linkedin || '');
+      setAcpgbiNumber((profile as any).acpgbi_number || '');
+      setSubspecialties((profile as any).subspecialty_interests || []);
+      if ((profile as any).directory_settings) {
+        setDirectorySettings((profile as any).directory_settings);
+      }
+    }
+  }, [profile]);
+
   const toggleSubspecialty = (s: string) => {
-    setSelectedSubspecialties((prev) =>
+    setSubspecialties((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
     );
   };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setSaving(true);
+    setSaved(false);
+
+    const nameParts = fullName.trim().split(' ');
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: fullName.trim(),
+        hospital,
+        region: region || null,
+        training_stage: trainingStage || null,
+        social_twitter: twitter,
+        social_linkedin: linkedin,
+        acpgbi_number: acpgbiNumber,
+        subspecialty_interests: subspecialties,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
+
+    setSaving(false);
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
+  };
+
+  const handleSavePrivacy = async () => {
+    if (!user) return;
+    setSaving(true);
+    setSaved(false);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        directory_settings: directorySettings,
+        is_directory_visible: directorySettings.visible,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
+
+    setSaving(false);
+    if (!error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!profile?.email) return;
+    await supabase.auth.resetPasswordForEmail(profile.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    alert('Password reset link sent to your email.');
+  };
+
+  const initials = fullName.split(' ').map((n: string) => n[0]).join('') || '?';
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -57,54 +164,59 @@ const MemberProfile = () => {
 
         {/* Personal Info */}
         <TabsContent value="personal" className="space-y-6 mt-6">
-          {/* Profile Photo */}
           <Card className="border">
             <CardContent className="p-6">
               <div className="flex items-center gap-4 mb-6">
                 <div className="relative">
                   <div className="w-20 h-20 rounded-full bg-navy flex items-center justify-center text-navy-foreground text-xl font-bold">
-                    {mockUser.firstName[0]}{mockUser.lastName[0]}
+                    {initials}
                   </div>
                   <button className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
                     <Camera size={14} />
                   </button>
                 </div>
                 <div>
-                  <p className="font-semibold text-foreground">{mockUser.firstName} {mockUser.lastName}</p>
-                  <p className="text-sm text-muted-foreground">{mockUser.email}</p>
+                  <p className="font-semibold text-foreground">{fullName}</p>
+                  <p className="text-sm text-muted-foreground">{profile.email}</p>
                 </div>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>First Name</Label>
-                  <Input defaultValue={mockUser.firstName} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Last Name</Label>
-                  <Input defaultValue={mockUser.lastName} />
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Full Name</Label>
+                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <div className="flex items-center gap-2">
-                    <Input defaultValue={mockUser.email} disabled className="flex-1" />
+                    <Input value={profile.email || ''} disabled className="flex-1" />
                     <Badge variant="outline" className="text-emerald-600 border-emerald-600 text-[10px] shrink-0">Verified</Badge>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Hospital / Place of Work</Label>
-                  <Input defaultValue={mockUser.hospital} />
+                  <Input value={hospital} onChange={(e) => setHospital(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Region</Label>
-                  <select className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm" defaultValue={mockUser.region}>
-                    {regions.map((r) => <option key={r}>{r}</option>)}
+                  <select
+                    className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm"
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                  >
+                    <option value="">Select region...</option>
+                    {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <Label>Training Stage</Label>
-                  <select className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm" defaultValue={mockUser.trainingStage}>
-                    {trainingStages.map((s) => <option key={s}>{s}</option>)}
+                  <select
+                    className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm"
+                    value={trainingStage}
+                    onChange={(e) => setTrainingStage(e.target.value)}
+                  >
+                    <option value="">Select stage...</option>
+                    {trainingStages.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
@@ -118,7 +230,7 @@ const MemberProfile = () => {
                       key={s}
                       onClick={() => toggleSubspecialty(s)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                        selectedSubspecialties.includes(s)
+                        subspecialties.includes(s)
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background text-muted-foreground border-border hover:border-primary/50"
                       }`}
@@ -133,11 +245,11 @@ const MemberProfile = () => {
               <div className="mt-4 grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Twitter / X</Label>
-                  <Input defaultValue={mockUser.twitter} placeholder="@username" />
+                  <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="@username" />
                 </div>
                 <div className="space-y-2">
                   <Label>LinkedIn</Label>
-                  <Input defaultValue={mockUser.linkedin} placeholder="https://linkedin.com/in/..." />
+                  <Input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/in/..." />
                 </div>
               </div>
 
@@ -147,12 +259,22 @@ const MemberProfile = () => {
               <div className="space-y-2">
                 <Label>ACPGBI Membership Number</Label>
                 <div className="flex items-center gap-3">
-                  <Input defaultValue={mockUser.acpgbiNumber} className="max-w-xs" />
-                  <Badge className="bg-emerald-600 text-emerald-50 text-[10px]">Active ACPGBI Member</Badge>
+                  <Input value={acpgbiNumber} onChange={(e) => setAcpgbiNumber(e.target.value)} className="max-w-xs" />
+                  {acpgbiNumber && (
+                    <Badge className="bg-emerald-600 text-emerald-50 text-[10px]">ACPGBI Member</Badge>
+                  )}
                 </div>
               </div>
 
-              <Button variant="default" size="sm" className="mt-4">Save Changes</Button>
+              <Button variant="default" size="sm" className="mt-4" onClick={handleSaveProfile} disabled={saving}>
+                {saving ? (
+                  <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
+                ) : saved ? (
+                  <><Check size={14} className="mr-2" /> Saved</>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -171,19 +293,22 @@ const MemberProfile = () => {
                   <p className="text-sm font-medium text-foreground">Show me in the members directory</p>
                   <p className="text-xs text-muted-foreground">Other members can find and connect with you</p>
                 </div>
-                <Switch checked={directoryVisible} onCheckedChange={setDirectoryVisible} />
+                <Switch
+                  checked={directorySettings.visible}
+                  onCheckedChange={(checked) => setDirectorySettings({ ...directorySettings, visible: checked })}
+                />
               </div>
-              {directoryVisible && (
+              {directorySettings.visible && (
                 <>
                   <Separator />
                   <div className="space-y-3">
                     {[
-                      { key: "showEmail", label: "Show email address", desc: "Other members can see your email" },
-                      { key: "showHospital", label: "Show hospital", desc: "Display your hospital in your directory listing" },
-                      { key: "showRegion", label: "Show region", desc: "Display your region" },
-                      { key: "showTrainingStage", label: "Show training stage", desc: "Display your current training level" },
-                      { key: "showSubspecialties", label: "Show subspecialty interests", desc: "Display your areas of interest" },
-                      { key: "showSocial", label: "Show social links", desc: "Display your Twitter/X and LinkedIn" },
+                      { key: "show_email", label: "Show email address", desc: "Other members can see your email" },
+                      { key: "show_hospital", label: "Show hospital", desc: "Display your hospital in your directory listing" },
+                      { key: "show_region", label: "Show region", desc: "Display your region" },
+                      { key: "show_training_stage", label: "Show training stage", desc: "Display your current training level" },
+                      { key: "show_subspecialty_interests", label: "Show subspecialty interests", desc: "Display your areas of interest" },
+                      { key: "show_social_links", label: "Show social links", desc: "Display your Twitter/X and LinkedIn" },
                     ].map((toggle) => (
                       <div key={toggle.key} className="flex items-center justify-between">
                         <div>
@@ -191,15 +316,23 @@ const MemberProfile = () => {
                           <p className="text-[11px] text-muted-foreground">{toggle.desc}</p>
                         </div>
                         <Switch
-                          checked={(settings as any)[toggle.key]}
-                          onCheckedChange={(checked) => setSettings({ ...settings, [toggle.key]: checked })}
+                          checked={(directorySettings as any)[toggle.key]}
+                          onCheckedChange={(checked) => setDirectorySettings({ ...directorySettings, [toggle.key]: checked })}
                         />
                       </div>
                     ))}
                   </div>
                 </>
               )}
-              <Button variant="default" size="sm" className="mt-2">Save Settings</Button>
+              <Button variant="default" size="sm" className="mt-2" onClick={handleSavePrivacy} disabled={saving}>
+                {saving ? (
+                  <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
+                ) : saved ? (
+                  <><Check size={14} className="mr-2" /> Saved</>
+                ) : (
+                  'Save Settings'
+                )}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -211,8 +344,10 @@ const MemberProfile = () => {
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold text-foreground mb-3">Membership</h2>
               <div className="flex items-center gap-3">
-                <Badge className="bg-navy text-navy-foreground">Member</Badge>
-                <p className="text-sm text-muted-foreground">Full access to all features and content</p>
+                <Badge className="bg-navy text-navy-foreground capitalize">{profile.role}</Badge>
+                <p className="text-sm text-muted-foreground">
+                  {profile.approval_status === 'approved' ? 'Full access to all features and content' : `Status: ${profile.approval_status}`}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -221,34 +356,9 @@ const MemberProfile = () => {
           <Card className="border">
             <CardContent className="p-6 space-y-3">
               <h2 className="text-lg font-semibold text-foreground">Security</h2>
-              <Button variant="outline" size="sm">Change Password</Button>
-            </CardContent>
-          </Card>
-
-          {/* Notifications */}
-          <Card className="border">
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Bell size={18} className="text-muted-foreground" />
-                <h2 className="text-lg font-semibold text-foreground">Email Notifications</h2>
-              </div>
-              {[
-                { key: "newEvents", label: "New events announced", desc: "Get notified about upcoming events and courses" },
-                { key: "newsletter", label: "Weekly newsletter", desc: "Receive our weekly digest of news and updates" },
-                { key: "questionBank", label: "Question bank updates", desc: "New questions and features added to the question bank" },
-                { key: "fellowships", label: "Fellowship opportunities", desc: "New fellowship positions and application deadlines" },
-              ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{item.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <Switch
-                    checked={(notifications as any)[item.key]}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, [item.key]: checked })}
-                  />
-                </div>
-              ))}
+              <Button variant="outline" size="sm" onClick={handleChangePassword}>
+                Change Password
+              </Button>
             </CardContent>
           </Card>
 

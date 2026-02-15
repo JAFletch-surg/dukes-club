@@ -2,37 +2,90 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Video, HelpCircle, Calendar, BarChart3, Play, MapPin, ArrowRight, TrendingUp } from "lucide-react";
-import { mockUser, mockStats, mockVideos, mockUpcomingEvents, mockWeakTopics } from "@/data/mockMembersData";
+import { Video, HelpCircle, Calendar, BarChart3, Play, MapPin, ArrowRight } from "lucide-react";
+import { useAuth } from "@/lib/use-auth";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-const statCards = [
-  { label: "Videos watched", value: mockStats.videosWatched, icon: Video, color: "text-navy" },
-  { label: "Questions attempted", value: `${mockStats.questionsAttempted}/${mockStats.totalQuestions}`, icon: HelpCircle, color: "text-emerald-600" },
-  { label: "Events booked", value: mockStats.eventsBooked, icon: Calendar, color: "text-gold" },
-  { label: "Exam average", value: `${mockStats.examAverage}%`, icon: BarChart3, color: "text-primary" },
-];
+const supabase = createClient();
 
 const MembersDashboard = () => {
-  const latestVideos = mockVideos.slice(0, 3);
-  const upcomingEvents = mockUpcomingEvents.slice(0, 3);
+  const { profile, loading: authLoading } = useAuth();
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [latestVideos, setLatestVideos] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    async function fetchDashboardData() {
+      // Fetch upcoming published events
+      const { data: events } = await supabase
+        .from('events')
+        .select('id, title, slug, starts_at, location, member_price_pence, price_pence')
+        .eq('status', 'published')
+        .gte('starts_at', new Date().toISOString())
+        .order('starts_at', { ascending: true })
+        .limit(3);
+
+      if (events) setUpcomingEvents(events);
+
+      // Fetch latest published videos
+      const { data: videos } = await supabase
+        .from('videos')
+        .select('id, title, speaker, duration_display, category')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (videos) setLatestVideos(videos);
+
+      setLoadingData(false);
+    }
+
+    fetchDashboardData();
+  }, []);
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'Member';
+
+  const formatPrice = (pence: number | null) => {
+    if (!pence || pence === 0) return 'Free';
+    return `£${(pence / 100).toFixed(pence % 100 === 0 ? 0 : 2)}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+    });
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
-          Welcome back, {mockUser.firstName}
+          Welcome back, {firstName}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Here's what's new in the Dukes' Club community
+          Here&apos;s what&apos;s new in the Dukes&apos; Club community
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — placeholder until tracking tables exist */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat) => (
+        {[
+          { label: "Videos watched", value: "–", icon: Video, color: "text-navy" },
+          { label: "Questions attempted", value: "–", icon: HelpCircle, color: "text-emerald-600" },
+          { label: "Events booked", value: "–", icon: Calendar, color: "text-gold" },
+          { label: "Exam average", value: "–", icon: BarChart3, color: "text-primary" },
+        ].map((stat) => (
           <Card key={stat.label} className="border">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
@@ -54,25 +107,29 @@ const MembersDashboard = () => {
         {/* Latest Videos */}
         <Card className="border">
           <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Video size={18} className="text-muted-foreground" />
-                <h2 className="text-lg font-semibold text-foreground">Latest Videos</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <Video size={18} className="text-muted-foreground" />
+              <h2 className="text-lg font-semibold text-foreground">Latest Videos</h2>
+            </div>
+            {loadingData ? (
+              <p className="text-sm text-muted-foreground py-4">Loading...</p>
+            ) : latestVideos.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No videos published yet</p>
+            ) : (
+              <div className="space-y-3">
+                {latestVideos.map((video) => (
+                  <div key={video.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
+                    <div className="w-16 h-11 rounded-md bg-navy flex items-center justify-center shrink-0">
+                      <Play size={14} className="text-navy-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{video.title}</p>
+                      <p className="text-xs text-muted-foreground">{video.speaker}{video.duration_display ? ` · ${video.duration_display}` : ''}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className="space-y-3">
-              {latestVideos.map((video) => (
-                <div key={video.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
-                  <div className="w-16 h-11 rounded-md bg-navy flex items-center justify-center shrink-0">
-                    <Play size={14} className="text-navy-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{video.title}</p>
-                    <p className="text-xs text-muted-foreground">{video.speaker} · {video.duration}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            )}
             <Link href="/members/videos">
               <Button variant="ghost" size="sm" className="mt-3 w-full">
                 View All <ArrowRight size={14} className="ml-1" />
@@ -84,41 +141,45 @@ const MembersDashboard = () => {
         {/* Upcoming Events */}
         <Card className="border">
           <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Calendar size={18} className="text-muted-foreground" />
-                <h2 className="text-lg font-semibold text-foreground">Upcoming Events</h2>
-              </div>
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar size={18} className="text-muted-foreground" />
+              <h2 className="text-lg font-semibold text-foreground">Upcoming Events</h2>
             </div>
-            <div className="space-y-3">
-              {upcomingEvents.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/events/${event.slug}`}
-                  className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors"
-                >
-                  <div className="w-11 h-11 rounded-md bg-gold/10 flex items-center justify-center shrink-0">
-                    <Calendar size={16} className="text-gold" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">{event.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                      <span>{new Date(event.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
-                      <span>·</span>
-                      <span className="flex items-center gap-1">
-                        <MapPin size={10} />
-                        {event.location.split(",")[0]}
-                      </span>
+            {loadingData ? (
+              <p className="text-sm text-muted-foreground py-4">Loading...</p>
+            ) : upcomingEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No upcoming events</p>
+            ) : (
+              <div className="space-y-3">
+                {upcomingEvents.map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/events/${event.slug}`}
+                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="w-11 h-11 rounded-md bg-gold/10 flex items-center justify-center shrink-0">
+                      <Calendar size={16} className="text-gold" />
                     </div>
-                    {event.memberPrice && (
-                      <Badge variant="outline" className="mt-1 text-[10px] text-emerald-600 border-emerald-600/30">
-                        Member price: {event.memberPrice}
-                      </Badge>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{event.title}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        <span>{formatDate(event.starts_at)}</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-1">
+                          <MapPin size={10} />
+                          {event.location?.split(",")[0]}
+                        </span>
+                      </div>
+                      {event.member_price_pence !== null && (
+                        <Badge variant="outline" className="mt-1 text-[10px] text-emerald-600 border-emerald-600/30">
+                          Member price: {formatPrice(event.member_price_pence)}
+                        </Badge>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
             <Link href="/events">
               <Button variant="ghost" size="sm" className="mt-3 w-full">
                 View All Events <ArrowRight size={14} className="ml-1" />
@@ -127,40 +188,6 @@ const MembersDashboard = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Weak Topics */}
-      <Card className="border">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={18} className="text-muted-foreground" />
-              <h2 className="text-lg font-semibold text-foreground">Your Weak Topics</h2>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {mockWeakTopics.map((item) => (
-              <div key={item.topic} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{item.topic}</span>
-                  <span className={`text-sm font-bold ${item.percentage < 50 ? "text-destructive" : "text-gold"}`}>
-                    {item.percentage}%
-                  </span>
-                </div>
-                <Progress
-                  value={item.percentage}
-                  className={`h-2 ${item.percentage < 50 ? "[&>div]:bg-destructive" : "[&>div]:bg-gold"}`}
-                />
-                <Link
-                  href="/members/questions"
-                  className="text-xs text-primary font-medium hover:underline inline-block"
-                >
-                  Practice Now →
-                </Link>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
