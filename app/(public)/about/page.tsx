@@ -1,147 +1,23 @@
 'use client'
-import { useState } from "react";
-
-
-
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { ChevronDown, MapPin, User, FileText, Download, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-
-
-
-
-
-
-type ExecRole =
-  | "President"
-  | "Vice-President"
-  | "Past-President"
-  | "Secretary"
-  | "Web Master"
-  | "IBD Lead"
-  | "Abdominal Wall / Intestinal Failure Lead"
-  | "Pelvic Floor Lead"
-  | "Proctology Lead"
-  | "Endoscopy Lead"
-  | "ASiT Representative"
-  | "Research Lead"
-  | "Advanced Cancer Lead"
-  | "Training and Education Lead";
-
 type CommitteeMember = {
-  name: string;
-  role: ExecRole;
-  placeOfWork: string;
-  statement: string;
-  image?: string;
+  id: string;
+  full_name: string;
+  role: string;
+  region: string | null;
+  statement: string | null;
+  email: string | null;
+  photo_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  social_media_tag: string | null;
+  social_media_url: string | null;
 };
-
-const committeeMembers: CommitteeMember[] = [
-  {
-    name: "Mr James Richardson",
-    role: "President",
-    placeOfWork: "St Mark's Hospital, London",
-    image: "/images/committee/jason.png",
-    statement:
-      "It is a privilege to serve as President of the Dukes' Club. Our mission remains to support the next generation of colorectal surgeons through world-class education, training opportunities, and a strong sense of community. I look forward to building on the excellent work of my predecessors and championing initiatives that will shape the future of our specialty.",
-  },
-  {
-    name: "Miss Sarah Thompson",
-    role: "Vice-President",
-    placeOfWork: "Oxford University Hospitals",
-    image: "/images/committee/charlotte.png",
-    statement:
-      "As Vice-President, I am committed to expanding our educational programme and fostering collaboration between trainees across the UK. The Dukes' Club has been instrumental in my own development, and I am passionate about ensuring every trainee has access to the same opportunities and mentorship that shaped my career.",
-  },
-  {
-    name: "Mr David Clarke",
-    role: "Past-President",
-    placeOfWork: "Leeds Teaching Hospitals",
-    image: "/images/committee/joshua.png",
-    statement:
-      "Serving as President was one of the highlights of my career. I remain dedicated to supporting the Club in an advisory capacity, drawing on my experience to guide strategic decisions and ensure continuity of our core values: excellence, collegiality, and innovation in colorectal surgery training.",
-  },
-  {
-    name: "Miss Emily Watson",
-    role: "Secretary",
-    placeOfWork: "Royal London Hospital",
-    image: "/images/committee/badge.png",
-    statement:
-      "As Secretary, I ensure the smooth running of all Club operations, from committee meetings to our annual programme of events. I am passionate about transparency and communication, and I work to keep our membership informed and engaged with everything the Dukes' Club has to offer.",
-  },
-  {
-    name: "Mr Andrew Chen",
-    role: "Web Master",
-    placeOfWork: "University Hospitals Birmingham",
-    image: "/images/committee/susanna.png",
-    statement:
-      "I am responsible for the Club's digital presence, ensuring our website and online resources serve as a valuable hub for trainees. My goal is to make information accessible, streamline membership processes, and leverage technology to enhance the trainee experience.",
-  },
-  {
-    name: "Miss Priya Patel",
-    role: "IBD Lead",
-    placeOfWork: "John Radcliffe Hospital, Oxford",
-    statement:
-      "Inflammatory bowel disease surgery is a rapidly evolving field, and I am committed to organising courses and resources that keep trainees at the forefront of best practice. From pouch surgery workshops to multidisciplinary case discussions, our IBD programme aims to build confidence and competence.",
-  },
-  {
-    name: "Mr Robert Hughes",
-    role: "Abdominal Wall / Intestinal Failure Lead",
-    placeOfWork: "Salford Royal Hospital",
-    statement:
-      "Complex abdominal wall reconstruction and intestinal failure represent some of the most challenging areas in our specialty. I lead educational initiatives including cadaveric courses and lecture days to equip trainees with the knowledge and skills needed to manage these demanding cases.",
-  },
-  {
-    name: "Miss Laura Mitchell",
-    role: "Pelvic Floor Lead",
-    placeOfWork: "St James's University Hospital, Leeds",
-    statement:
-      "Pelvic floor disorders significantly impact quality of life, and surgical training in this area requires a nuanced, multidisciplinary approach. I coordinate masterclasses and webinars that cover the latest assessment techniques, surgical options, and shared decision-making frameworks.",
-  },
-  {
-    name: "Mr Oliver Grant",
-    role: "Proctology Lead",
-    placeOfWork: "St Mark's Hospital, London",
-    statement:
-      "Proctology encompasses a wide range of conditions requiring both surgical finesse and excellent patient communication. I am dedicated to developing training resources that cover everything from fistula management to haemorrhoidal disease, ensuring trainees are well-prepared for independent practice.",
-  },
-  {
-    name: "Miss Hannah Brooks",
-    role: "Endoscopy Lead",
-    placeOfWork: "Guy's and St Thomas' Hospital, London",
-    statement:
-      "Endoscopy is fundamental to colorectal practice, and I work to ensure trainees have access to high-quality training in both diagnostic and therapeutic techniques. Our programme includes simulation days, TEMS workshops, and guidance on achieving JAG accreditation.",
-  },
-  {
-    name: "Mr Daniel Foster",
-    role: "ASiT Representative",
-    placeOfWork: "Royal Infirmary of Edinburgh",
-    statement:
-      "As the ASiT representative, I act as a bridge between the Dukes' Club and the wider surgical trainee community. I advocate for trainee interests at a national level and ensure that colorectal surgery is well represented in cross-specialty initiatives and workforce planning discussions.",
-  },
-  {
-    name: "Miss Catherine Byrne",
-    role: "Research Lead",
-    placeOfWork: "Addenbrooke's Hospital, Cambridge",
-    statement:
-      "Research is the foundation of surgical progress, and I am passionate about supporting trainees to engage in high-quality clinical and translational research. I coordinate the annual research prize, facilitate collaborative studies, and provide mentorship for those pursuing academic careers.",
-  },
-  {
-    name: "Mr Thomas Ashworth",
-    role: "Advanced Cancer Lead",
-    placeOfWork: "The Christie, Manchester",
-    statement:
-      "Advanced and locally recurrent colorectal cancer requires specialist expertise and a multidisciplinary approach. I lead educational events focused on exenterative surgery, peritoneal malignancy, and the latest systemic therapies, preparing trainees for the most complex oncological challenges.",
-  },
-  {
-    name: "Miss Rebecca Norton",
-    role: "Training and Education Lead",
-    placeOfWork: "Queen Elizabeth Hospital, Birmingham",
-    statement:
-      "As Training and Education Lead, I oversee our curriculum development and educational strategy. My focus is on ensuring our programme aligns with the evolving training landscape, incorporating simulation, e-learning, and competency-based assessment to support trainees at every stage of their journey.",
-  },
-];
 
 const AnimatedSection = ({
   children,
@@ -200,8 +76,8 @@ const CommitteeCard = ({
       {/* Photo / Avatar */}
       <div className="relative z-10 pt-8 pb-4 flex items-center justify-center">
         <div className="w-36 h-36 rounded-full bg-navy-foreground/10 flex items-center justify-center overflow-hidden shadow-md transition-transform duration-300 group-hover:scale-110">
-          {member.image ? (
-            <img src={member.image} alt={member.name} className="w-full h-full object-cover" />
+          {member.photo_url ? (
+            <img src={member.photo_url} alt={member.full_name} className="w-full h-full object-cover" />
           ) : (
             <User className="text-gold/60" size={52} />
           )}
@@ -211,77 +87,56 @@ const CommitteeCard = ({
       {/* Info */}
       <div className="relative z-10 px-6 pb-6 text-center">
         <h3 className="text-lg font-sans font-semibold text-navy-foreground mb-1">
-          {member.name}
+          {member.full_name}
         </h3>
         <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gold/20 text-gold mb-2 inline-block">
           {member.role}
         </span>
-        <div className="flex items-center justify-center gap-1.5 text-sm text-navy-foreground/60 mb-4">
-          <MapPin size={13} className="text-gold shrink-0" />
-          <span>{member.placeOfWork}</span>
-        </div>
+        {member.region && (
+          <div className="flex items-center justify-center gap-1.5 text-sm text-navy-foreground/60 mb-4">
+            <MapPin size={13} className="text-gold shrink-0" />
+            <span>{member.region}</span>
+          </div>
+        )}
 
         {/* Expandable statement */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-gold hover:text-gold/80 transition-colors"
-        >
-          Personal Statement
-          <ChevronDown
-            size={14}
-            className={cn(
-              "transition-transform duration-300",
-              expanded && "rotate-180"
-            )}
-          />
-        </button>
-        <div
-          className={cn(
-            "overflow-hidden transition-all duration-500 ease-in-out",
-            expanded ? "max-h-96 opacity-100 mt-3" : "max-h-0 opacity-0"
-          )}
-        >
-          <p className="text-sm text-navy-foreground/70 leading-relaxed text-left">
-            {member.statement}
-          </p>
-        </div>
+        {member.statement && (
+          <>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-gold hover:text-gold/80 transition-colors"
+            >
+              Personal Statement
+              <ChevronDown
+                size={14}
+                className={cn(
+                  "transition-transform duration-300",
+                  expanded && "rotate-180"
+                )}
+              />
+            </button>
+            <div
+              className={cn(
+                "overflow-hidden transition-all duration-500 ease-in-out",
+                expanded ? "max-h-96 opacity-100 mt-3" : "max-h-0 opacity-0"
+              )}
+            >
+              <p className="text-sm text-navy-foreground/70 leading-relaxed text-left">
+                {member.statement}
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-type RegionalRep = {
-  region: string;
-  name: string;
-  image?: string;
-};
-
-const regionalReps: RegionalRep[] = [
-  { region: "Mersey", name: "TBC" },
-  { region: "Wessex", name: "TBC" },
-  { region: "North East Thames", name: "TBC" },
-  { region: "North West", name: "TBC" },
-  { region: "Yorkshire", name: "TBC" },
-  { region: "South West", name: "TBC" },
-  { region: "South Wales", name: "TBC" },
-  { region: "Scotland", name: "TBC" },
-  { region: "Republic of Ireland", name: "TBC" },
-  { region: "East Anglia", name: "TBC" },
-  { region: "SE Thames", name: "TBC" },
-  { region: "Oxford", name: "TBC" },
-  { region: "Northern", name: "TBC" },
-  { region: "North West Thames", name: "TBC" },
-  { region: "West Midlands", name: "TBC" },
-  { region: "North Wales", name: "TBC" },
-  { region: "East Midlands", name: "TBC" },
-  { region: "Northern Ireland", name: "TBC" },
-];
-
 const RegionalRepCard = ({
-  rep,
+  member,
   index,
 }: {
-  rep: RegionalRep;
+  member: CommitteeMember;
   index: number;
 }) => {
   const { ref, isVisible } = useScrollAnimation(0.1);
@@ -306,8 +161,8 @@ const RegionalRepCard = ({
 
       {/* Headshot */}
       <div className="relative z-10 w-14 h-14 shrink-0 rounded-full bg-navy-foreground/10 flex items-center justify-center overflow-hidden transition-transform duration-300 group-hover:scale-110">
-        {rep.image ? (
-          <img src={rep.image} alt={rep.name} className="w-full h-full object-cover" />
+        {member.photo_url ? (
+          <img src={member.photo_url} alt={member.full_name} className="w-full h-full object-cover" />
         ) : (
           <User className="text-gold/60" size={24} />
         )}
@@ -316,18 +171,72 @@ const RegionalRepCard = ({
       {/* Text */}
       <div className="relative z-10 text-left">
         <h3 className="text-sm font-sans font-semibold text-navy-foreground leading-tight">
-          {rep.region}
+          {member.region || member.role}
         </h3>
-        <p className="text-xs text-navy-foreground/60 mt-0.5">{rep.name}</p>
+        <p className="text-xs text-navy-foreground/60 mt-0.5">{member.full_name}</p>
       </div>
     </div>
   );
 };
 
+const LoadingSkeleton = ({ count, type }: { count: number; type: 'card' | 'rep' }) => (
+  <>
+    {Array.from({ length: count }).map((_, i) => (
+      type === 'card' ? (
+        <div key={i} className="rounded-lg border-2 border-navy-foreground/30 bg-navy p-6 animate-pulse">
+          <div className="flex justify-center mb-4">
+            <div className="w-36 h-36 rounded-full bg-navy-foreground/10" />
+          </div>
+          <div className="space-y-2 text-center">
+            <div className="h-5 bg-navy-foreground/10 rounded w-3/4 mx-auto" />
+            <div className="h-4 bg-gold/10 rounded-full w-1/3 mx-auto" />
+            <div className="h-3 bg-navy-foreground/10 rounded w-1/2 mx-auto" />
+          </div>
+        </div>
+      ) : (
+        <div key={i} className="flex items-center gap-4 rounded-lg border border-navy-foreground/30 bg-navy p-4 animate-pulse">
+          <div className="w-14 h-14 rounded-full bg-navy-foreground/10 shrink-0" />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-4 bg-navy-foreground/10 rounded w-1/2" />
+            <div className="h-3 bg-navy-foreground/10 rounded w-1/3" />
+          </div>
+        </div>
+      )
+    ))}
+  </>
+);
+
 const AboutPage = () => {
+  const [execMembers, setExecMembers] = useState<CommitteeMember[]>([]);
+  const [regionalReps, setRegionalReps] = useState<CommitteeMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTeam = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('executive_committee')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (!error && data) {
+        const exec = data.filter((m: CommitteeMember) => m.role !== 'Regional Representative');
+        const reps = data.filter((m: CommitteeMember) => m.role === 'Regional Representative');
+        setExecMembers(exec);
+        setRegionalReps(reps);
+      }
+      setLoading(false);
+    };
+
+    fetchTeam();
+  }, []);
+
+  // Derive the list of exec roles from current members for the governance section
+  const execRoles = execMembers.map(m => m.role);
+
   return (
     <div className="min-h-screen bg-background">
-      
 
       {/* Video Hero */}
       <section className="relative pt-16 overflow-hidden">
@@ -348,10 +257,10 @@ const AboutPage = () => {
             Who We Are
           </p>
           <h1 className="text-4xl md:text-5xl font-sans font-bold text-navy-foreground animate-fade-in">
-            About Dukes' Club
+            About Dukes&apos; Club
           </h1>
           <p className="mt-4 text-navy-foreground/80 max-w-2xl text-base md:text-lg animate-fade-in">
-            The Dukes' Club is the national trainee association for colorectal surgery in the United Kingdom, dedicated to education, training, and community.
+            The Dukes&apos; Club is the national trainee association for colorectal surgery in the United Kingdom, dedicated to education, training, and community.
           </p>
         </div>
       </section>
@@ -365,7 +274,7 @@ const AboutPage = () => {
                 Our Mission
               </h2>
               <p className="text-navy-foreground/90 text-lg leading-relaxed">
-                Founded to support and advance colorectal surgical training in the UK, the Dukes' Club provides
+                Founded to support and advance colorectal surgical training in the UK, the Dukes&apos; Club provides
                 a platform for education, research, networking, and professional development. We organise courses,
                 webinars, and our flagship Annual Weekend, while working closely with the ACPGBI to represent
                 the interests of trainees at every level.
@@ -386,14 +295,23 @@ const AboutPage = () => {
               Executive Committee
             </h2>
             <p className="mt-4 text-navy-foreground/80 max-w-2xl mx-auto">
-              Meet the dedicated team driving the Dukes' Club forward. Click on any member to read their personal statement.
+              Meet the dedicated team driving the Dukes&apos; Club forward. Click on any member to read their personal statement.
             </p>
           </AnimatedSection>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {committeeMembers.map((member, i) => (
-              <CommitteeCard key={member.role} member={member} index={i} />
-            ))}
+            {loading ? (
+              <LoadingSkeleton count={6} type="card" />
+            ) : execMembers.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-navy-foreground/50">
+                <User size={36} className="mx-auto mb-3 opacity-40" />
+                <p>Committee members coming soon.</p>
+              </div>
+            ) : (
+              execMembers.map((member, i) => (
+                <CommitteeCard key={member.id} member={member} index={i} />
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -409,7 +327,7 @@ const AboutPage = () => {
               Constitution & Roles
             </h2>
             <p className="mt-4 text-navy-foreground/80 max-w-2xl mx-auto">
-              The Dukes' Club is governed by a formal constitution. Each executive committee role carries specific responsibilities outlined in the documents below.
+              The Dukes&apos; Club is governed by a formal constitution. Each executive committee role carries specific responsibilities outlined in the documents below.
             </p>
           </AnimatedSection>
 
@@ -425,38 +343,41 @@ const AboutPage = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-sans font-semibold text-navy-foreground">
-                    Dukes' Club Constitution
+                    Dukes&apos; Club Constitution
                   </h3>
                   <p className="text-sm text-navy-foreground/60">
-                    The governing document of the Dukes' Club, outlining objectives, membership, and committee structure.
+                    The governing document of the Dukes&apos; Club, outlining objectives, membership, and committee structure.
                   </p>
                 </div>
                 <Download size={18} className="text-navy-foreground/40 group-hover:text-gold transition-colors shrink-0" />
               </a>
             </AnimatedSection>
 
-            {/* Role Documents */}
+            {/* Role Documents — driven by exec roles from Supabase */}
             <AnimatedSection delay={200}>
               <h3 className="text-lg font-sans font-semibold text-navy-foreground mb-4 mt-8">
                 Roles & Responsibilities
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
-                  "President",
-                  "Vice-President",
-                  "Past-President",
-                  "Secretary",
-                  "Web Master",
-                  "IBD Lead",
-                  "Abdominal Wall / Intestinal Failure Lead",
-                  "Pelvic Floor Lead",
-                  "Proctology Lead",
-                  "Endoscopy Lead",
-                  "ASiT Representative",
-                  "Research Lead",
-                  "Advanced Cancer Lead",
-                  "Training and Education Lead",
-                ].map((role) => (
+                {(execRoles.length > 0
+                  ? execRoles
+                  : [
+                      "President",
+                      "Vice-President",
+                      "Past-President",
+                      "Secretary",
+                      "Web Master",
+                      "IBD Lead",
+                      "Abdominal Wall / Intestinal Failure Lead",
+                      "Pelvic Floor Lead",
+                      "Proctology Lead",
+                      "Endoscopy Lead",
+                      "ASiT Representative",
+                      "Research Lead",
+                      "Advanced Cancer Lead",
+                      "Training and Education Lead",
+                    ]
+                ).map((role) => (
                   <a
                     key={role}
                     href="#"
@@ -489,14 +410,22 @@ const AboutPage = () => {
           </AnimatedSection>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {regionalReps.map((rep, i) => (
-              <RegionalRepCard key={rep.region} rep={rep} index={i} />
-            ))}
+            {loading ? (
+              <LoadingSkeleton count={6} type="rep" />
+            ) : regionalReps.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-navy-foreground/50">
+                <MapPin size={36} className="mx-auto mb-3 opacity-40" />
+                <p>Regional representatives coming soon.</p>
+              </div>
+            ) : (
+              regionalReps.map((member, i) => (
+                <RegionalRepCard key={member.id} member={member} index={i} />
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      
     </div>
   );
 };

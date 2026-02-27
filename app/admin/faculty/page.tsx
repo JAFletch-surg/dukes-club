@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { GraduationCap, Plus, Edit, Trash2, Save, Loader, X, Camera } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { GraduationCap, Plus, Edit, Trash2, Save, Loader, X, Camera, Upload } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
+import { createClient } from '@/lib/supabase/client'
 
 export default function FacultyAdmin() {
   const { data: faculty, loading, create, update, remove } = useSupabaseTable<any>('faculty', 'sort_order', true)
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const emptyForm = { full_name: '', position_title: '', hospital: '', bio: '', email: '', photo_url: '', sort_order: 0, is_active: true }
   const [form, setForm] = useState(emptyForm)
@@ -24,6 +27,30 @@ export default function FacultyAdmin() {
       sort_order: f.sort_order || 0, is_active: f.is_active ?? true,
     })
     setEditing(f.id)
+  }
+
+  const handlePhotoUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return }
+    if (file.size > 5 * 1024 * 1024) { showToast('Image must be under 5MB', 'error'); return }
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileName = `faculty-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('media')
+        .upload(`faculty-photos/${fileName}`, file, { cacheControl: '3600', upsert: false })
+      if (uploadErr) throw uploadErr
+      const { data: urlData } = supabase.storage
+        .from('media')
+        .getPublicUrl(`faculty-photos/${fileName}`)
+      setForm(prev => ({ ...prev, photo_url: urlData.publicUrl }))
+      showToast('Photo uploaded')
+    } catch (err: any) {
+      console.error('Upload error:', err)
+      showToast(err.message || 'Upload failed', 'error')
+    }
+    setUploading(false)
   }
 
   const handleSave = async () => {
@@ -100,7 +127,7 @@ export default function FacultyAdmin() {
             </div>
             <div className="px-6 py-5 space-y-4">
 
-              {/* Photo */}
+              {/* Photo Upload */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-2">Headshot Photo</label>
                 <div className="flex items-center gap-4">
@@ -113,14 +140,31 @@ export default function FacultyAdmin() {
                   )}
                   <div className="flex-1">
                     <input
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      value={form.photo_url}
-                      onChange={(e) => setForm({ ...form, photo_url: e.target.value })}
-                      placeholder="https://... paste image URL"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handlePhotoUpload(file)
+                        e.target.value = ''
+                      }}
                     />
-                    <p className="text-xs text-gray-400 mt-1">Paste a URL to a headshot photo. Square images work best.</p>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-colors disabled:opacity-50 w-full justify-center"
+                    >
+                      {uploading ? (
+                        <><Loader className="animate-spin" size={15} /> Uploading...</>
+                      ) : (
+                        <><Upload size={15} /> {form.photo_url ? 'Change Photo' : 'Upload Photo'}</>
+                      )}
+                    </button>
+                    <p className="text-xs text-gray-400 mt-1.5">JPG, PNG or WebP. Max 5MB. Square images work best.</p>
                     {form.photo_url && (
-                      <button onClick={() => setForm({ ...form, photo_url: '' })} className="text-xs text-red-500 font-medium mt-1 hover:text-red-700">Remove photo</button>
+                      <button type="button" onClick={() => setForm({ ...form, photo_url: '' })} className="text-xs text-red-500 font-medium mt-1 hover:text-red-700">Remove photo</button>
                     )}
                   </div>
                 </div>

@@ -47,6 +47,7 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.564.0",
+    "mapbox-gl": "^3.19.0",
     "next": "^15.5.12",
     "react": "19.2.3",
     "react-day-picker": "^9.13.2",
@@ -62,6 +63,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

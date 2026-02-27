@@ -41,48 +41,44 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Logged in → check role for admin routes
-  if (user && isAdminRoute) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const role = profile?.role
-    if (!role || !['admin', 'super_admin', 'editor'].includes(role)) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/members'
-      return NextResponse.redirect(url)
-    }
+  // Already logged in → redirect away from auth pages
+  if (user && isAuthRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/members'
+    return NextResponse.redirect(url)
   }
 
-  // Logged in → check approval for member routes
-  if (user && isMembersRoute) {
+  // For protected routes, fetch profile once and check both role + approval
+  if (user && (isAdminRoute || isMembersRoute)) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, approval_status')
       .eq('id', user.id)
       .single()
 
-    if (profile?.approval_status === 'pending') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/pending-approval'
-      return NextResponse.redirect(url)
+    // Admin route — check role
+    if (isAdminRoute) {
+      const role = profile?.role
+      if (!role || !['admin', 'super_admin', 'editor'].includes(role)) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/members'
+        return NextResponse.redirect(url)
+      }
     }
 
-    if (profile?.approval_status === 'rejected') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      return NextResponse.redirect(url)
+    // Members route — check approval status
+    if (isMembersRoute) {
+      if (profile?.approval_status === 'pending') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/pending-approval'
+        return NextResponse.redirect(url)
+      }
+      if (profile?.approval_status === 'rejected') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        return NextResponse.redirect(url)
+      }
     }
-  }
-
-  // Already logged in → redirect away from auth pages
-  if (user && isAuthRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/members'
-    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload } from 'lucide-react'
+import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 
@@ -51,6 +51,122 @@ function parseCSV(text: string): { time: string; title: string }[] {
   return rows
 }
 
+/* ── Searchable Faculty Picker ──────────────────── */
+function FacultySearch({ faculty, assigned, onAdd }: {
+  faculty: any[]
+  assigned: { faculty_id: string; role: string }[]
+  onAdd: (id: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const available = faculty.filter(f => {
+    if (assigned.some(af => af.faculty_id === f.id)) return false
+    if (!query) return true
+    const q = query.toLowerCase()
+    return (
+      f.full_name?.toLowerCase().includes(q) ||
+      f.hospital?.toLowerCase().includes(q) ||
+      f.position_title?.toLowerCase().includes(q)
+    )
+  })
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        border: '1.5px solid #D1D1D6', borderRadius: 10, padding: '0 12px',
+        background: '#fff',
+        ...(open ? { borderColor: '#7C3AED', boxShadow: '0 0 0 3px rgba(124,58,237,0.1)' } : {}),
+      }}>
+        <Search size={15} color="#999" style={{ flexShrink: 0 }} />
+        <input
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search faculty by name, hospital, or role..."
+          style={{
+            width: '100%', padding: '10px 0', border: 'none', fontSize: 14,
+            color: '#000', background: 'transparent', outline: 'none',
+            fontFamily: 'Montserrat, sans-serif',
+          }}
+        />
+        {query && (
+          <button type="button" onClick={() => { setQuery(''); setOpen(false) }}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#999', padding: 2, flexShrink: 0 }}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          marginTop: 4, background: '#fff', border: '1.5px solid #D1D1D6',
+          borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+          maxHeight: 240, overflowY: 'auto',
+        }}>
+          {available.length === 0 ? (
+            <div style={{ padding: '16px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
+              {query ? 'No matching faculty found' : 'All faculty have been assigned'}
+            </div>
+          ) : (
+            available.slice(0, 20).map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => { onAdd(f.id); setQuery(''); setOpen(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '10px 14px', border: 'none', background: 'none',
+                  cursor: 'pointer', textAlign: 'left', fontSize: 13,
+                  borderBottom: '1px solid #F1F1F3', transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#F8F5FF')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+              >
+                {f.photo_url ? (
+                  <img src={f.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%', background: '#059669',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {f.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '?'}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#181820', lineHeight: 1.3 }}>{f.full_name}</div>
+                  <div style={{ fontSize: 11, color: '#888', lineHeight: 1.3, marginTop: 1 }}>
+                    {[f.position_title, f.hospital].filter(Boolean).join(' · ') || 'Faculty'}
+                  </div>
+                </div>
+                <Plus size={14} color="#7C3AED" style={{ flexShrink: 0 }} />
+              </button>
+            ))
+          )}
+          {available.length > 20 && (
+            <div style={{ padding: '8px 14px', textAlign: 'center', color: '#999', fontSize: 11 }}>
+              Type to narrow down {available.length} results...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const S = {
   input: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
   select: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
@@ -74,24 +190,17 @@ export default function EventsAdmin() {
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
-  // Ref to prevent the useEffect from overwriting our local faculty map after save
-  const skipNextFacultyLoad = useRef(false)
-
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('faculty').select('id, full_name, position_title, hospital').order('full_name').then(({ data }) => setFaculty(data || []))
+    supabase.from('faculty').select('id, full_name, position_title, hospital, photo_url').order('full_name').then(({ data }: any) => setFaculty(data || []))
   }, [])
 
   const [eventFacultyMap, setEventFacultyMap] = useState<Record<string, { faculty_id: string; role: string }[]>>({})
 
-  // Load event_faculty junction data — but skip if we just saved
+  // Load event_faculty ONCE on mount — managed locally after that
   useEffect(() => {
-    if (skipNextFacultyLoad.current) {
-      skipNextFacultyLoad.current = false
-      return
-    }
     const supabase = createClient()
-    supabase.from('event_faculty').select('event_id, faculty_id, role').then(({ data }) => {
+    supabase.from('event_faculty').select('event_id, faculty_id, role').then(({ data }: any) => {
       const map: Record<string, { faculty_id: string; role: string }[]> = {}
       ;(data || []).forEach((ef: any) => {
         if (!map[ef.event_id]) map[ef.event_id] = []
@@ -99,7 +208,7 @@ export default function EventsAdmin() {
       })
       setEventFacultyMap(map)
     })
-  }, [events]) // re-run when events change, but skip after our own save
+  }, [])
 
   const emptyForm = {
     title: '', slug: '', starts_at: '', ends_at: '', location: '', address: '',
@@ -140,22 +249,6 @@ export default function EventsAdmin() {
     setEditing(e.id)
   }
 
-  // Helper to sync junction table
-  const syncFaculty = async (supabase: any, eventId: string, assignedFaculty: { faculty_id: string; role: string }[]) => {
-    const { error: delErr } = await supabase.from('event_faculty').delete().eq('event_id', eventId)
-    if (delErr) console.error('DELETE event_faculty:', delErr)
-    if (assignedFaculty.length > 0) {
-      const { error: insErr } = await supabase.from('event_faculty').insert(
-        assignedFaculty.map((af: any, i: number) => ({
-          event_id: eventId,
-          faculty_id: af.faculty_id,
-          role: af.role || 'Faculty',
-        }))
-      )
-      if (insErr) console.error('INSERT event_faculty:', insErr)
-    }
-  }
-
   const handleSave = async () => {
     if (!form.title || !form.starts_at) { showToast('Title and start date are required', 'error'); return }
     setSaving(true)
@@ -191,32 +284,37 @@ export default function EventsAdmin() {
         payload.vimeo_live_embed_url = form.vimeo_live_embed_url || null
       }
 
-      // Tell the useEffect not to overwrite our local map on the next re-render
-      skipNextFacultyLoad.current = true
-
       let eventId: string
       if (editing === 'new') {
-        // For new events: create first to get ID, then sync faculty
         const created = await create(payload)
         eventId = created.id
-        await syncFaculty(supabase, eventId, form.assigned_faculty)
         showToast('Event created')
       } else {
-        // For edits: sync faculty FIRST, then update event
-        // This prevents the race condition where update() triggers a refetch
-        // that reads empty junction data between delete and insert
-        eventId = editing!
-        await syncFaculty(supabase, eventId, form.assigned_faculty)
         await update(editing!, payload)
+        eventId = editing!
         showToast('Event updated')
       }
 
-      // Update local map immediately
+      // Sync event_faculty junction table
+      const { error: delErr } = await supabase.from('event_faculty').delete().eq('event_id', eventId)
+      if (delErr) console.error('DELETE event_faculty error:', delErr)
+
+      if (form.assigned_faculty.length > 0) {
+        const { error: insErr } = await supabase.from('event_faculty').insert(
+          form.assigned_faculty.map((af) => ({
+            event_id: eventId,
+            faculty_id: af.faculty_id,
+            role: af.role || 'Faculty',
+          }))
+        )
+        if (insErr) console.error('INSERT event_faculty error:', insErr)
+      }
+
+      // Update local map
       setEventFacultyMap(prev => ({ ...prev, [eventId]: form.assigned_faculty }))
       setEditing(null)
     } catch (err: any) {
       showToast(err.message, 'error')
-      skipNextFacultyLoad.current = false
     }
     setSaving(false)
   }
@@ -398,6 +496,7 @@ export default function EventsAdmin() {
                 </div>
               </div>
 
+              {/* Faculty — searchable picker */}
               <div style={S.section}>
                 <p style={S.sectionTitle}>SPEAKERS / FACULTY</p>
                 {form.assigned_faculty.length > 0 && (
@@ -431,17 +530,15 @@ export default function EventsAdmin() {
                 )}
                 <div>
                   <label style={S.label}>Add Faculty Member</label>
-                  <select style={S.select} value="" onChange={(e) => {
-                    if (!e.target.value) return
-                    if (form.assigned_faculty.some(af => af.faculty_id === e.target.value)) { showToast('Already assigned', 'error'); return }
-                    setForm({ ...form, assigned_faculty: [...form.assigned_faculty, { faculty_id: e.target.value, role: 'Faculty' }] })
-                  }}>
-                    <option value="">— Select faculty to add —</option>
-                    {faculty.filter(f => !form.assigned_faculty.some(af => af.faculty_id === f.id)).map(f => (
-                      <option key={f.id} value={f.id}>{f.full_name}{f.hospital ? ` — ${f.hospital}` : ''}</option>
-                    ))}
-                  </select>
-                  <p style={S.hint}>Add multiple faculty members. Manage faculty via the <a href="/admin/faculty" style={{ color: '#2563EB', textDecoration: 'underline' }}>Faculty admin page</a>.</p>
+                  <FacultySearch
+                    faculty={faculty}
+                    assigned={form.assigned_faculty}
+                    onAdd={(id) => {
+                      if (form.assigned_faculty.some(af => af.faculty_id === id)) { showToast('Already assigned', 'error'); return }
+                      setForm({ ...form, assigned_faculty: [...form.assigned_faculty, { faculty_id: id, role: 'Faculty' }] })
+                    }}
+                  />
+                  <p style={S.hint}>Search by name, hospital, or role. Manage faculty via the <a href="/admin/faculty" style={{ color: '#2563EB', textDecoration: 'underline' }}>Faculty admin page</a>.</p>
                 </div>
               </div>
 
