@@ -13,6 +13,17 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { mockFellowships as rawMockFellowships } from "@/data/mockMembersData";
 
+/* ─── Union Jack SVG for UK badges ─── */
+const UnionJack = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size * 0.6} viewBox="0 0 60 36" className="shrink-0 rounded-[2px]">
+    <rect width="60" height="36" fill="#012169" />
+    <path d="M0,0 L60,36 M60,0 L0,36" stroke="#fff" strokeWidth="7.2" />
+    <path d="M0,0 L60,36 M60,0 L0,36" stroke="#C8102E" strokeWidth="4.8" />
+    <path d="M30,0 V36 M0,18 H60" stroke="#fff" strokeWidth="12" />
+    <path d="M30,0 V36 M0,18 H60" stroke="#C8102E" strokeWidth="7.2" />
+  </svg>
+);
+
 /* ═══════════════════════════════════════════
    TYPES
    ═══════════════════════════════════════════ */
@@ -118,33 +129,29 @@ function getImageForFellowship(f: Fellowship): string {
   return FALLBACK_IMAGES.default;
 }
 
-/* ─── Subspecialty colour tokens (matches Supabase enum) ─── */
-const subspecialtyColors: Record<string, string> = {
-  "Robotic":                "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/25",
-  "Laparoscopic":           "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25",
-  "Open":                   "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/25",
-  "TAMIS":                  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25",
-  "General":                "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/25",
-  "Cancer - Colon":         "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/25",
-  "Cancer - Rectal":        "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/25",
-  "Cancer - Anal":          "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-500/25",
-  "Cancer - Advanced":      "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/25",
-  "Peritoneal Malignancy":  "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/25",
-  "IBD":                    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25",
-  "Intestinal Failure":     "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/25",
-  "Pelvic Floor":           "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/25",
-  "Proctology":             "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/25",
-  "Fistula":                "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/25",
-  "Abdominal Wall":         "bg-lime-500/15 text-lime-700 dark:text-lime-300 border-lime-500/25",
-  "Emergency":              "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/25",
-  "Trauma":                 "bg-orange-600/15 text-orange-800 dark:text-orange-200 border-orange-600/25",
-  "Endoscopy":              "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/25",
-  "Research":               "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/25",
-  "Training":               "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-500/25",
-  "Radiology":              "bg-stone-500/15 text-stone-700 dark:text-stone-300 border-stone-500/25",
+/* ─── Subspecialty colour groups ─── */
+type TagGroup = "approach" | "cancer" | "functional" | "general";
+const TAG_GROUP_STYLES: Record<TagGroup, { base: string; active: string }> = {
+  approach:   { base: "bg-[#E1E8F0] text-[#1a365d] border-[#E1E8F0]",     active: "bg-[#C7D4E4] text-[#1a365d] border-[#5A7FAD]" },
+  cancer:     { base: "bg-[#FDF3DC] text-[#8B6914] border-[#FDF3DC]",     active: "bg-[#FAE7B4] text-[#8B6914] border-[#E5A718]" },
+  functional: { base: "bg-[#E5F1FB] text-[#0060AB] border-[#E5F1FB]",     active: "bg-[#C5DFFA] text-[#0060AB] border-[#0078D4]" },
+  general:    { base: "bg-[#E4E5E9] text-[#44444D] border-[#E4E5E9]",     active: "bg-[#D0D1D8] text-[#44444D] border-[#6E6F7A]" },
 };
-const getSubspecialtyClass = (tag: string) =>
-  subspecialtyColors[tag] ?? "bg-muted/50 text-muted-foreground border-border";
+
+const TAG_GROUP_MAP: Record<string, TagGroup> = {
+  "Robotic": "approach", "Laparoscopic": "approach", "Open": "approach", "TAMIS": "approach",
+  "Cancer - Colon": "cancer", "Cancer - Rectal": "cancer", "Cancer - Anal": "cancer", "Cancer - Advanced": "cancer",
+  "Peritoneal Malignancy": "functional", "IBD": "functional", "Intestinal Failure": "functional",
+  "Pelvic Floor": "functional", "Proctology": "functional", "Fistula": "functional",
+  "General": "general", "Abdominal Wall": "general", "Emergency": "general", "Trauma": "general",
+  "Endoscopy": "general", "Research": "general", "Training": "general", "Radiology": "general",
+};
+
+const getSubspecialtyClass = (tag: string, isActive = false) => {
+  const group = TAG_GROUP_MAP[tag] ?? "general";
+  const styles = TAG_GROUP_STYLES[group];
+  return isActive ? styles.active : styles.base;
+};
 
 /* ─── Full subspecialty list for filter chips (matches Supabase enum) ─── */
 const ALL_SUBSPECIALTIES = [
@@ -235,7 +242,7 @@ const FellowshipMap = ({
         const el = document.createElement("div");
         el.style.cssText = `
           width: 32px; height: 32px; border-radius: 50%;
-          background: ${isIntl ? "#E5A718" : "#7C3AED"};
+          background: ${isIntl ? "#E5A718" : "#0078D4"};
           border: 3px solid white;
           box-shadow: 0 2px 8px rgba(0,0,0,0.25);
           cursor: pointer;
@@ -304,7 +311,7 @@ const MapPlaceholder = ({ distanceSearch }: { distanceSearch: string }) => (
       </p>
     </div>
     <div className="flex gap-4 text-[11px] text-muted-foreground/50 z-10">
-      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-primary/40" /> UK</span>
+      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#0078D4]/60" /> UK</span>
       <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gold/40" /> International</span>
     </div>
     {distanceSearch && (
@@ -366,8 +373,8 @@ const FellowshipCard = ({
                 : "bg-navy/90 text-white"
             }`}
           >
-            {isInternational && <Globe size={10} className="mr-1" />}
-            {fellowship.type}
+            {isInternational ? <Globe size={10} className="mr-1" /> : <UnionJack size={14} />}
+            <span className="ml-1">{fellowship.type}</span>
           </Badge>
           <Badge className="text-[10px] font-medium backdrop-blur-md bg-black/40 text-white border-0 shadow-sm">
             <Clock size={10} className="mr-1" /> {fellowship.duration}
@@ -573,6 +580,7 @@ const FellowshipsPage = () => {
                     : "bg-background text-muted-foreground hover:bg-muted border border-border/60"
                 }`}
               >
+                {type === "UK" && <UnionJack size={14} />}
                 {type === "International" && <Globe size={11} className="inline mr-1 -mt-px" />}
                 {type}
               </button>
@@ -601,7 +609,7 @@ const FellowshipsPage = () => {
               onClick={() => toggleTag(tag)}
               className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all duration-200 ${
                 selectedTags.includes(tag)
-                  ? getSubspecialtyClass(tag)
+                  ? getSubspecialtyClass(tag, true)
                   : "bg-background text-muted-foreground border-border/60 hover:border-primary/30"
               }`}
             >
@@ -734,8 +742,8 @@ const FellowshipsPage = () => {
                         ? "bg-gold/90 text-navy"
                         : "bg-navy/90 text-white"
                     }`}>
-                      {selected.type === "International" && <Globe size={10} className="mr-1" />}
-                      {selected.type}
+                      {selected.type === "International" ? <Globe size={10} className="mr-1" /> : <UnionJack size={14} />}
+                      <span className="ml-1">{selected.type}</span>
                     </Badge>
                     <Badge className="text-[10px] font-medium bg-black/40 text-white border-0 backdrop-blur-sm">
                       <Clock size={10} className="mr-1" /> {selected.duration}
