@@ -6,7 +6,8 @@ import { usePathname } from 'next/navigation'
 import {
   BarChart3, Calendar, Newspaper, Video, Globe, UserCheck,
   GraduationCap, Users, Building2, Menu, Shield,
-  ChevronRight, Radio, Mic, FileText, ArrowLeft
+  ChevronRight, Radio, Mic, FileText, ArrowLeft,
+  Landmark
 } from 'lucide-react'
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { href: '/admin/members', label: 'Members', icon: Users },
   { type: 'divider', label: 'ORGANISATION' },
   { href: '/admin/sponsors', label: 'Sponsors', icon: Building2 },
+  { href: '/admin/institutions', label: 'Institutions', icon: Landmark }
 ] as const
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

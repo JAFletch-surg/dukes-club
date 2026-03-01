@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3, Calendar, Newspaper, Video, Globe, UserCheck,
-  GraduationCap, Users, Building2, Menu, Shield, ChevronLeft
+  GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark
 } from 'lucide-react'
 
 const navItems = [
@@ -20,6 +20,7 @@ const navItems = [
   { href: '/admin/faculty', label: 'Faculty', icon: GraduationCap },
   { href: '/admin/members', label: 'Members', icon: Users },
   { type: 'divider', label: 'ORGANISATION' },
+  { href: '/admin/institutions', label: 'Institutions', icon: Landmark },
   { href: '/admin/sponsors', label: 'Sponsors', icon: Building2 },
 ] as const
 

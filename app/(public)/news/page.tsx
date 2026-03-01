@@ -1,7 +1,6 @@
 'use client'
 import Link from "next/link";
-import { useState, useMemo } from "react";
-
+import { useState, useMemo, useEffect } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,8 +15,8 @@ import {
   Collapsible,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { Search, ArrowRight, X, SlidersHorizontal, ChevronDown, Newspaper, Star } from "lucide-react";
-
+import { Search, ArrowRight, X, SlidersHorizontal, ChevronDown, Newspaper, Star, User, Loader } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const categories = [
   "Announcement", "Education", "Careers", "Research",
@@ -25,90 +24,18 @@ const categories = [
 ] as const;
 
 type NewsItem = {
+  id: string;
   title: string;
   slug: string;
-  category: (typeof categories)[number];
+  category: string;
   date: string;
   sortDate: string;
   description: string;
   featured?: boolean;
+  imageUrl?: string;
+  authorName?: string;
+  authorPhoto?: string;
 };
-
-const allNews: NewsItem[] = [
-  {
-    title: "2026 Annual Weekend Registration Now Open",
-    slug: "2026-annual-weekend-registration-now-open",
-    category: "Announcement",
-    date: "10 Feb 2026",
-    sortDate: "2026-02-10",
-    description: "Early bird registration is available for the Dukes' Club Annual Weekend. Secure your place at the premier colorectal surgery training event of the year. Members receive priority booking and discounted rates.",
-    featured: true,
-  },
-  {
-    title: "New FRCS Revision Course Launched",
-    slug: "new-frcs-revision-course-launched",
-    category: "Education",
-    date: "28 Jan 2026",
-    sortDate: "2026-01-28",
-    description: "A comprehensive online revision course for Section 2 FRCS is now available to all Dukes' Club members, featuring mock vivas and structured question banks.",
-  },
-  {
-    title: "Fellowship Applications: Deadline Approaching",
-    slug: "fellowship-applications-deadline-approaching",
-    category: "Careers",
-    date: "15 Jan 2026",
-    sortDate: "2026-01-15",
-    description: "Applications for the 2026–27 colorectal fellowship posts close on 28 February. Visit the fellowships directory for full details and eligibility criteria.",
-  },
-  {
-    title: "Updated Guidelines for Rectal Cancer Management",
-    slug: "updated-guidelines-rectal-cancer-management",
-    category: "Research",
-    date: "5 Jan 2026",
-    sortDate: "2026-01-05",
-    description: "New NICE guidelines on the management of locally advanced rectal cancer have been published, with significant implications for surgical training and practice.",
-  },
-  {
-    title: "Dukes' Club Trainee Survey Results 2025",
-    slug: "dukes-club-trainee-survey-results-2025",
-    category: "Member News",
-    date: "18 Dec 2025",
-    sortDate: "2025-12-18",
-    description: "Results from the annual trainee satisfaction survey are now available. Key findings highlight areas of excellence and opportunities for improvement in colorectal training.",
-  },
-  {
-    title: "ACPGBI Joint Statement on AI in Colorectal Surgery",
-    slug: "acpgbi-joint-statement-ai-colorectal-surgery",
-    category: "Policy",
-    date: "2 Dec 2025",
-    sortDate: "2025-12-02",
-    description: "A joint position statement has been released outlining the responsible integration of artificial intelligence tools in colorectal surgical practice and training.",
-  },
-  {
-    title: "Robotic Surgery Webinar Series Announced",
-    slug: "robotic-surgery-webinar-series-announced",
-    category: "Events",
-    date: "20 Nov 2025",
-    sortDate: "2025-11-20",
-    description: "A new monthly webinar series covering robotic techniques in colorectal surgery will launch in January 2026, featuring leading UK and international faculty.",
-  },
-  {
-    title: "Annual Research Prize Winners Announced",
-    slug: "annual-research-prize-winners-announced",
-    category: "Research",
-    date: "10 Nov 2025",
-    sortDate: "2025-11-10",
-    description: "Congratulations to this year's winners of the Dukes' Club research prizes. Outstanding submissions were received across clinical, translational, and basic science categories.",
-  },
-  {
-    title: "New Committee Members Elected",
-    slug: "new-committee-members-elected",
-    category: "General",
-    date: "1 Nov 2025",
-    sortDate: "2025-11-01",
-    description: "The Dukes' Club is pleased to welcome three new committee members following the annual elections. They bring expertise in IBD, pelvic floor, and surgical education.",
-  },
-];
 
 const NEWS_PER_PAGE = 6;
 
@@ -116,8 +43,21 @@ type SortOption = "date" | "dateAdded";
 
 const NewsCard = ({ item }: { item: NewsItem }) => (
   <div className="group rounded-lg border overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card">
-    <div className="bg-navy p-6 flex items-center justify-center aspect-[4/2]">
-      <Newspaper className="text-navy-foreground/40 group-hover:text-gold transition-colors" size={48} />
+    <div className="relative h-48 overflow-hidden bg-navy">
+      {item.imageUrl ? (
+        <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <Newspaper className="text-navy-foreground/40 group-hover:text-gold transition-colors" size={48} />
+        </div>
+      )}
+      {item.featured && (
+        <div className="absolute top-3 right-3">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gold/90 text-navy text-[10px] font-bold uppercase tracking-wide shadow-sm backdrop-blur-md">
+            <Star size={10} className="fill-current" /> Featured
+          </span>
+        </div>
+      )}
     </div>
     <div className="p-6">
       <div className="flex items-center gap-2 mb-3">
@@ -130,22 +70,76 @@ const NewsCard = ({ item }: { item: NewsItem }) => (
         {item.title}
       </h3>
       <p className="text-sm text-muted-foreground mb-4 line-clamp-3">{item.description}</p>
-      <Link
-        href={`/news/${item.slug}`}
-        className="inline-flex items-center gap-1 text-sm font-medium text-gold hover:text-gold/80 transition-colors"
-      >
-        Read more <ArrowRight size={14} />
-      </Link>
+      <div className="flex items-center justify-between">
+        {item.authorName && (
+          <div className="flex items-center gap-2">
+            {item.authorPhoto
+              ? <img src={item.authorPhoto} alt="" className="w-6 h-6 rounded-full object-cover" />
+              : <User size={14} className="text-muted-foreground" />
+            }
+            <span className="text-xs text-muted-foreground">{item.authorName}</span>
+          </div>
+        )}
+        <Link
+          href={`/news/${item.slug}`}
+          className="inline-flex items-center gap-1 text-sm font-medium text-gold hover:text-gold/80 transition-colors ml-auto"
+        >
+          Read more <ArrowRight size={14} />
+        </Link>
+      </div>
     </div>
   </div>
 );
 
 const NewsPage = () => {
+  const [allNews, setAllNews] = useState<NewsItem[]>([]);
+  const [dbLoading, setDbLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
+
+  /* Fetch from Supabase */
+  useEffect(() => {
+    const load = async () => {
+      setDbLoading(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("status", "published")
+          .order("published_at", { ascending: false });
+
+        if (error) throw error;
+        if (data) {
+          setAllNews(data.map((p: any) => ({
+            id: p.id,
+            title: p.title || "",
+            slug: p.slug || "",
+            category: p.category || "General",
+            date: p.published_at
+              ? new Date(p.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "",
+            sortDate: p.published_at || p.created_at || "",
+            description: p.excerpt || p.content_plain?.slice(0, 200) || "",
+            featured: p.is_featured,
+            imageUrl: p.featured_image_url || undefined,
+            authorName: p.author_name || undefined,
+            authorPhoto: p.author_photo_url || undefined,
+          })));
+        }
+      } catch {
+        // Fallback: empty state
+        setAllNews([]);
+      }
+      setDbLoading(false);
+    };
+    load();
+  }, []);
+
+  const featuredItem = allNews.find((n) => n.featured);
 
   const toggleFilter = (value: string) => {
     setSelectedCategories((prev) =>
@@ -154,7 +148,6 @@ const NewsPage = () => {
     setPage(1);
   };
 
-  const featuredItem = allNews.find((n) => n.featured);
   const nonFeaturedItems = allNews.filter((n) => !n.featured);
 
   const filteredNews = useMemo(() => {
@@ -226,43 +219,7 @@ const NewsPage = () => {
         </div>
       </section>
 
-      {/* Featured Article */}
-      {featuredItem && (
-        <section style={{ backgroundColor: "hsl(220, 80%, 55%)" }}>
-          <div className="container mx-auto px-4 py-12">
-            <div className="flex items-center gap-2 mb-6">
-              <Star size={16} className="text-white fill-white" />
-              <p className="text-white font-semibold text-sm tracking-widest uppercase">Featured Article</p>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 rounded-lg border-2 border-white overflow-hidden bg-card shadow-xl">
-              <div className="bg-navy p-6 flex items-center justify-center">
-                <Newspaper className="text-navy-foreground/40" size={80} />
-              </div>
-              <div className="p-8 flex flex-col justify-center">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gold/10 text-gold">
-                    {featuredItem.category}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{featuredItem.date}</span>
-                </div>
-                <h2 className="text-2xl md:text-3xl font-sans font-bold text-card-foreground mb-4">
-                  {featuredItem.title}
-                </h2>
-                <p className="text-muted-foreground mb-6">{featuredItem.description}</p>
-                <div>
-                  <Link href="/news">
-                    <Button variant="gold" size="lg">
-                      Read Article <ArrowRight className="ml-1" size={16} />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Filters & Search */}
+      {/* Filters & Search — always above content */}
       <section className="bg-navy border-t border-navy-foreground/10 sticky top-16 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
@@ -335,9 +292,56 @@ const NewsPage = () => {
         </div>
       </section>
 
+      {/* Featured Article */}
+      {featuredItem && (
+        <section style={{ backgroundColor: "hsl(220, 80%, 55%)" }}>
+          <div className="container mx-auto px-4 py-12">
+            <div className="flex items-center gap-2 mb-6">
+              <Star size={16} className="text-white fill-white" />
+              <p className="text-white font-semibold text-sm tracking-widest uppercase">Featured Article</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 rounded-lg border-2 border-white overflow-hidden bg-card shadow-xl">
+              <div className="relative bg-navy flex items-center justify-center overflow-hidden">
+                {featuredItem.imageUrl ? (
+                  <img src={featuredItem.imageUrl} alt={featuredItem.title} className="w-full h-full object-cover min-h-[240px]" />
+                ) : (
+                  <Newspaper className="text-navy-foreground/40" size={80} />
+                )}
+              </div>
+              <div className="p-8 flex flex-col justify-center">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gold/10 text-gold">
+                    {featuredItem.category}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{featuredItem.date}</span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-sans font-bold text-card-foreground mb-4">
+                  {featuredItem.title}
+                </h2>
+                <p className="text-muted-foreground mb-6">{featuredItem.description}</p>
+                <div>
+                  <Link href={`/news/${featuredItem.slug}`}>
+                    <Button variant="gold" size="lg">
+                      Read Article <ArrowRight className="ml-1" size={16} />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* News Grid */}
       <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
+          {dbLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader className="animate-spin text-muted-foreground mb-3" size={28} />
+              <p className="text-sm text-muted-foreground">Loading posts...</p>
+            </div>
+          ) : (
+          <>
           <p className="text-sm text-muted-foreground mb-6">
             Showing {paginatedNews.length} of {filteredNews.length} article{filteredNews.length !== 1 ? "s" : ""}
           </p>
@@ -392,10 +396,10 @@ const NewsPage = () => {
               )}
             </>
           )}
+          </>
+          )}
         </div>
       </section>
-
-      
     </div>
   );
 };
