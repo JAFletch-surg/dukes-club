@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   CalendarDays, MapPin, PoundSterling, Users, User, Clock,
-  ArrowLeft, ExternalLink, Globe, Loader2,
+  ArrowLeft, ExternalLink, Globe, Loader2, Check, X as XIcon,
 } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
@@ -41,10 +41,17 @@ const AnimatedSection = ({ children, className, delay = 0 }: { children: React.R
 
 const EventDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [event, setEvent] = useState<any>(null);
   const [faculty, setFaculty] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [existingBooking, setExistingBooking] = useState<any>(null);
+  const [applying, setApplying] = useState(false);
+  const [showApplyForm, setShowApplyForm] = useState(false);
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [motivation, setMotivation] = useState('');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [applyError, setApplyError] = useState('');
 
   useEffect(() => {
     async function fetchEvent() {
@@ -58,6 +65,17 @@ const EventDetailPage = () => {
 
       if (eventData) {
         setEvent(eventData);
+
+        // Check if user has already applied
+        if (user) {
+          const { data: booking } = await supabase
+            .from('event_bookings')
+            .select('*')
+            .eq('event_id', eventData.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (booking) setExistingBooking(booking);
+        }
 
         // Fetch faculty via junction table (two-step to avoid FK join issues)
         const { data: efData } = await supabase
@@ -111,12 +129,48 @@ const EventDetailPage = () => {
     );
   }
 
-  const startDate = formatDate(event.starts_at);
-  const startTime = formatTime(event.starts_at);
-  const endTime = event.ends_at ? formatTime(event.ends_at) : null;
-  const price = formatPrice(event.price_pence);
-  const memberPrice = event.member_price_pence != null ? formatPrice(event.member_price_pence) : null;
-  const timetable = event.timetable_data as { time: string; title: string }[] | null;
+  const handleApply = async () => {
+    if (!user || !event) return;
+    setApplying(true);
+    setApplyError('');
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('event_bookings').insert({
+        event_id: event.id,
+        user_id: user.id,
+        applicant_name: profile?.full_name || user.email?.split('@')[0] || 'Unknown',
+        applicant_email: user.email || '',
+        applicant_training_level: profile?.training_stage || '',
+        applicant_hospital: (profile as any)?.hospital || '',
+        applicant_deanery: profile?.region || '',
+        motivation,
+        answers,
+        status: event.auto_approve ? 'approved' : 'pending',
+      });
+      if (error) {
+        if (error.code === '23505') setApplyError('You have already applied for this event.');
+        else throw error;
+      } else {
+        setApplySuccess(true);
+        setShowApplyForm(false);
+        setExistingBooking({ status: event.auto_approve ? 'approved' : 'pending' });
+      }
+    } catch (e: any) {
+      setApplyError(e.message || 'Failed to submit application');
+    }
+    setApplying(false);
+  };
+
+  const isApplicationEvent = event?.applications_enabled && ['Practical Workshop', 'In Person Course'].includes(event?.event_type);
+  const deadlinePassed = event?.application_deadline && new Date(event.application_deadline) < new Date();
+  const questions: { question: string; required: boolean }[] = event?.application_questions || [];
+
+  const startDate = event ? formatDate(event.starts_at) : '';
+  const startTime = event ? formatTime(event.starts_at) : '';
+  const endTime = event?.ends_at ? formatTime(event.ends_at) : null;
+  const price = event ? formatPrice(event.price_pence) : '';
+  const memberPrice = event?.member_price_pence != null ? formatPrice(event.member_price_pence) : null;
+  const timetable = event?.timetable_data as { time: string; title: string }[] | null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -218,7 +272,121 @@ const EventDetailPage = () => {
                       )}
                     </div>
 
-                    {/* Action Button - gated behind login */}
+                    {/* Action Button */}
+                    {isApplicationEvent ? (
+                      /* ── Application-based event ── */
+                      <div className="mb-6">
+                        {existingBooking ? (
+                          <div className="text-center">
+                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${
+                              existingBooking.status === 'approved' || existingBooking.status === 'confirmed'
+                                ? 'bg-emerald-500/10 text-emerald-400'
+                                : existingBooking.status === 'pending'
+                                  ? 'bg-amber-500/10 text-amber-400'
+                                  : existingBooking.status === 'rejected'
+                                    ? 'bg-red-500/10 text-red-400'
+                                    : 'bg-gray-500/10 text-gray-400'
+                            }`}>
+                              {existingBooking.status === 'pending' && <><Clock size={14} /> Application Pending</>}
+                              {existingBooking.status === 'approved' && <><Check size={14} /> Application Approved</>}
+                              {existingBooking.status === 'confirmed' && <><Check size={14} /> Confirmed</>}
+                              {existingBooking.status === 'rejected' && <><XIcon size={14} /> Application Not Successful</>}
+                              {existingBooking.status === 'waitlisted' && <><Clock size={14} /> On Waitlist</>}
+                              {existingBooking.status === 'cancelled' && <><XIcon size={14} /> Cancelled</>}
+                            </div>
+                            {existingBooking.status === 'approved' && event.confirmation_message && (
+                              <p className="text-xs text-navy-foreground/60 mt-3 text-left">{event.confirmation_message}</p>
+                            )}
+                            <Link href="/members" className="block mt-3">
+                              <p className="text-xs text-gold hover:text-gold/80 transition-colors">View in dashboard →</p>
+                            </Link>
+                          </div>
+                        ) : deadlinePassed ? (
+                          <div className="text-center py-2">
+                            <p className="text-sm text-red-400 font-semibold">Application deadline has passed</p>
+                          </div>
+                        ) : !user ? (
+                          <div>
+                            <Link href="/login">
+                              <Button variant="gold" size="lg" className="w-full">
+                                Log in to Apply
+                              </Button>
+                            </Link>
+                            <p className="text-xs text-center text-navy-foreground/50 mt-2">Members only — <Link href="/register" className="text-gold underline">join now</Link></p>
+                          </div>
+                        ) : !showApplyForm ? (
+                          <Button variant="gold" size="lg" className="w-full" onClick={() => setShowApplyForm(true)}>
+                            Apply for Place
+                          </Button>
+                        ) : (
+                          /* ── Application form ── */
+                          <div className="space-y-4 text-left">
+                            <div>
+                              <p className="text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-2">Your Details</p>
+                              <div className="text-sm text-navy-foreground space-y-1">
+                                <p><span className="text-navy-foreground/50">Name:</span> {profile?.full_name || user.email}</p>
+                                <p><span className="text-navy-foreground/50">Email:</span> {user.email}</p>
+                                {profile?.training_stage && <p><span className="text-navy-foreground/50">Level:</span> {profile.training_stage}</p>}
+                                {(profile as any)?.hospital && <p><span className="text-navy-foreground/50">Hospital:</span> {(profile as any).hospital}</p>}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-1">Why do you want to attend?</label>
+                              <textarea
+                                value={motivation}
+                                onChange={(e) => setMotivation(e.target.value)}
+                                placeholder="Brief motivation statement..."
+                                className="w-full p-3 rounded-lg bg-navy-foreground/10 border border-navy-foreground/20 text-navy-foreground text-sm placeholder:text-navy-foreground/40 focus:outline-none focus:border-gold/50"
+                                rows={3}
+                              />
+                            </div>
+
+                            {questions.map((q, i) => (
+                              <div key={i}>
+                                <label className="block text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-1">
+                                  {q.question} {q.required && <span className="text-red-400">*</span>}
+                                </label>
+                                <textarea
+                                  value={answers[`q${i}`] || ''}
+                                  onChange={(e) => setAnswers({ ...answers, [`q${i}`]: e.target.value })}
+                                  className="w-full p-3 rounded-lg bg-navy-foreground/10 border border-navy-foreground/20 text-navy-foreground text-sm placeholder:text-navy-foreground/40 focus:outline-none focus:border-gold/50"
+                                  rows={2}
+                                />
+                              </div>
+                            ))}
+
+                            {applyError && <p className="text-xs text-red-400">{applyError}</p>}
+
+                            <div className="flex gap-2">
+                              <Button variant="gold" size="lg" className="flex-1" onClick={handleApply} disabled={applying}>
+                                {applying ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+                                Submit Application
+                              </Button>
+                              <Button variant="outline" size="lg" onClick={() => setShowApplyForm(false)} className="border-navy-foreground/30 text-navy-foreground">
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Eligibility info */}
+                        {event.eligibility_criteria && !existingBooking && (
+                          <div className="mt-4 p-3 rounded-lg bg-navy-foreground/5 border border-navy-foreground/10">
+                            <p className="text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-1">Eligibility</p>
+                            <p className="text-xs text-navy-foreground/70 leading-relaxed">{event.eligibility_criteria}</p>
+                          </div>
+                        )}
+
+                        {event.places_available && !existingBooking && (
+                          <p className="text-xs text-navy-foreground/40 mt-2 text-center">
+                            {event.places_available} places available
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      /* ── Standard booking (webinars, external URL) ── */
+                      <>
                     {user ? (
                       <>
                         {event.booking_url ? (
@@ -243,6 +411,8 @@ const EventDetailPage = () => {
                         <p className="text-xs text-center text-navy-foreground/50 mt-2">Members only — <Link href="/register" className="text-gold underline">join now</Link></p>
                       </Link>
                     ) : null}
+                      </>
+                    )}
 
                     <div className="space-y-4">
                       <div>

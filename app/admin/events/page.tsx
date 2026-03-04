@@ -210,6 +210,8 @@ export default function EventsAdmin() {
     })
   }, [])
 
+  const isApplicationType = (t: string) => ['Practical Workshop', 'In Person Course'].includes(t)
+
   const emptyForm = {
     title: '', slug: '', starts_at: '', ends_at: '', location: '', address: '',
     description_plain: '', event_type: 'In Person Course', capacity: 30,
@@ -221,6 +223,15 @@ export default function EventsAdmin() {
     vimeo_live_id: '', vimeo_live_embed_url: '',
     subspecialties: [] as string[],
     timetable_data: [] as { time: string; title: string }[],
+    // Application fields
+    applications_enabled: false,
+    eligibility_criteria: '',
+    eligibility_training_levels: [] as string[],
+    application_deadline: '',
+    application_questions: [] as { question: string; required: boolean }[],
+    places_available: '' as string | number,
+    auto_approve: false,
+    confirmation_message: '',
   }
   const [form, setForm] = useState(emptyForm)
 
@@ -245,6 +256,15 @@ export default function EventsAdmin() {
       vimeo_live_id: e.vimeo_live_id || '', vimeo_live_embed_url: e.vimeo_live_embed_url || '',
       subspecialties: Array.isArray(e.subspecialties) ? e.subspecialties : [],
       timetable_data: Array.isArray(e.timetable_data) ? e.timetable_data : [],
+      // Application fields
+      applications_enabled: e.applications_enabled || false,
+      eligibility_criteria: e.eligibility_criteria || '',
+      eligibility_training_levels: Array.isArray(e.eligibility_training_levels) ? e.eligibility_training_levels : [],
+      application_deadline: e.application_deadline?.slice(0, 16) || '',
+      application_questions: Array.isArray(e.application_questions) ? e.application_questions : [],
+      places_available: e.places_available ?? '',
+      auto_approve: e.auto_approve || false,
+      confirmation_message: e.confirmation_message || '',
     })
     setEditing(e.id)
   }
@@ -274,6 +294,15 @@ export default function EventsAdmin() {
         subspecialties: form.subspecialties,
         timetable_data: form.timetable_data.length > 0 ? form.timetable_data : null,
         published_at: form.status === 'published' ? new Date().toISOString() : null,
+        // Application fields
+        applications_enabled: form.applications_enabled,
+        eligibility_criteria: form.eligibility_criteria || null,
+        eligibility_training_levels: form.eligibility_training_levels,
+        application_deadline: form.application_deadline ? new Date(form.application_deadline).toISOString() : null,
+        application_questions: form.application_questions.length > 0 ? form.application_questions : [],
+        places_available: form.places_available ? Number(form.places_available) : null,
+        auto_approve: form.auto_approve,
+        confirmation_message: form.confirmation_message || null,
       }
       if (isStreamingType(form.event_type)) {
         payload.stream_type = form.stream_type
@@ -411,6 +440,9 @@ export default function EventsAdmin() {
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                      {e.applications_enabled && (
+                        <a href={`/admin/events/${e.id}/applicants`} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#2563EB', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} title="View applicants"><Users size={16} /></a>
+                      )}
                       <button onClick={() => openEdit(e)} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#504F58' }}><Edit size={16} /></button>
                       <button onClick={() => handleDelete(e.id)} disabled={deleting === e.id} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6' }}>
                         {deleting === e.id ? <Loader className="animate-spin" size={16} /> : <Trash2 size={16} />}
@@ -574,6 +606,92 @@ export default function EventsAdmin() {
                 <div><label style={S.label}>Member Price (pence)</label><input style={S.input} type="number" value={form.member_price_pence} onChange={(e) => setForm({ ...form, member_price_pence: e.target.value })} /><p style={S.hint}>Leave blank for same as above</p></div>
                 <div><label style={S.label}>Booking URL</label><input style={S.input} value={form.booking_url} onChange={(e) => setForm({ ...form, booking_url: e.target.value })} placeholder="https://..." /></div>
               </div>
+
+              {/* APPLICATION SETTINGS — shown for workshops & courses */}
+              {isApplicationType(form.event_type) && (
+                <div style={S.section}>
+                  <p style={S.sectionTitle}>APPLICATION SETTINGS</p>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 600, color: '#181820', cursor: 'pointer', marginBottom: 12 }}>
+                    <input type="checkbox" checked={form.applications_enabled} onChange={(e) => setForm({ ...form, applications_enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
+                    Enable member applications for this event
+                  </label>
+
+                  {form.applications_enabled && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        <div>
+                          <label style={S.label}>Places Available</label>
+                          <input style={S.input} type="number" value={form.places_available} onChange={(e) => setForm({ ...form, places_available: e.target.value })} placeholder="e.g. 20" />
+                          <p style={S.hint}>Maximum approved applicants</p>
+                        </div>
+                        <div>
+                          <label style={S.label}>Application Deadline</label>
+                          <input style={S.input} type="datetime-local" value={form.application_deadline} onChange={(e) => setForm({ ...form, application_deadline: e.target.value })} />
+                          <p style={S.hint}>Leave blank for no deadline</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={S.label}>Eligibility Criteria</label>
+                        <textarea style={{ ...S.input, minHeight: 80 }} value={form.eligibility_criteria} onChange={(e) => setForm({ ...form, eligibility_criteria: e.target.value })} placeholder="Describe who is eligible to apply, e.g. 'Open to ST3+ colorectal trainees registered with ISCP'" />
+                        <p style={S.hint}>Displayed to applicants on the event page</p>
+                      </div>
+
+                      <div>
+                        <label style={S.label}>Required Training Level(s)</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {['CT1-2', 'ST3', 'ST4', 'ST5', 'ST6', 'ST7', 'ST8', 'Post-CCT', 'Fellow', 'Consultant', 'SAS', 'Other'].map(level => {
+                            const sel = form.eligibility_training_levels.includes(level)
+                            return <button key={level} type="button" onClick={() => {
+                              const v = sel ? form.eligibility_training_levels.filter(x => x !== level) : [...form.eligibility_training_levels, level]
+                              setForm({ ...form, eligibility_training_levels: v })
+                            }}
+                              style={{ padding: '4px 12px', borderRadius: 20, border: sel ? '1.5px solid #2563EB' : '1.5px solid #D1D1D6', background: sel ? '#EFF6FF' : '#fff', color: sel ? '#2563EB' : '#504F58', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{level}</button>
+                          })}
+                        </div>
+                        <p style={S.hint}>Leave empty to allow all training levels</p>
+                      </div>
+
+                      <div>
+                        <label style={S.label}>Application Questions <span style={{ fontWeight: 400, color: '#999' }}>(optional)</span></label>
+                        {form.application_questions.map((q, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                            <input style={{ ...S.input, flex: 1 }} value={q.question} onChange={(e) => {
+                              const qs = [...form.application_questions]
+                              qs[i] = { ...qs[i], question: e.target.value }
+                              setForm({ ...form, application_questions: qs })
+                            }} placeholder="e.g. What do you hope to gain from this course?" />
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#666', whiteSpace: 'nowrap' }}>
+                              <input type="checkbox" checked={q.required} onChange={(e) => {
+                                const qs = [...form.application_questions]
+                                qs[i] = { ...qs[i], required: e.target.checked }
+                                setForm({ ...form, application_questions: qs })
+                              }} /> Required
+                            </label>
+                            <button type="button" onClick={() => setForm({ ...form, application_questions: form.application_questions.filter((_, j) => j !== i) })}
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => setForm({ ...form, application_questions: [...form.application_questions, { question: '', required: false }] })}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #D1D1D6', borderRadius: 8, background: 'none', fontSize: 12, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>
+                          <Plus size={13} /> Add question
+                        </button>
+                      </div>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 500, color: '#181820', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={form.auto_approve} onChange={(e) => setForm({ ...form, auto_approve: e.target.checked })} style={{ width: 16, height: 16 }} />
+                        Auto-approve applications (skip manual review)
+                      </label>
+
+                      <div>
+                        <label style={S.label}>Confirmation Message <span style={{ fontWeight: 400, color: '#999' }}>(optional)</span></label>
+                        <textarea style={{ ...S.input, minHeight: 60 }} value={form.confirmation_message} onChange={(e) => setForm({ ...form, confirmation_message: e.target.value })} placeholder="Shown to applicants after approval, e.g. venue directions, what to bring" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={S.section}>
                 <p style={S.sectionTitle}>TIMETABLE / SCHEDULE</p>
