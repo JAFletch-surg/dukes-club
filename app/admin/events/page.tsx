@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search } from 'lucide-react'
+import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare } from 'lucide-react'
+import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 
@@ -439,13 +440,40 @@ export default function EventsAdmin() {
                     )}>{e.status}</span>
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
                       {e.applications_enabled && (
-                        <a href={`/admin/events/${e.id}/applicants`} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#2563EB', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }} title="View applicants"><Users size={16} /></a>
+                        <Link href={`/admin/events/${e.id}/applicants`} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                          borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                          background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE',
+                          cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}>
+                          <Users size={12} /> Applicants
+                        </Link>
                       )}
-                      <button onClick={() => openEdit(e)} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#504F58' }}><Edit size={16} /></button>
-                      <button onClick={() => handleDelete(e.id)} disabled={deleting === e.id} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6' }}>
-                        {deleting === e.id ? <Loader className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                      <Link href={`/admin/events/${e.id}/feedback`} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                        borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                        background: '#FEF9E7', color: '#92400E', border: '1px solid #FDE68A',
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>
+                        <MessageSquare size={12} /> Feedback
+                      </Link>
+                      <button onClick={() => openEdit(e)} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                        borderRadius: 8, fontSize: 11, fontWeight: 600,
+                        background: '#F3F4F6', color: '#504F58', border: '1px solid #E4E4E8',
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>
+                        <Edit size={12} /> Edit
+                      </button>
+                      <button onClick={() => handleDelete(e.id)} disabled={deleting === e.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                        borderRadius: 8, fontSize: 11, fontWeight: 600,
+                        background: '#fff', color: '#D1D1D6', border: '1px solid #E4E4E8',
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>
+                        {deleting === e.id ? <Loader className="animate-spin" size={12} /> : <Trash2 size={12} />}
                       </button>
                     </div>
                   </td>

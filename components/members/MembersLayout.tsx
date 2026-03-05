@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Home, Video, Play, Mic, BookOpen, FileText, Globe, Users,
-  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink,
+  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink, Award,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/use-auth";
@@ -39,6 +39,7 @@ const navSections = [
   {
     label: "ACCOUNT",
     items: [
+      { title: "My Certificates", path: "/members/certificates", icon: Award },
       { title: "My Profile", path: "/members/profile", icon: Settings },
     ],
   },

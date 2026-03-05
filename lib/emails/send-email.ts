@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 
-type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset'
+type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'feedback_request' | 'certificate_ready'
 
 interface SendEmailParams {
   type: EmailType

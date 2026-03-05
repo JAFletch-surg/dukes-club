@@ -367,3 +367,87 @@ export function passwordResetEmail(params: {
     `),
   }
 }
+
+// ─────────────────────────────────────────
+// ADDITIONS TO lib/emails/templates.ts
+// Add these two functions at the end of the file
+// ─────────────────────────────────────────
+
+// 7. Feedback Request
+// ─────────────────────────────────────────
+export function feedbackRequestEmail(params: {
+  name: string
+  eventTitle: string
+  eventId: string
+}): { subject: string; html: string } {
+  const { name, eventTitle, eventId } = params
+  const firstName = name.split(' ')[0] || name
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+
+  return {
+    subject: `We'd love your feedback — ${eventTitle}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        How Was the Event?
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName},
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.7;">
+        Thank you for attending <strong>${eventTitle}</strong>. Your feedback helps us improve future events and ensure we&rsquo;re delivering the best educational experiences for colorectal trainees.
+      </p>
+      <div style="background-color:#F9F8F5;border-left:4px solid #E5A718;padding:16px 20px;margin:0 0 24px;border-radius:0 8px 8px 0;">
+        <p style="margin:0;font-size:14px;color:#444;line-height:1.7;">
+          ⏱️ It takes less than 2 minutes to complete.<br/>
+          🏆 You&rsquo;ll receive your certificate of attendance upon completion.
+        </p>
+      </div>
+      ${button('Submit Feedback', `${siteUrl}/members/events/${eventId}/feedback`)}
+      <p style="margin:0;font-size:14px;color:#888;line-height:1.6;">
+        If you have any questions, contact us at
+        <a href="mailto:contact@dukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@dukesclub.org.uk</a>
+      </p>
+    `),
+  }
+}
+
+// 8. Certificate Ready
+// ─────────────────────────────────────────
+export function certificateReadyEmail(params: {
+  name: string
+  eventTitle: string
+  eventId: string
+  certificateId: string
+  cpdPoints?: number | null
+}): { subject: string; html: string } {
+  const { name, eventTitle, eventId, certificateId, cpdPoints } = params
+  const firstName = name.split(' ')[0] || name
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+
+  return {
+    subject: `Your Certificate — ${eventTitle}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        🏆 Your Certificate is Ready
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName},
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.7;">
+        Thank you for completing the feedback for <strong>${eventTitle}</strong>. Your certificate of attendance is now ready to download.
+      </p>
+      ${cpdPoints ? `
+      <div style="background-color:#FFF8E7;border:1.5px solid #E5A718;padding:14px 20px;margin:0 0 24px;border-radius:10px;text-align:center;">
+        <p style="margin:0;font-size:16px;font-weight:700;color:#92400E;">
+          ✦ ${cpdPoints} CPD Points Awarded
+        </p>
+      </div>
+      ` : ''}
+      ${button('Download Certificate', `${siteUrl}/api/certificates/download?id=${certificateId}`)}
+      <p style="margin:0;font-size:13px;color:#888;line-height:1.6;">
+        You can also download your certificate at any time from your
+        <a href="${siteUrl}/members" style="color:#E5A718;text-decoration:none;font-weight:600;">Members Dashboard</a>.
+      </p>
+    `),
+  }
+}

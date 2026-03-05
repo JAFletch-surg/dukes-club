@@ -12,6 +12,7 @@ import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { sendEmail } from "@/lib/emails/send-email";
 
 const supabase = createClient();
 
@@ -154,6 +155,22 @@ const EventDetailPage = () => {
         setApplySuccess(true);
         setShowApplyForm(false);
         setExistingBooking({ status: event.auto_approve ? 'approved' : 'pending' });
+
+        // Send booking confirmation email (non-blocking)
+        const eventDate = new Date(event.starts_at).toLocaleDateString('en-GB', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        });
+        sendEmail({
+          type: 'booking_confirmation',
+          to: user.email || '',
+          data: {
+            name: profile?.full_name || user.email?.split('@')[0] || 'Member',
+            eventTitle: event.title,
+            eventDate,
+            eventLocation: event.location || 'TBC',
+            status: event.auto_approve ? 'approved' : 'pending',
+          },
+        }).catch(err => console.error('Booking email failed:', err));
       }
     } catch (e: any) {
       setApplyError(e.message || 'Failed to submit application');
