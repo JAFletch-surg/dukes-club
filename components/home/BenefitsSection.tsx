@@ -60,7 +60,7 @@ const BenefitsSection = () => {
         </div>
 
         <div className="text-center">
-          <Link href="/join">
+          <Link href="/register">
             <Button variant="gold" size="lg">
               Join Dukes' Club Today
             </Button>

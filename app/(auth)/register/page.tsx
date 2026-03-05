@@ -2,6 +2,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { sendEmail } from "@/lib/emails/send-email"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -98,6 +99,13 @@ const RegisterPage = () => {
       }
       return
     }
+
+    // Send welcome email (fire and forget — don't block registration)
+    sendEmail({
+      type: 'welcome',
+      to: formData.email,
+      data: { name: formData.fullName },
+    }).catch((err) => console.error('Welcome email failed:', err))
 
     const approved = isApprovedDomain(formData.email)
     setApprovalType(approved ? "auto" : "pending")

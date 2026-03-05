@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { GraduationCap, Plus, Edit, Trash2, Save, Loader, X, Camera, Upload } from 'lucide-react'
+import { GraduationCap, Plus, Edit, Trash2, Save, Loader, X, Camera, Upload, Search } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 
@@ -11,6 +11,7 @@ export default function FacultyAdmin() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -74,16 +75,49 @@ export default function FacultyAdmin() {
 
   const initials = (name: string) => name.split(' ').map(n => n[0]).join('').slice(0, 2)
 
+  const filtered = faculty.filter((f: any) => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (f.full_name || '').toLowerCase().includes(q) ||
+      (f.hospital || '').toLowerCase().includes(q) ||
+      (f.position_title || '').toLowerCase().includes(q) ||
+      (f.email || '').toLowerCase().includes(q)
+  })
+
   return (
     <div>
       {toast && <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg text-white text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.msg}</div>}
+
       <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-serif font-bold text-slate-800">Faculty</h1><p className="text-sm text-gray-500 mt-1">{faculty.length} faculty members</p></div>
+        <div>
+          <h1 className="text-2xl font-sans font-bold text-slate-800">Faculty</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {search ? `${filtered.length} of ${faculty.length}` : faculty.length} faculty members
+          </p>
+        </div>
         <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Faculty</button>
       </div>
 
+      <div className="relative mb-5 max-w-sm">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          placeholder="Search by name, hospital, or position..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {loading ? <div className="flex justify-center py-16"><Loader className="animate-spin text-gray-400" size={28} /></div>
-      : faculty.length === 0 ? <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400"><GraduationCap size={36} className="mx-auto mb-3 opacity-40" /><p>No faculty yet</p></div>
+      : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400">
+          <GraduationCap size={36} className="mx-auto mb-3 opacity-40" />
+          <p>{search ? 'No matching faculty found' : 'No faculty yet'}</p>
+          {search && (
+            <button onClick={() => setSearch('')} className="mt-2 text-sm text-blue-600 hover:underline">Clear search</button>
+          )}
+        </div>
+      )
       : <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-100">
@@ -93,15 +127,23 @@ export default function FacultyAdmin() {
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
               <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
             </tr></thead>
-            <tbody>{faculty.map((f: any) => (
+            <tbody>{filtered.map((f: any) => (
               <tr key={f.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {f.photo_url ? (
-                      <img src={f.photo_url} alt={f.full_name} className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-8 h-8 bg-emerald-700 text-white rounded-full flex items-center justify-center text-xs font-bold">{initials(f.full_name || '?')}</div>
-                    )}
+                    {f.photo_url && f.photo_url.startsWith('http') ? (
+                      <img
+                        src={f.photo_url}
+                        alt={f.full_name}
+                        className="w-8 h-8 rounded-full object-cover bg-gray-100"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; const next = e.currentTarget.nextElementSibling as HTMLElement; if (next) next.style.display = 'flex' }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-8 h-8 bg-emerald-700 text-white rounded-full items-center justify-center text-xs font-bold ${f.photo_url && f.photo_url.startsWith('http') ? 'hidden' : 'flex'}`}
+                    >
+                      {initials(f.full_name || '?')}
+                    </div>
                     <span className="font-medium">{f.full_name}</span>
                   </div>
                 </td>
@@ -122,7 +164,7 @@ export default function FacultyAdmin() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-serif font-bold">{editing === 'new' ? 'Add Faculty' : 'Edit Faculty'}</h2>
+              <h2 className="text-lg font-sans font-bold">{editing === 'new' ? 'Add Faculty' : 'Edit Faculty'}</h2>
               <button onClick={() => setEditing(null)} className="p-1 rounded hover:bg-gray-100"><X size={18} /></button>
             </div>
             <div className="px-6 py-5 space-y-4">
@@ -132,7 +174,12 @@ export default function FacultyAdmin() {
                 <label className="block text-xs font-semibold text-gray-700 mb-2">Headshot Photo</label>
                 <div className="flex items-center gap-4">
                   {form.photo_url ? (
-                    <img src={form.photo_url} alt="Preview" className="w-16 h-16 rounded-full object-cover border-2 border-gray-200" />
+                    <img
+                      src={form.photo_url}
+                      alt="Preview"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
                       <Camera size={20} className="text-gray-400" />

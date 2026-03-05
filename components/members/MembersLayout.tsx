@@ -45,7 +45,7 @@ const navSections = [
   {
     label: "ADMIN",
     items: [
-      { title: "CMS / Admin Panel", path: "/admin", icon: ShieldCheck, external: true },
+      { title: "CMS / Admin Panel", path: "/admin", icon: ShieldCheck },
     ],
   },
 ];

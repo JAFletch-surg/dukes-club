@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 
@@ -46,42 +46,66 @@ export function useAuth() {
   return useContext(AuthContext)
 }
 
-const supabase = createClient()
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function fetchProfile(userId: string) {
+  const fetchProfile = useCallback(async (userId: string) => {
+    const supabase = createClient()
     const { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
     setProfile(data)
-  }
+  }, [])
 
-  async function refreshProfile() {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       await fetchProfile(user.id)
     }
-  }
+  }, [user, fetchProfile])
 
   useEffect(() => {
     let cancelled = false
+    const supabase = createClient()
 
     async function init() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        // getSession reads from local storage — instant, no network call
+        const { data: { session } } = await supabase.auth.getSession()
+        
         if (cancelled) return
-        setUser(user)
-        if (user) {
-          await fetchProfile(user.id)
+
+        if (session?.user) {
+          setUser(session.user)
+          await fetchProfile(session.user.id)
+          if (!cancelled) setLoading(false)
+          
+          // Verify with getUser in background (network call)
+          const { data: { user: verifiedUser } } = await supabase.auth.getUser()
+          if (cancelled) return
+          if (verifiedUser) {
+            setUser(verifiedUser)
+          } else {
+            setUser(null)
+            setProfile(null)
+          }
+        } else {
+          // No cached session — try getUser as fallback
+          const { data: { user: freshUser } } = await supabase.auth.getUser()
+          if (cancelled) return
+          if (freshUser) {
+            setUser(freshUser)
+            await fetchProfile(freshUser.id)
+          } else {
+            setUser(null)
+            setProfile(null)
+          }
+          if (!cancelled) setLoading(false)
         }
       } catch (e) {
-        // Ignore AbortError from lock contention in dev
-      } finally {
         if (!cancelled) setLoading(false)
       }
     }
@@ -89,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     init()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         if (cancelled) return
         const u = session?.user ?? null
         setUser(u)
@@ -106,9 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cancelled = true
       subscription.unsubscribe()
     }
-  }, [])
+  }, [fetchProfile])
 
   const signOut = async () => {
+    const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)

@@ -106,7 +106,7 @@ const HeroSection = () => {
               collaboration, and excellence.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/join">
+              <Link href="/register">
                 <Button variant="gold" size="lg" className="text-base px-8">
                   Become a Member <ArrowRight className="ml-1" size={18} />
                 </Button>

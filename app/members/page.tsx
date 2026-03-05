@@ -17,6 +17,7 @@ const MembersDashboard = () => {
   const [myBookings, setMyBookings] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [questionStats, setQuestionStats] = useState<any>(null);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -41,7 +42,7 @@ const MembersDashboard = () => {
 
       if (videos) setLatestVideos(videos);
 
-      // Fetch user's event bookings
+      // Fetch user's event bookings and question stats
       if (user) {
         const { data: bookings } = await supabase
           .from('event_bookings')
@@ -51,6 +52,14 @@ const MembersDashboard = () => {
           .order('created_at', { ascending: false });
 
         if (bookings) setMyBookings(bookings);
+
+        // Fetch question stats
+        const { data: qStats } = await supabase
+          .from('user_question_stats')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        if (qStats) setQuestionStats(qStats);
       }
 
       setLoadingData(false);
@@ -105,13 +114,13 @@ const MembersDashboard = () => {
         </p>
       </div>
 
-      {/* Stats — placeholder until tracking tables exist */}
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Videos watched", value: "–", icon: Video, color: "text-navy" },
-          { label: "Questions attempted", value: "–", icon: HelpCircle, color: "text-emerald-600" },
-          { label: "Events booked", value: "–", icon: Calendar, color: "text-gold" },
-          { label: "Exam average", value: "–", icon: BarChart3, color: "text-primary" },
+          { label: "Questions attempted", value: questionStats?.total_attempted || 0, icon: HelpCircle, color: "text-emerald-600" },
+          { label: "Events booked", value: myBookings.length, icon: Calendar, color: "text-gold" },
+          { label: "Exam average", value: questionStats?.overall_percentage ? `${questionStats.overall_percentage}%` : "–", icon: BarChart3, color: "text-primary" },
         ].map((stat) => (
           <Card key={stat.label} className="border">
             <CardContent className="p-5">

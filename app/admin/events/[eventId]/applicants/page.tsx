@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Check, X, Clock, Users, Loader, Mail, MessageSquare, ChevronDown, AlertCircle, UserCheck, UserX, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { sendEmail } from '@/lib/emails/send-email'
 
 const STATUS_CONFIG: Record<string, { bg: string; fg: string; label: string }> = {
   pending: { bg: '#FEF3C7', fg: '#92400E', label: 'Pending' },
@@ -76,6 +77,20 @@ export default function ApplicantsPage() {
       if (error) throw error
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status, reviewed_at: new Date().toISOString() } : b))
       showToast(`Application ${status}`)
+
+      // Send status update email to applicant (non-blocking)
+      const booking = bookings.find(b => b.id === bookingId)
+      if (booking && event && ['approved', 'rejected', 'waitlisted', 'cancelled'].includes(status)) {
+        sendEmail({
+          type: 'booking_status',
+          to: booking.applicant_email,
+          data: {
+            name: booking.applicant_name,
+            eventTitle: event.title,
+            newStatus: status,
+          },
+        }).catch(err => console.error('Status email failed:', err))
+      }
     } catch (e: any) {
       showToast(e.message || 'Failed to update', 'error')
     }

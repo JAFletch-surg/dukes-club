@@ -8,12 +8,55 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   Check, X, ChevronLeft, ChevronRight, Flag, Clock,
   FileText, BookOpen, Play, RotateCcw, Trophy, AlertTriangle,
+  Loader2, Trash2, BarChart3, Filter,
 } from "lucide-react";
-import { mockQuestions, questionTopics } from "@/data/mockMembersData";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/use-auth";
 
 type Mode = "study" | "exam";
 type Screen = "setup" | "session" | "results";
 type Difficulty = "all" | "easy" | "medium" | "hard";
+type QuestionFilter = "all" | "unanswered" | "incorrect";
+
+interface Question {
+  id: string;
+  question_text: string;
+  options: string[];
+  correct_answer: number;
+  explanation: string | null;
+  topic_id: string | null;
+  subtopic: string | null;
+  difficulty: string;
+  question_type: string;
+  image_url: string | null;
+  source: string | null;
+}
+
+interface Topic {
+  id: string;
+  name: string;
+  category: string | null;
+  slug: string | null;
+}
+
+interface UserStats {
+  total_attempted: number;
+  total_correct: number;
+  overall_percentage: number;
+  easy_attempted: number;
+  easy_correct: number;
+  medium_attempted: number;
+  medium_correct: number;
+  hard_attempted: number;
+  hard_correct: number;
+  total_sessions: number;
+  study_sessions: number;
+  exam_sessions: number;
+  best_exam_percentage: number;
+  average_exam_percentage: number;
+  current_streak_days: number;
+  longest_streak_days: number;
+}
 
 const questionCounts = [10, 25, 50, 100];
 const timeLimits = [
@@ -24,12 +67,23 @@ const timeLimits = [
 ];
 
 const QuestionBank = () => {
+  const { user } = useAuth();
+  const supabase = createClient();
+
+  // Data state
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [previousAttempts, setPreviousAttempts] = useState<Record<string, { selected: number; correct: boolean }>>({});
+  const [dataLoading, setDataLoading] = useState(true);
+
   // Setup state
   const [mode, setMode] = useState<Mode>("study");
   const [numQuestions, setNumQuestions] = useState(10);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty>("all");
   const [timeLimit, setTimeLimit] = useState(0);
+  const [questionFilter, setQuestionFilter] = useState<QuestionFilter>("all");
 
   // Session state
   const [screen, setScreen] = useState<Screen>("setup");
@@ -37,12 +91,54 @@ const QuestionBank = () => {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
-  const [sessionQuestions, setSessionQuestions] = useState(mockQuestions);
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [timeRemaining, setTimeRemaining] = useState(0);
-  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState(0);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [showNavigator, setShowNavigator] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Load questions, topics, user stats, and previous attempts
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadData() {
+      setDataLoading(true);
+
+      const [questionsRes, topicsRes, statsRes, attemptsRes] = await Promise.all([
+        supabase.from('questions').select('*').eq('status', 'published').eq('is_active', true),
+        supabase.from('question_topics').select('*').order('sort_order'),
+        supabase.from('user_question_stats').select('*').eq('user_id', user!.id).single(),
+        supabase.from('question_attempts').select('question_id, selected_answer, is_correct').eq('user_id', user!.id),
+      ]);
+
+      if (questionsRes.data) {
+        const parsed = questionsRes.data.map((q: any) => ({
+          ...q,
+          options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
+        }));
+        setAllQuestions(parsed);
+      }
+
+      if (topicsRes.data) setTopics(topicsRes.data);
+      if (statsRes.data) setUserStats(statsRes.data);
+
+      // Build a map of latest attempt per question
+      if (attemptsRes.data) {
+        const map: Record<string, { selected: number; correct: boolean }> = {};
+        attemptsRes.data.forEach((a: any) => {
+          map[a.question_id] = { selected: a.selected_answer, correct: a.is_correct };
+        });
+        setPreviousAttempts(map);
+      }
+
+      setDataLoading(false);
+    }
+
+    loadData();
+  }, [user]);
 
   // Timer
   useEffect(() => {
@@ -62,32 +158,60 @@ const QuestionBank = () => {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const toggleTopic = (topic: string) => {
+  // Group topics by category
+  const topicsByCategory = topics.reduce<Record<string, Topic[]>>((acc, t) => {
+    const cat = t.category || 'Other';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(t);
+    return acc;
+  }, {});
+
+  const getTopicName = (id: string | null) => {
+    if (!id) return 'Uncategorised';
+    return topics.find(t => t.id === id)?.name || 'Unknown';
+  };
+
+  const toggleTopic = (topicId: string) => {
     setSelectedTopics((prev) =>
-      prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
+      prev.includes(topicId) ? prev.filter((t) => t !== topicId) : [...prev, topicId]
     );
   };
 
-  const toggleAllInCategory = (topics: readonly string[]) => {
-    const allSelected = topics.every((t) => selectedTopics.includes(t));
+  const toggleAllInCategory = (categoryTopics: Topic[]) => {
+    const ids = categoryTopics.map(t => t.id);
+    const allSelected = ids.every((id) => selectedTopics.includes(id));
     if (allSelected) {
-      setSelectedTopics((prev) => prev.filter((t) => !topics.includes(t)));
+      setSelectedTopics((prev) => prev.filter((id) => !ids.includes(id)));
     } else {
-      setSelectedTopics((prev) => [...new Set([...prev, ...topics])]);
+      setSelectedTopics((prev) => [...new Set([...prev, ...ids])]);
     }
   };
 
   const startSession = () => {
-    let questions = [...mockQuestions];
+    let questions = [...allQuestions];
+
+    // Filter by topics
     if (selectedTopics.length > 0) {
-      questions = questions.filter((q) => selectedTopics.includes(q.topic));
+      questions = questions.filter((q) => q.topic_id && selectedTopics.includes(q.topic_id));
     }
+
+    // Filter by difficulty
     if (difficulty !== "all") {
       questions = questions.filter((q) => q.difficulty === difficulty);
     }
+
+    // Filter by attempt history
+    if (questionFilter === "unanswered") {
+      questions = questions.filter((q) => !previousAttempts[q.id]);
+    } else if (questionFilter === "incorrect") {
+      questions = questions.filter((q) => previousAttempts[q.id]?.correct === false);
+    }
+
     // Shuffle
     questions.sort(() => Math.random() - 0.5);
     questions = questions.slice(0, Math.min(numQuestions, questions.length));
+
+    if (questions.length === 0) return;
 
     setSessionQuestions(questions);
     setCurrentIndex(0);
@@ -95,6 +219,7 @@ const QuestionBank = () => {
     setShowExplanation(false);
     setFlaggedQuestions(new Set());
     setTimeRemaining(timeLimit * 60);
+    setSessionStartTime(Date.now());
     setScreen("session");
   };
 
@@ -132,10 +257,162 @@ const QuestionBank = () => {
     setScreen("results");
   }, []);
 
+  // Save results to Supabase
+  const saveResults = useCallback(async () => {
+    if (!user || saving) return;
+    setSaving(true);
+
+    try {
+      const timeTaken = Math.round((Date.now() - sessionStartTime) / 1000);
+      let correct = 0;
+
+      // Insert individual attempts
+      const attempts = sessionQuestions.map((q, i) => {
+        const isCorrect = selectedAnswers[i] === q.correct_answer;
+        if (isCorrect) correct++;
+        return {
+          user_id: user.id,
+          question_id: q.id,
+          selected_answer: selectedAnswers[i] ?? -1,
+          is_correct: isCorrect,
+          session_mode: mode,
+        };
+      });
+
+      await supabase.from('question_attempts').insert(attempts);
+
+      // Save session summary
+      const percentage = sessionQuestions.length > 0 ? Math.round((correct / sessionQuestions.length) * 100) : 0;
+      await supabase.from('question_sessions').insert({
+        user_id: user.id,
+        mode,
+        total_questions: sessionQuestions.length,
+        correct_answers: correct,
+        percentage,
+        time_limit_minutes: timeLimit || null,
+        time_taken_seconds: timeTaken,
+        topics: selectedTopics.length > 0 ? selectedTopics : null,
+        difficulty_filter: difficulty !== 'all' ? difficulty : null,
+      });
+
+      // Update aggregate stats
+      const diffKey = (d: string) => {
+        if (d === 'easy') return 'easy';
+        if (d === 'hard') return 'hard';
+        return 'medium';
+      };
+
+      // Calculate difficulty breakdowns from this session
+      const diffStats = { easy: { attempted: 0, correct: 0 }, medium: { attempted: 0, correct: 0 }, hard: { attempted: 0, correct: 0 } };
+      sessionQuestions.forEach((q, i) => {
+        const dk = diffKey(q.difficulty) as keyof typeof diffStats;
+        diffStats[dk].attempted++;
+        if (selectedAnswers[i] === q.correct_answer) diffStats[dk].correct++;
+      });
+
+      const prev = userStats || {
+        total_attempted: 0, total_correct: 0, overall_percentage: 0,
+        easy_attempted: 0, easy_correct: 0, medium_attempted: 0, medium_correct: 0,
+        hard_attempted: 0, hard_correct: 0, total_sessions: 0, study_sessions: 0,
+        exam_sessions: 0, best_exam_percentage: 0, average_exam_percentage: 0,
+        current_streak_days: 0, longest_streak_days: 0,
+      };
+
+      const newTotalAttempted = prev.total_attempted + sessionQuestions.length;
+      const newTotalCorrect = prev.total_correct + correct;
+      const newOverall = newTotalAttempted > 0 ? Math.round((newTotalCorrect / newTotalAttempted) * 100) : 0;
+      const newTotalSessions = prev.total_sessions + 1;
+      const newStudy = prev.study_sessions + (mode === 'study' ? 1 : 0);
+      const newExam = prev.exam_sessions + (mode === 'exam' ? 1 : 0);
+      const newBestExam = mode === 'exam' ? Math.max(prev.best_exam_percentage, percentage) : prev.best_exam_percentage;
+      const newAvgExam = mode === 'exam' && newExam > 0
+        ? Math.round(((prev.average_exam_percentage * prev.exam_sessions) + percentage) / newExam)
+        : prev.average_exam_percentage;
+
+      await supabase.from('user_question_stats').upsert({
+        user_id: user.id,
+        total_attempted: newTotalAttempted,
+        total_correct: newTotalCorrect,
+        overall_percentage: newOverall,
+        easy_attempted: prev.easy_attempted + diffStats.easy.attempted,
+        easy_correct: prev.easy_correct + diffStats.easy.correct,
+        medium_attempted: prev.medium_attempted + diffStats.medium.attempted,
+        medium_correct: prev.medium_correct + diffStats.medium.correct,
+        hard_attempted: prev.hard_attempted + diffStats.hard.attempted,
+        hard_correct: prev.hard_correct + diffStats.hard.correct,
+        total_sessions: newTotalSessions,
+        study_sessions: newStudy,
+        exam_sessions: newExam,
+        best_exam_percentage: newBestExam,
+        average_exam_percentage: newAvgExam,
+        last_activity_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+      // Update question-level stats
+      for (const q of sessionQuestions) {
+        await supabase.rpc('increment_question_stats', { q_id: q.id, was_correct: selectedAnswers[sessionQuestions.indexOf(q)] === q.correct_answer });
+      }
+
+      // Update local state
+      setUserStats({
+        ...prev,
+        total_attempted: newTotalAttempted,
+        total_correct: newTotalCorrect,
+        overall_percentage: newOverall,
+        easy_attempted: prev.easy_attempted + diffStats.easy.attempted,
+        easy_correct: prev.easy_correct + diffStats.easy.correct,
+        medium_attempted: prev.medium_attempted + diffStats.medium.attempted,
+        medium_correct: prev.medium_correct + diffStats.medium.correct,
+        hard_attempted: prev.hard_attempted + diffStats.hard.attempted,
+        hard_correct: prev.hard_correct + diffStats.hard.correct,
+        total_sessions: newTotalSessions,
+        study_sessions: newStudy,
+        exam_sessions: newExam,
+        best_exam_percentage: newBestExam,
+        average_exam_percentage: newAvgExam,
+        current_streak_days: prev.current_streak_days,
+        longest_streak_days: prev.longest_streak_days,
+      });
+
+      // Update previous attempts map
+      const newAttempts = { ...previousAttempts };
+      sessionQuestions.forEach((q, i) => {
+        newAttempts[q.id] = { selected: selectedAnswers[i] ?? -1, correct: selectedAnswers[i] === q.correct_answer };
+      });
+      setPreviousAttempts(newAttempts);
+
+    } catch (e) {
+      console.error('Failed to save results:', e);
+    }
+    setSaving(false);
+  }, [user, sessionQuestions, selectedAnswers, mode, timeLimit, difficulty, selectedTopics, sessionStartTime, userStats, previousAttempts, saving]);
+
+  // Auto-save when results screen is shown
+  useEffect(() => {
+    if (screen === "results" && !saving && sessionQuestions.length > 0) {
+      saveResults();
+    }
+  }, [screen]);
+
+  const handleResetProgress = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await supabase.rpc('reset_question_progress', { target_user_id: user.id });
+      setUserStats(null);
+      setPreviousAttempts({});
+      setShowResetConfirm(false);
+    } catch (e) {
+      console.error('Failed to reset:', e);
+    }
+    setSaving(false);
+  };
+
   const getScore = () => {
     let correct = 0;
     sessionQuestions.forEach((q, i) => {
-      if (selectedAnswers[i] === q.correctAnswerIndex) correct++;
+      if (selectedAnswers[i] === q.correct_answer) correct++;
     });
     return correct;
   };
@@ -150,21 +427,98 @@ const QuestionBank = () => {
     }
 
     if (selected === undefined) return "border-border hover:bg-muted/30 cursor-pointer";
-    if (optIndex === question.correctAnswerIndex) return "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30";
-    if (optIndex === selected && optIndex !== question.correctAnswerIndex) return "border-destructive bg-destructive/5";
+    if (optIndex === question.correct_answer) return "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30";
+    if (optIndex === selected && optIndex !== question.correct_answer) return "border-destructive bg-destructive/5";
     return "border-border opacity-50";
   };
 
-  const optionLabels = ["A", "B", "C", "D", "E"];
+  const optionLabels = ["A", "B", "C", "D", "E", "F"];
+
+  const availableQuestionCount = (() => {
+    let questions = [...allQuestions];
+    if (selectedTopics.length > 0) questions = questions.filter(q => q.topic_id && selectedTopics.includes(q.topic_id));
+    if (difficulty !== "all") questions = questions.filter(q => q.difficulty === difficulty);
+    if (questionFilter === "unanswered") questions = questions.filter(q => !previousAttempts[q.id]);
+    else if (questionFilter === "incorrect") questions = questions.filter(q => previousAttempts[q.id]?.correct === false);
+    return questions.length;
+  })();
+
+  // === LOADING ===
+  if (dataLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="animate-spin text-muted-foreground" size={28} />
+      </div>
+    );
+  }
 
   // === SETUP SCREEN ===
   if (screen === "setup") {
+    const attempted = Object.keys(previousAttempts).length;
+    const incorrectCount = Object.values(previousAttempts).filter(a => !a.correct).length;
+
     return (
       <div className="space-y-6 max-w-3xl mx-auto">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Question Bank</h1>
-          <p className="text-muted-foreground mt-1">Practice colorectal surgery exam questions</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Question Bank</h1>
+            <p className="text-muted-foreground mt-1">
+              {allQuestions.length} questions available · {attempted} attempted
+            </p>
+          </div>
+          {userStats && userStats.total_attempted > 0 && (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-destructive border border-border rounded-lg hover:border-destructive/30 transition-colors"
+            >
+              <RotateCcw size={12} /> Reset Progress
+            </button>
+          )}
         </div>
+
+        {/* Stats Overview */}
+        {userStats && userStats.total_attempted > 0 && (
+          <Card className="border">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 size={16} className="text-muted-foreground" />
+                <span className="text-sm font-semibold text-foreground">Your Progress</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{userStats.overall_percentage}%</p>
+                  <p className="text-xs text-muted-foreground">Overall Score</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{userStats.total_attempted}</p>
+                  <p className="text-xs text-muted-foreground">Questions Done</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{userStats.total_sessions}</p>
+                  <p className="text-xs text-muted-foreground">Sessions</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{userStats.best_exam_percentage || 0}%</p>
+                  <p className="text-xs text-muted-foreground">Best Exam</p>
+                </div>
+              </div>
+              {/* Difficulty breakdown */}
+              <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
+                {(['easy', 'medium', 'hard'] as const).map(d => {
+                  const att = userStats[`${d}_attempted` as keyof UserStats] as number;
+                  const cor = userStats[`${d}_correct` as keyof UserStats] as number;
+                  const pct = att > 0 ? Math.round((cor / att) * 100) : 0;
+                  return (
+                    <div key={d} className="text-center">
+                      <p className={`text-lg font-bold ${pct >= 70 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-600' : 'text-destructive'}`}>{pct}%</p>
+                      <p className="text-xs text-muted-foreground capitalize">{d} ({att})</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border">
           <CardContent className="p-6 space-y-6">
@@ -201,6 +555,28 @@ const QuestionBank = () => {
               </div>
             </div>
 
+            {/* Question Filter */}
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">Question Selection</label>
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { value: 'all', label: 'All Questions', count: allQuestions.length },
+                  { value: 'unanswered', label: 'Not Yet Attempted', count: allQuestions.length - attempted },
+                  { value: 'incorrect', label: 'Previously Incorrect', count: incorrectCount },
+                ] as const).map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => setQuestionFilter(f.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      questionFilter === f.value ? "bg-navy text-navy-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Number of Questions */}
             <div>
               <label className="text-sm font-medium text-foreground mb-2 block">Number of Questions</label>
@@ -217,35 +593,40 @@ const QuestionBank = () => {
                   </button>
                 ))}
               </div>
+              {availableQuestionCount < numQuestions && (
+                <p className="text-xs text-amber-600 mt-2">
+                  Only {availableQuestionCount} questions match your filters
+                </p>
+              )}
             </div>
 
             {/* Topics */}
             <div>
               <label className="text-sm font-medium text-foreground mb-2 block">Topics</label>
               <div className="space-y-4">
-                {Object.entries(questionTopics).map(([category, topics]) => (
+                {Object.entries(topicsByCategory).map(([category, catTopics]) => (
                   <div key={category}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{category}</span>
                       <button
-                        onClick={() => toggleAllInCategory(topics)}
+                        onClick={() => toggleAllInCategory(catTopics)}
                         className="text-[11px] text-primary hover:underline"
                       >
-                        {topics.every((t) => selectedTopics.includes(t)) ? "Deselect all" : "Select all"}
+                        {catTopics.every((t) => selectedTopics.includes(t.id)) ? "Deselect all" : "Select all"}
                       </button>
                     </div>
                     <div className="flex gap-2 flex-wrap">
-                      {topics.map((topic) => (
+                      {catTopics.map((topic) => (
                         <button
-                          key={topic}
-                          onClick={() => toggleTopic(topic)}
+                          key={topic.id}
+                          onClick={() => toggleTopic(topic.id)}
                           className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                            selectedTopics.includes(topic)
+                            selectedTopics.includes(topic.id)
                               ? "bg-primary text-primary-foreground border-primary"
                               : "bg-background text-muted-foreground border-border hover:border-primary/50"
                           }`}
                         >
-                          {topic}
+                          {topic.name}
                         </button>
                       ))}
                     </div>
@@ -296,11 +677,36 @@ const QuestionBank = () => {
             )}
 
             {/* Start */}
-            <Button onClick={startSession} className="w-full bg-gold text-gold-foreground hover:bg-gold/90" size="lg">
-              <Play size={18} className="mr-2" /> Start Session
+            <Button
+              onClick={startSession}
+              className="w-full bg-gold text-gold-foreground hover:bg-gold/90"
+              size="lg"
+              disabled={availableQuestionCount === 0}
+            >
+              <Play size={18} className="mr-2" />
+              {availableQuestionCount === 0 ? 'No questions match filters' : `Start Session (${Math.min(numQuestions, availableQuestionCount)} questions)`}
             </Button>
           </CardContent>
         </Card>
+
+        {/* Reset Confirmation */}
+        <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset All Progress?</DialogTitle>
+              <DialogDescription>
+                This will permanently delete all your question attempt history, session records, and performance statistics. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-3 justify-end mt-4">
+              <Button variant="outline" onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleResetProgress} disabled={saving}>
+                {saving ? <Loader2 className="animate-spin mr-2" size={16} /> : <Trash2 size={16} className="mr-2" />}
+                Reset Everything
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -322,26 +728,29 @@ const QuestionBank = () => {
           </div>
           {sessionQuestions.map((question, qIdx) => {
             const userAnswer = selectedAnswers[qIdx];
-            const isCorrect = userAnswer === question.correctAnswerIndex;
+            const isCorrect = userAnswer === question.correct_answer;
             return (
               <Card key={qIdx} className={`border ${isCorrect ? "border-emerald-200" : "border-destructive/30"}`}>
                 <CardContent className="p-5 space-y-3">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-foreground">Q{qIdx + 1}. {question.question}</p>
+                    <p className="text-sm font-semibold text-foreground">Q{qIdx + 1}. {question.question_text}</p>
                     {isCorrect ? (
                       <Check size={18} className="text-emerald-600 shrink-0" />
                     ) : (
                       <X size={18} className="text-destructive shrink-0" />
                     )}
                   </div>
+                  {question.image_url && (
+                    <img src={question.image_url} alt="" className="rounded-lg max-h-48 object-contain" />
+                  )}
                   <div className="space-y-2">
-                    {question.options.map((opt, i) => (
+                    {question.options.map((opt: string, i: number) => (
                       <div
                         key={i}
                         className={`p-2.5 rounded-lg border text-sm flex items-start gap-2 ${
-                          i === question.correctAnswerIndex
+                          i === question.correct_answer
                             ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
-                            : i === userAnswer && i !== question.correctAnswerIndex
+                            : i === userAnswer && i !== question.correct_answer
                             ? "border-destructive bg-destructive/5"
                             : "border-border opacity-60"
                         }`}
@@ -351,10 +760,12 @@ const QuestionBank = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="p-3 rounded-lg bg-navy/5 border-l-4 border-navy">
-                    <p className="text-xs font-semibold text-foreground mb-1">Explanation</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{question.explanation}</p>
-                  </div>
+                  {question.explanation && (
+                    <div className="p-3 rounded-lg bg-navy/5 border-l-4 border-navy">
+                      <p className="text-xs font-semibold text-foreground mb-1">Explanation</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{question.explanation}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -367,6 +778,11 @@ const QuestionBank = () => {
       <div className="space-y-6 max-w-3xl mx-auto">
         <Card className="border">
           <CardContent className="p-8 text-center space-y-6">
+            {saving && (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="animate-spin" size={14} /> Saving results...
+              </div>
+            )}
             <Trophy size={48} className="mx-auto text-gold" />
             <div>
               <h1 className="text-3xl font-bold text-foreground">
@@ -397,9 +813,10 @@ const QuestionBank = () => {
                   <tbody>
                     {Object.entries(
                       sessionQuestions.reduce((acc, q, i) => {
-                        if (!acc[q.topic]) acc[q.topic] = { correct: 0, total: 0 };
-                        acc[q.topic].total++;
-                        if (selectedAnswers[i] === q.correctAnswerIndex) acc[q.topic].correct++;
+                        const topicName = getTopicName(q.topic_id);
+                        if (!acc[topicName]) acc[topicName] = { correct: 0, total: 0 };
+                        acc[topicName].total++;
+                        if (selectedAnswers[i] === q.correct_answer) acc[topicName].correct++;
                         return acc;
                       }, {} as Record<string, { correct: number; total: number }>)
                     ).map(([topic, data]) => {
@@ -526,14 +943,19 @@ const QuestionBank = () => {
             </div>
           </div>
 
+          {/* Image */}
+          {question.image_url && (
+            <img src={question.image_url} alt="" className="rounded-lg max-h-64 object-contain mb-6" />
+          )}
+
           {/* Question */}
           <p className="text-base font-semibold text-foreground leading-relaxed mb-6">
-            {question.question}
+            {question.question_text}
           </p>
 
           {/* Options */}
           <div className="space-y-3">
-            {question.options.map((option, index) => (
+            {question.options.map((option: string, index: number) => (
               <button
                 key={index}
                 onClick={() => handleAnswer(index)}
@@ -544,10 +966,10 @@ const QuestionBank = () => {
                   {optionLabels[index]}.
                 </span>
                 <span className="text-sm text-foreground flex-1">{option}</span>
-                {mode === "study" && selectedAnswers[currentIndex] !== undefined && index === question.correctAnswerIndex && (
+                {mode === "study" && selectedAnswers[currentIndex] !== undefined && index === question.correct_answer && (
                   <Check size={18} className="text-emerald-600 shrink-0 mt-0.5" />
                 )}
-                {mode === "study" && selectedAnswers[currentIndex] === index && index !== question.correctAnswerIndex && (
+                {mode === "study" && selectedAnswers[currentIndex] === index && index !== question.correct_answer && (
                   <X size={18} className="text-destructive shrink-0 mt-0.5" />
                 )}
               </button>
@@ -555,7 +977,7 @@ const QuestionBank = () => {
           </div>
 
           {/* Explanation (study mode) */}
-          {showExplanation && mode === "study" && (
+          {showExplanation && mode === "study" && question.explanation && (
             <div className="mt-6 p-4 rounded-lg bg-navy/5 border-l-4 border-navy">
               <p className="text-sm font-semibold text-foreground mb-1">Explanation</p>
               <p className="text-sm text-muted-foreground leading-relaxed">{question.explanation}</p>
