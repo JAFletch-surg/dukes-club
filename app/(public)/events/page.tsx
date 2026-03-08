@@ -7,9 +7,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { CalendarDays, MapPin, PoundSterling, Search, ArrowRight, X, SlidersHorizontal, ChevronDown, Star, Loader2 } from "lucide-react";
+import { CalendarDays, MapPin, PoundSterling, Search, ArrowRight, X, SlidersHorizontal, ChevronDown, Star, Loader2, LayoutList, Calendar as CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/use-auth";
+import EventsCalendar from "@/components/EventsCalendar";
 
 const supabase = createClient();
 
@@ -25,6 +27,7 @@ const eventTypes = ["Conference", "Workshop", "Webinar", "Course", "Masterclass"
 
 const EVENTS_PER_PAGE = 6;
 type SortOption = "date" | "price" | "dateAdded";
+type ViewMode = "list" | "calendar";
 
 const formatPrice = (pence: number | null) => {
   if (!pence || pence === 0) return "Free";
@@ -99,7 +102,9 @@ const FilterTagButton = ({ label, active, onClick }: { label: string; active: bo
 );
 
 const EventsPage = () => {
+  const { user } = useAuth();
   const [events, setEvents] = useState<any[]>([]);
+  const [calendarDates, setCalendarDates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedSubs, setSelectedSubs] = useState<string[]>([]);
@@ -107,18 +112,26 @@ const EventsPage = () => {
   const [sort, setSort] = useState<SortOption>("date");
   const [page, setPage] = useState(1);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
-    async function fetchEvents() {
-      const { data } = await supabase
+    async function fetchData() {
+      const { data: eventsData } = await supabase
         .from('events')
         .select('*')
         .eq('status', 'published')
         .order('starts_at', { ascending: true });
-      setEvents(data || []);
+      setEvents(eventsData || []);
+
+      const { data: calDates } = await supabase
+        .from('calendar_dates')
+        .select('*')
+        .order('start_date', { ascending: true });
+      setCalendarDates(calDates || []);
+
       setLoading(false);
     }
-    fetchEvents();
+    fetchData();
   }, []);
 
   const toggleSub = (s: string) => {
@@ -174,27 +187,27 @@ const EventsPage = () => {
 
   const filtersContent = (
     <div className="space-y-5">
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-foreground/40" />
-        <Input
-          placeholder="Search events..."
-          className="pl-9 bg-navy-foreground/5 border-navy-foreground/20 text-navy-foreground placeholder:text-navy-foreground/40"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
+      <div>
+        <p className="text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-2">Search</p>
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-foreground/40" />
+          <Input
+            placeholder="Search events..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9 bg-navy-foreground/5 border-navy-foreground/20 text-navy-foreground placeholder:text-navy-foreground/40 focus:border-gold/50 focus:ring-gold/20"
+          />
+        </div>
       </div>
 
       <div>
         <p className="text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-2">Event Type</p>
-        <Select value={selectedType} onValueChange={(v) => { setSelectedType(v); setPage(1); }}>
-          <SelectTrigger className="bg-navy-foreground/5 border-navy-foreground/20 text-navy-foreground">
-            <SelectValue placeholder="All types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {eventTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap gap-1.5">
+          <FilterTagButton label="All" active={selectedType === "all"} onClick={() => { setSelectedType("all"); setPage(1); }} />
+          {eventTypes.map((t) => (
+            <FilterTagButton key={t} label={t} active={selectedType === t} onClick={() => { setSelectedType(t); setPage(1); }} />
+          ))}
+        </div>
       </div>
 
       <div>
@@ -254,113 +267,171 @@ const EventsPage = () => {
         </div>
       </section>
 
-      {/* Mobile filter toggle */}
-      <div className="lg:hidden bg-navy border-t border-navy-foreground/10">
-        <div className="container mx-auto px-4 py-3">
-          <Button variant="hero" size="default" onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)} className="gap-2 w-full">
-            <SlidersHorizontal size={16} />
-            Search & Filters
-            {activeFilterCount > 0 && (
-              <span className="bg-gold text-gold-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">{activeFilterCount}</span>
-            )}
-            <ChevronDown size={14} className={`transition-transform ml-auto ${mobileFiltersOpen ? "rotate-180" : ""}`} />
-          </Button>
-          <Collapsible open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-            <CollapsibleContent className="pt-4 pb-2 animate-accordion-down">{filtersContent}</CollapsibleContent>
-          </Collapsible>
+      {/* View Toggle Bar */}
+      <div className="bg-navy border-t border-navy-foreground/10">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-navy-foreground/50">
+            {events.length} event{events.length !== 1 ? 's' : ''}{calendarDates.length > 0 ? ` · ${calendarDates.length} key date${calendarDates.length !== 1 ? 's' : ''}` : ''}
+          </p>
+          <div className="flex items-center bg-navy-foreground/10 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                viewMode === "list"
+                  ? "bg-gold text-gold-foreground shadow-sm"
+                  : "text-navy-foreground/50 hover:text-navy-foreground"
+              }`}
+            >
+              <LayoutList size={14} /> List
+            </button>
+            <button
+              onClick={() => setViewMode("calendar")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                viewMode === "calendar"
+                  ? "bg-gold text-gold-foreground shadow-sm"
+                  : "text-navy-foreground/50 hover:text-navy-foreground"
+              }`}
+            >
+              <CalendarIcon size={14} /> Calendar
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main content */}
-      <section className="bg-navy py-10">
-        <div className="container mx-auto px-4">
-          <div className="flex gap-8">
-            <aside className="hidden lg:block w-72 xl:w-80 shrink-0">
-              <div className="sticky top-24">{filtersContent}</div>
-            </aside>
+      {/* ═══ CALENDAR VIEW ═══════════════════════════════ */}
+      {viewMode === "calendar" && (
+        <section className="bg-navy py-8">
+          <div className="container mx-auto px-4 max-w-5xl">
+            <EventsCalendar
+              events={events.map(e => ({
+                id: e.id,
+                title: e.title,
+                slug: e.slug,
+                starts_at: e.starts_at,
+                ends_at: e.ends_at,
+                location: e.location,
+                event_type: e.event_type,
+                price_pence: e.price_pence,
+              }))}
+              calendarDates={calendarDates}
+              isLoggedIn={!!user}
+            />
+          </div>
+        </section>
+      )}
 
-            <div className="flex-1 min-w-0 space-y-10">
-              {/* Featured Event */}
-              {featuredEvent && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Star size={16} className="text-gold fill-gold" />
-                    <p className="text-gold font-semibold text-sm tracking-widest uppercase">Featured Event</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0 rounded-lg border-2 border-navy-foreground overflow-hidden bg-navy">
-                    <div className="aspect-[4/3] md:aspect-auto overflow-hidden">
-                      {featuredEvent.featured_image_url ? (
-                        <img src={featuredEvent.featured_image_url} alt={featuredEvent.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-navy-foreground/10 flex items-center justify-center">
-                          <CalendarDays size={48} className="text-gold/30" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-6 md:p-8 flex flex-col justify-center">
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30">{featuredEvent.event_type}</Badge>
-                        {(featuredEvent.subspecialties || []).map((sub: string) => (
-                          <Badge key={sub} variant="outline" className="border-navy-foreground/30 text-navy-foreground/70">{sub}</Badge>
-                        ))}
-                      </div>
-                      <h2 className="text-xl md:text-2xl font-sans font-bold text-navy-foreground mb-3">{featuredEvent.title}</h2>
-                      <div className="space-y-1.5 mb-4">
-                        <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
-                          <CalendarDays size={14} className="text-gold shrink-0" /><span>{formatDate(featuredEvent.starts_at)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
-                          <MapPin size={14} className="text-gold shrink-0" /><span>{featuredEvent.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
-                          <PoundSterling size={14} className="text-gold shrink-0" />
-                          <span>{formatPrice(featuredEvent.price_pence)}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-navy-foreground/70 mb-5">{featuredEvent.description_plain}</p>
-                      <div>
-                        <Link href={`/events/${featuredEvent.slug}`}>
-                          <Button variant="gold" size="lg">Register Now <ArrowRight className="ml-1" size={16} /></Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Events Grid */}
-              <div>
-                <p className="text-sm text-navy-foreground/50 mb-6">
-                  Showing {paginatedEvents.length} of {nonFeatured.length} event{nonFeatured.length !== 1 ? "s" : ""}
-                </p>
-
-                {nonFeatured.length === 0 ? (
-                  <div className="text-center py-20">
-                    <p className="text-navy-foreground/60 text-lg">No events match your filters.</p>
-                    <button onClick={clearFilters} className="mt-4 text-gold hover:text-gold/80 text-sm font-medium">Clear filters</button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {paginatedEvents.map((event) => <EventCard key={event.id} event={event} />)}
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-center gap-2 mt-12">
-                        <Button variant="hero" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                          <button key={p} onClick={() => setPage(p)} className={`w-9 h-9 rounded-md text-sm font-medium transition-colors ${p === page ? "bg-gold text-gold-foreground" : "text-navy-foreground/60 hover:text-navy-foreground"}`}>{p}</button>
-                        ))}
-                        <Button variant="hero" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
-                      </div>
-                    )}
-                  </>
+      {/* ═══ LIST VIEW ═══════════════════════════════════ */}
+      {viewMode === "list" && (
+        <>
+          {/* Mobile filter toggle */}
+          <div className="lg:hidden bg-navy border-t border-navy-foreground/10">
+            <div className="container mx-auto px-4 py-3">
+              <Button variant="hero" size="default" onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)} className="gap-2 w-full">
+                <SlidersHorizontal size={16} />
+                Search & Filters
+                {activeFilterCount > 0 && (
+                  <span className="bg-gold text-gold-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">{activeFilterCount}</span>
                 )}
-              </div>
+                <ChevronDown size={14} className={`transition-transform ml-auto ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+              </Button>
+              <Collapsible open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                <CollapsibleContent className="pt-4 pb-2 animate-accordion-down">{filtersContent}</CollapsibleContent>
+              </Collapsible>
             </div>
           </div>
-        </div>
-      </section>
+
+          {/* Main content */}
+          <section className="bg-navy py-10">
+            <div className="container mx-auto px-4">
+              <div className="flex gap-8">
+                <aside className="hidden lg:block w-72 xl:w-80 shrink-0">
+                  <div className="sticky top-24">{filtersContent}</div>
+                </aside>
+
+                <div className="flex-1 min-w-0 space-y-10">
+                  {/* Featured Event */}
+                  {featuredEvent && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Star size={16} className="text-gold fill-gold" />
+                        <p className="text-gold font-semibold text-sm tracking-widest uppercase">Featured Event</p>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-0 rounded-lg border-2 border-navy-foreground overflow-hidden bg-navy">
+                        <div className="aspect-[4/3] md:aspect-auto overflow-hidden">
+                          {featuredEvent.featured_image_url ? (
+                            <img src={featuredEvent.featured_image_url} alt={featuredEvent.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-navy-foreground/10 flex items-center justify-center">
+                              <CalendarDays size={48} className="text-gold/30" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-6 md:p-8 flex flex-col justify-center">
+                          <div className="flex flex-wrap gap-1.5 mb-4">
+                            <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30">{featuredEvent.event_type}</Badge>
+                            {(featuredEvent.subspecialties || []).map((sub: string) => (
+                              <Badge key={sub} variant="outline" className="border-navy-foreground/30 text-navy-foreground/70">{sub}</Badge>
+                            ))}
+                          </div>
+                          <h2 className="text-xl md:text-2xl font-sans font-bold text-navy-foreground mb-3">{featuredEvent.title}</h2>
+                          <div className="space-y-1.5 mb-4">
+                            <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
+                              <CalendarDays size={14} className="text-gold shrink-0" /><span>{formatDate(featuredEvent.starts_at)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
+                              <MapPin size={14} className="text-gold shrink-0" /><span>{featuredEvent.location}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
+                              <PoundSterling size={14} className="text-gold shrink-0" />
+                              <span>{formatPrice(featuredEvent.price_pence)}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-navy-foreground/70 mb-5">{featuredEvent.description_plain}</p>
+                          <div>
+                            <Link href={`/events/${featuredEvent.slug}`}>
+                              <Button variant="gold" size="lg">Register Now <ArrowRight className="ml-1" size={16} /></Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Events Grid */}
+                  <div>
+                    <p className="text-sm text-navy-foreground/50 mb-6">
+                      Showing {paginatedEvents.length} of {nonFeatured.length} event{nonFeatured.length !== 1 ? "s" : ""}
+                    </p>
+
+                    {nonFeatured.length === 0 ? (
+                      <div className="text-center py-20">
+                        <p className="text-navy-foreground/60 text-lg">No events match your filters.</p>
+                        <button onClick={clearFilters} className="mt-4 text-gold hover:text-gold/80 text-sm font-medium">Clear filters</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {paginatedEvents.map((event) => <EventCard key={event.id} event={event} />)}
+                        </div>
+
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-center gap-2 mt-12">
+                            <Button variant="hero" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                              <button key={p} onClick={() => setPage(p)} className={`w-9 h-9 rounded-md text-sm font-medium transition-colors ${p === page ? "bg-gold text-gold-foreground" : "text-navy-foreground/60 hover:text-navy-foreground"}`}>{p}</button>
+                            ))}
+                            <Button variant="hero" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 };

@@ -178,7 +178,7 @@ const EventDetailPage = () => {
     setApplying(false);
   };
 
-  const isApplicationEvent = event?.applications_enabled;
+  const isApplicationEvent = event?.applications_enabled && ['Practical Workshop', 'In Person Course'].includes(event?.event_type);
   const deadlinePassed = event?.application_deadline && new Date(event.application_deadline) < new Date();
   const questions: { question: string; required: boolean }[] = event?.application_questions || [];
 
@@ -314,21 +314,8 @@ const EventDetailPage = () => {
                             {existingBooking.status === 'approved' && event.confirmation_message && (
                               <p className="text-xs text-navy-foreground/60 mt-3 text-left">{event.confirmation_message}</p>
                             )}
-
-                            {/* Zoom/Meeting link — shown to approved attendees */}
-                            {['approved', 'confirmed'].includes(existingBooking.status) && event.zoom_url && (
-                              <a
-                                href={event.zoom_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors"
-                              >
-                                <ExternalLink size={14} /> Join Webinar
-                              </a>
-                            )}
-
                             <Link href="/members" className="block mt-3">
-                              <p className="text-xs text-gold hover:text-gold/80 transition-colors">View in My Events →</p>
+                              <p className="text-xs text-gold hover:text-gold/80 transition-colors">View in dashboard →</p>
                             </Link>
                           </div>
                         ) : deadlinePassed ? (
