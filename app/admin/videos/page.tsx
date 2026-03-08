@@ -1,157 +1,299 @@
-'use client'
+// ============================================================
+// EditVideoModal.tsx — Updated with category + subspecialty tagging
+// Adapt paths/imports to match your actual project structure
+// ============================================================
 
-import { useState } from 'react'
-import { Video, Plus, Edit, Trash2, Save, Loader, X, RefreshCw, Check } from 'lucide-react'
-import { useSupabaseTable } from '@/lib/use-supabase-table'
-import { createClient } from '@/lib/supabase/client'
+"use client";
 
-const STATUSES = ['draft', 'published', 'archived']
-function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { VIDEO_CATEGORIES, SUBSPECIALTIES, type VideoCategory, type Subspecialty } from "@/lib/constants/video-tags";
 
-export default function VideosAdmin() {
-  const { data: videos, loading, create, update, remove, refetch } = useSupabaseTable<any>('videos', 'created_at', false)
-  const [editing, setEditing] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<any>(null)
-  const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
-  const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+type Video = {
+  id: string;
+  title: string;
+  vimeo_id: string;
+  description: string | null;
+  duration: number | null;
+  status: "draft" | "published";
+  members_only: boolean;
+  category: VideoCategory | null;
+  subspecialties: Subspecialty[];
+  presenter: string | null;
+  recorded_at: string | null;
+};
 
-  const emptyForm = { title: '', slug: '', description: '', vimeo_id: '', duration_seconds: 0, is_members_only: true, status: 'draft' }
-  const [form, setForm] = useState(emptyForm)
+type EditVideoModalProps = {
+  video: Video | null;
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+};
 
-  const openNew = () => { setForm(emptyForm); setEditing('new') }
-  const openEdit = (v: any) => {
-    setForm({ title: v.title || '', slug: v.slug || '', description: v.description || '', vimeo_id: v.vimeo_id || '', duration_seconds: v.duration_seconds || 0, is_members_only: v.is_members_only ?? true, status: v.status || 'draft' })
-    setEditing(v.id)
-  }
+export default function EditVideoModal({ video, open, onClose, onSaved }: EditVideoModalProps) {
+  const supabase = createClient();
+
+  const [title, setTitle] = useState("");
+  const [vimeoId, setVimeoId] = useState("");
+  const [description, setDescription] = useState("");
+  const [duration, setDuration] = useState<number | "">("");
+  const [status, setStatus] = useState<"draft" | "published">("draft");
+  const [membersOnly, setMembersOnly] = useState(true);
+  const [category, setCategory] = useState<VideoCategory | "">("");
+  const [subspecialties, setSubspecialties] = useState<Subspecialty[]>([]);
+  const [presenter, setPresenter] = useState("");
+  const [recordedAt, setRecordedAt] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Populate form when video prop changes
+  useEffect(() => {
+    if (video) {
+      setTitle(video.title || "");
+      setVimeoId(video.vimeo_id || "");
+      setDescription(video.description || "");
+      setDuration(video.duration ?? "");
+      setStatus(video.status || "draft");
+      setMembersOnly(video.members_only ?? true);
+      setCategory(video.category || "");
+      setSubspecialties(video.subspecialties || []);
+      setPresenter(video.presenter || "");
+      setRecordedAt(video.recorded_at || "");
+    } else {
+      // Reset for "Add new" mode
+      setTitle("");
+      setVimeoId("");
+      setDescription("");
+      setDuration("");
+      setStatus("draft");
+      setMembersOnly(true);
+      setCategory("");
+      setSubspecialties([]);
+      setPresenter("");
+      setRecordedAt("");
+    }
+  }, [video]);
+
+  const toggleSubspecialty = (sub: Subspecialty) => {
+    setSubspecialties((prev) =>
+      prev.includes(sub) ? prev.filter((s) => s !== sub) : [...prev, sub]
+    );
+  };
 
   const handleSave = async () => {
-    if (!form.title) { showToast('Title is required', 'error'); return }
-    setSaving(true)
-    try {
-      const payload: any = { ...form, slug: form.slug || slugify(form.title), published_at: form.status === 'published' ? new Date().toISOString() : null }
-      if (editing === 'new') { await create(payload); showToast('Video added') }
-      else { await update(editing!, payload); showToast('Video updated') }
-      setEditing(null)
-    } catch (err: any) { showToast(err.message, 'error') }
-    setSaving(false)
-  }
+    if (!title.trim()) return;
+    setSaving(true);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this video?')) return
-    setDeleting(id)
-    try { await remove(id); showToast('Video deleted') } catch (err: any) { showToast(err.message, 'error') }
-    setDeleting(null)
-  }
+    const payload = {
+      title: title.trim(),
+      vimeo_id: vimeoId.trim(),
+      description: description.trim() || null,
+      duration: duration === "" ? null : Number(duration),
+      status,
+      members_only: membersOnly,
+      category: category || null,
+      subspecialties,
+      presenter: presenter.trim() || null,
+      recorded_at: recordedAt || null,
+    };
 
-  const fmtDur = (s: number) => s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '—'
-
-  const handleSync = async () => {
-    setSyncing(true)
-    setSyncResult(null)
-    try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/api/vimeo/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      })
-      const result = await res.json()
-      if (!res.ok) {
-        showToast(result.error || 'Sync failed', 'error')
-      } else {
-        setSyncResult(result)
-        showToast(`Synced: ${result.created} new, ${result.updated} updated`)
-        refetch()
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Sync failed', 'error')
+    let error;
+    if (video?.id) {
+      ({ error } = await supabase.from("videos").update(payload).eq("id", video.id));
+    } else {
+      ({ error } = await supabase.from("videos").insert(payload));
     }
-    setSyncing(false)
-  }
+
+    setSaving(false);
+
+    if (error) {
+      console.error("Save video error:", error);
+      alert("Failed to save video. Check console for details.");
+      return;
+    }
+
+    onSaved();
+    onClose();
+  };
+
+  if (!open) return null;
 
   return (
-    <div>
-      {toast && <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg text-white text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.msg}</div>}
-
-      <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-serif font-bold text-slate-800">Videos</h1><p className="text-sm text-gray-500 mt-1">{videos.length} videos{syncResult ? ` · Last sync: ${syncResult.created} new, ${syncResult.updated} updated` : ''}</p></div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleSync} disabled={syncing} className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
-            {syncing ? <Loader className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-            {syncing ? 'Syncing...' : 'Sync from Vimeo'}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-xl font-semibold text-gray-900">
+            {video ? "Edit Video" : "Add Video"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Video</button>
         </div>
-      </div>
 
-      {loading ? <div className="flex justify-center py-16"><Loader className="animate-spin text-gray-400" size={28} /></div>
-      : videos.length === 0 ? <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400"><Video size={36} className="mx-auto mb-3 opacity-40" /><p>No videos yet</p></div>
-      : <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-gray-100">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Title</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Vimeo ID</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Duration</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Access</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
-            </tr></thead>
-            <tbody>{videos.map((v: any) => (
-              <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                <td className="px-4 py-3 font-medium max-w-[250px]">
-                  <div className="flex items-center gap-3">
-                    {v.thumbnail_url ? (
-                      <img src={v.thumbnail_url} alt="" className="w-16 h-10 rounded object-cover shrink-0 bg-gray-100" />
-                    ) : (
-                      <div className="w-16 h-10 rounded bg-gray-100 flex items-center justify-center shrink-0"><Video size={14} className="text-gray-300" /></div>
-                    )}
-                    <span className="truncate">{v.title}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-500 font-mono text-xs">{v.vimeo_id || '—'}</td>
-                <td className="px-4 py-3 text-gray-500">{fmtDur(v.duration_seconds)}</td>
-                <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${v.is_members_only ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>{v.is_members_only ? 'Members' : 'Public'}</span></td>
-                <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${v.status === 'published' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>{v.status}</span></td>
-                <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1">
-                  <button onClick={() => openEdit(v)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Edit size={15} /></button>
-                  <button onClick={() => handleDelete(v.id)} disabled={deleting === v.id} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600">{deleting === v.id ? <Loader className="animate-spin" size={15} /> : <Trash2 size={15} />}</button>
-                </div></td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      }
+        {/* Body */}
+        <div className="p-6 space-y-5">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              placeholder="e.g. Complete mesocolic excision"
+            />
+          </div>
 
-      {editing !== null && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-serif font-bold">{editing === 'new' ? 'Add Video' : 'Edit Video'}</h2>
-              <button onClick={() => setEditing(null)} className="p-1 rounded hover:bg-gray-100"><X size={18} /></button>
+          {/* Vimeo ID + Presenter (side by side) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vimeo ID</label>
+              <input
+                type="text"
+                value={vimeoId}
+                onChange={(e) => setVimeoId(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                placeholder="e.g. 353960614"
+              />
             </div>
-            <div className="px-6 py-5 space-y-4">
-              <div><label className="block text-xs font-semibold text-gray-700 mb-1">Title *</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: slugify(e.target.value) })} /></div>
-              <div><label className="block text-xs font-semibold text-gray-700 mb-1">Vimeo ID</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.vimeo_id} onChange={(e) => setForm({ ...form, vimeo_id: e.target.value })} placeholder="e.g. 123456789" /></div>
-              <div><label className="block text-xs font-semibold text-gray-700 mb-1">Description</label><textarea className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="block text-xs font-semibold text-gray-700 mb-1">Duration (sec)</label><input type="number" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.duration_seconds} onChange={(e) => setForm({ ...form, duration_seconds: Number(e.target.value) })} /></div>
-                <div><label className="block text-xs font-semibold text-gray-700 mb-1">Status</label><select className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></div>
-                <div className="flex items-end pb-1"><label className="flex items-center gap-2 text-sm font-medium text-gray-700"><input type="checkbox" checked={form.is_members_only} onChange={(e) => setForm({ ...form, is_members_only: e.target.checked })} className="rounded" />Members Only</label></div>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-600">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700 disabled:opacity-50">{saving ? <Loader className="animate-spin" size={15} /> : <Save size={15} />} {editing === 'new' ? 'Add' : 'Save'}</button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Presenter / Speaker</label>
+              <input
+                type="text"
+                value={presenter}
+                onChange={(e) => setPresenter(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                placeholder="e.g. Mr J. Smith"
+              />
             </div>
           </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-y"
+            />
+          </div>
+
+          {/* Category dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as VideoCategory)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+            >
+              <option value="">Select category...</option>
+              {VIDEO_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subspecialty Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tags / Subspecialties
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {SUBSPECIALTIES.map((sub) => {
+                const isSelected = subspecialties.includes(sub);
+                return (
+                  <button
+                    key={sub}
+                    type="button"
+                    onClick={() => toggleSubspecialty(sub)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                      isSelected
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-gray-800"
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Duration + Date Recorded + Status row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Duration (sec)</label>
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value === "" ? "" : Number(e.target.value))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date Recorded</label>
+              <input
+                type="date"
+                value={recordedAt}
+                onChange={(e) => setRecordedAt(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as "draft" | "published")}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Members Only toggle */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={membersOnly}
+              onChange={(e) => setMembersOnly(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Members Only</span>
+          </label>
         </div>
-      )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50 rounded-b-xl">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !title.trim()}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
