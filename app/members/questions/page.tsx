@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   Check, X, ChevronLeft, ChevronRight, Flag, Clock,
   FileText, BookOpen, Play, RotateCcw, Trophy, AlertTriangle,
-  Loader2, Trash2, BarChart3, Filter,
+  Loader2, Trash2, BarChart3, Filter, ZoomIn, Send, SkipForward,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -29,6 +29,7 @@ interface Question {
   difficulty: string;
   question_type: string;
   image_url: string | null;
+  explanation_image_url: string | null;
   source: string | null;
 }
 
@@ -58,6 +59,15 @@ interface UserStats {
   longest_streak_days: number;
 }
 
+const REPORT_REASONS = [
+  { value: 'incorrect_answer', label: 'Incorrect answer marked as correct' },
+  { value: 'outdated_info', label: 'Outdated or inaccurate information' },
+  { value: 'unclear_wording', label: 'Unclear or confusing wording' },
+  { value: 'wrong_topic', label: 'Wrong topic classification' },
+  { value: 'duplicate', label: 'Duplicate question' },
+  { value: 'other', label: 'Other issue' },
+]
+
 const questionCounts = [10, 25, 50, 100];
 const timeLimits = [
   { label: "No limit", value: 0 },
@@ -65,6 +75,138 @@ const timeLimits = [
   { label: "60 min", value: 60 },
   { label: "90 min", value: 90 },
 ];
+
+/* ── Image Zoom Modal ────────────────────────── */
+function ImageZoom({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-zoom-out p-4"
+    >
+      <img
+        src={src}
+        alt=""
+        className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      />
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+      >
+        <X size={20} />
+      </button>
+    </div>
+  );
+}
+
+/* ── Report Issue Dialog ─────────────────────── */
+function ReportIssueDialog({
+  open, onClose, questionId, userId,
+}: {
+  open: boolean; onClose: () => void; questionId: string; userId: string;
+}) {
+  const [reason, setReason] = useState('incorrect_answer');
+  const [details, setDetails] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!details.trim() && reason === 'other') return;
+    setSubmitting(true);
+    try {
+      const supabase = createClient();
+      await supabase.from('question_flags').insert({
+        question_id: questionId,
+        user_id: userId,
+        reason,
+        details: details.trim() || null,
+        status: 'open',
+      });
+      setSubmitted(true);
+      setTimeout(() => { onClose(); setSubmitted(false); setDetails(''); setReason('incorrect_answer'); }, 1500);
+    } catch (e) {
+      console.error('Failed to submit report:', e);
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle size={18} className="text-amber-500" />
+            Report an Issue
+          </DialogTitle>
+          <DialogDescription>
+            Help us improve the question bank. Your report will be reviewed by the admin team.
+          </DialogDescription>
+        </DialogHeader>
+
+        {submitted ? (
+          <div className="py-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+              <Check size={24} className="text-emerald-600" />
+            </div>
+            <p className="font-semibold text-foreground">Report submitted</p>
+            <p className="text-sm text-muted-foreground mt-1">Thank you — the team will review this shortly.</p>
+          </div>
+        ) : (
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">What&apos;s the issue?</label>
+              <div className="space-y-2">
+                {REPORT_REASONS.map(r => (
+                  <button
+                    key={r.value}
+                    onClick={() => setReason(r.value)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                      reason === r.value
+                        ? "border-primary bg-primary/5 font-medium"
+                        : "border-border hover:bg-muted/30"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                Details {reason === 'other' ? '*' : '(optional)'}
+              </label>
+              <textarea
+                className="w-full border border-border rounded-lg p-3 text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                value={details}
+                onChange={e => setDetails(e.target.value)}
+                placeholder={
+                  reason === 'incorrect_answer'
+                    ? "e.g. The correct answer should be B because NICE guidelines state..."
+                    : reason === 'outdated_info'
+                    ? "e.g. This staging system was updated in 2023..."
+                    : "Describe the issue..."
+                }
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting || (reason === 'other' && !details.trim())}
+                className="bg-gold text-gold-foreground hover:bg-gold/90"
+              >
+                {submitting ? <Loader2 className="animate-spin mr-2" size={16} /> : <Send size={16} className="mr-2" />}
+                Submit Report
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const QuestionBank = () => {
   const { user } = useAuth();
@@ -100,6 +242,10 @@ const QuestionBank = () => {
   const [reviewMode, setReviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Report & zoom state
+  const [reportOpen, setReportOpen] = useState(false);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+
   // Load questions, topics, user stats, and previous attempts
   useEffect(() => {
     if (!user) return;
@@ -125,7 +271,6 @@ const QuestionBank = () => {
       if (topicsRes.data) setTopics(topicsRes.data);
       if (statsRes.data) setUserStats(statsRes.data);
 
-      // Build a map of latest attempt per question
       if (attemptsRes.data) {
         const map: Record<string, { selected: number; correct: boolean }> = {};
         attemptsRes.data.forEach((a: any) => {
@@ -190,24 +335,18 @@ const QuestionBank = () => {
   const startSession = () => {
     let questions = [...allQuestions];
 
-    // Filter by topics
     if (selectedTopics.length > 0) {
       questions = questions.filter((q) => q.topic_id && selectedTopics.includes(q.topic_id));
     }
-
-    // Filter by difficulty
     if (difficulty !== "all") {
       questions = questions.filter((q) => q.difficulty === difficulty);
     }
-
-    // Filter by attempt history
     if (questionFilter === "unanswered") {
       questions = questions.filter((q) => !previousAttempts[q.id]);
     } else if (questionFilter === "incorrect") {
       questions = questions.filter((q) => previousAttempts[q.id]?.correct === false);
     }
 
-    // Shuffle
     questions.sort(() => Math.random() - 0.5);
     questions = questions.slice(0, Math.min(numQuestions, questions.length));
 
@@ -220,6 +359,7 @@ const QuestionBank = () => {
     setFlaggedQuestions(new Set());
     setTimeRemaining(timeLimit * 60);
     setSessionStartTime(Date.now());
+    setReviewMode(false);
     setScreen("session");
   };
 
@@ -252,6 +392,19 @@ const QuestionBank = () => {
     });
   };
 
+  const jumpToNextFlagged = () => {
+    const flaggedArray = Array.from(flaggedQuestions).sort((a, b) => a - b);
+    const next = flaggedArray.find(i => i > currentIndex);
+    if (next !== undefined) {
+      setCurrentIndex(next);
+      setShowExplanation(mode === "study" && selectedAnswers[next] !== undefined);
+    } else if (flaggedArray.length > 0) {
+      // Wrap around to first flagged
+      setCurrentIndex(flaggedArray[0]);
+      setShowExplanation(mode === "study" && selectedAnswers[flaggedArray[0]] !== undefined);
+    }
+  };
+
   const handleSubmitExam = useCallback(() => {
     setShowSubmitConfirm(false);
     setScreen("results");
@@ -266,7 +419,6 @@ const QuestionBank = () => {
       const timeTaken = Math.round((Date.now() - sessionStartTime) / 1000);
       let correct = 0;
 
-      // Insert individual attempts
       const attempts = sessionQuestions.map((q, i) => {
         const isCorrect = selectedAnswers[i] === q.correct_answer;
         if (isCorrect) correct++;
@@ -281,7 +433,6 @@ const QuestionBank = () => {
 
       await supabase.from('question_attempts').insert(attempts);
 
-      // Save session summary
       const percentage = sessionQuestions.length > 0 ? Math.round((correct / sessionQuestions.length) * 100) : 0;
       await supabase.from('question_sessions').insert({
         user_id: user.id,
@@ -295,14 +446,12 @@ const QuestionBank = () => {
         difficulty_filter: difficulty !== 'all' ? difficulty : null,
       });
 
-      // Update aggregate stats
       const diffKey = (d: string) => {
         if (d === 'easy') return 'easy';
         if (d === 'hard') return 'hard';
         return 'medium';
       };
 
-      // Calculate difficulty breakdowns from this session
       const diffStats = { easy: { attempted: 0, correct: 0 }, medium: { attempted: 0, correct: 0 }, hard: { attempted: 0, correct: 0 } };
       sessionQuestions.forEach((q, i) => {
         const dk = diffKey(q.difficulty) as keyof typeof diffStats;
@@ -349,12 +498,10 @@ const QuestionBank = () => {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
 
-      // Update question-level stats
       for (const q of sessionQuestions) {
         await supabase.rpc('increment_question_stats', { q_id: q.id, was_correct: selectedAnswers[sessionQuestions.indexOf(q)] === q.correct_answer });
       }
 
-      // Update local state
       setUserStats({
         ...prev,
         total_attempted: newTotalAttempted,
@@ -375,7 +522,6 @@ const QuestionBank = () => {
         longest_streak_days: prev.longest_streak_days,
       });
 
-      // Update previous attempts map
       const newAttempts = { ...previousAttempts };
       sessionQuestions.forEach((q, i) => {
         newAttempts[q.id] = { selected: selectedAnswers[i] ?? -1, correct: selectedAnswers[i] === q.correct_answer };
@@ -502,7 +648,6 @@ const QuestionBank = () => {
                   <p className="text-xs text-muted-foreground">Best Exam</p>
                 </div>
               </div>
-              {/* Difficulty breakdown */}
               <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
                 {(['easy', 'medium', 'hard'] as const).map(d => {
                   const att = userStats[`${d}_attempted` as keyof UserStats] as number;
@@ -734,14 +879,21 @@ const QuestionBank = () => {
                 <CardContent className="p-5 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-semibold text-foreground">Q{qIdx + 1}. {question.question_text}</p>
-                    {isCorrect ? (
-                      <Check size={18} className="text-emerald-600 shrink-0" />
-                    ) : (
-                      <X size={18} className="text-destructive shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isCorrect ? (
+                        <Check size={18} className="text-emerald-600" />
+                      ) : (
+                        <X size={18} className="text-destructive" />
+                      )}
+                    </div>
                   </div>
                   {question.image_url && (
-                    <img src={question.image_url} alt="" className="rounded-lg max-h-48 object-contain" />
+                    <img
+                      src={question.image_url}
+                      alt=""
+                      className="rounded-lg max-h-48 object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
+                      onClick={() => setZoomImage(question.image_url)}
+                    />
                   )}
                   <div className="space-y-2">
                     {question.options.map((opt: string, i: number) => (
@@ -764,7 +916,24 @@ const QuestionBank = () => {
                     <div className="p-3 rounded-lg bg-navy/5 border-l-4 border-navy">
                       <p className="text-xs font-semibold text-foreground mb-1">Explanation</p>
                       <p className="text-xs text-muted-foreground leading-relaxed">{question.explanation}</p>
+                      {question.explanation_image_url && (
+                        <img
+                          src={question.explanation_image_url}
+                          alt=""
+                          className="rounded-lg max-h-40 object-contain mt-3 cursor-zoom-in hover:opacity-90 transition-opacity"
+                          onClick={() => setZoomImage(question.explanation_image_url)}
+                        />
+                      )}
                     </div>
+                  )}
+                  {/* Report button in review mode */}
+                  {user && (
+                    <button
+                      onClick={() => { setCurrentIndex(qIdx); setReportOpen(true); }}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-600 transition-colors mt-1"
+                    >
+                      <AlertTriangle size={12} /> Report issue with this question
+                    </button>
                   )}
                 </CardContent>
               </Card>
@@ -855,6 +1024,7 @@ const QuestionBank = () => {
   const question = sessionQuestions[currentIndex];
   const totalQuestions = sessionQuestions.length;
   const answeredCount = Object.keys(selectedAnswers).length;
+  const flaggedCount = flaggedQuestions.size;
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -864,11 +1034,12 @@ const QuestionBank = () => {
           <h1 className="text-2xl font-bold text-foreground">Question Bank</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {mode === "study" ? "Study Mode" : "Exam Mode"} · {answeredCount}/{totalQuestions} answered
+            {flaggedCount > 0 && <span className="text-gold ml-1">· {flaggedCount} bookmarked</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {mode === "exam" && timeLimit > 0 && (
-            <Badge variant="outline" className="font-mono text-sm">
+            <Badge variant="outline" className={`font-mono text-sm ${timeRemaining < 300 ? "text-destructive border-destructive" : ""}`}>
               <Clock size={14} className="mr-1" /> {formatTime(timeRemaining)}
             </Badge>
           )}
@@ -895,6 +1066,17 @@ const QuestionBank = () => {
       {showNavigator && (
         <Card className="border">
           <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-muted-foreground">QUESTION NAVIGATOR</span>
+              {flaggedCount > 0 && (
+                <button
+                  onClick={jumpToNextFlagged}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-gold hover:text-gold/80 transition-colors"
+                >
+                  <SkipForward size={12} /> Jump to next bookmarked
+                </button>
+              )}
+            </div>
             <div className="flex gap-2 flex-wrap">
               {sessionQuestions.map((_, i) => {
                 const answered = selectedAnswers[i] !== undefined;
@@ -904,7 +1086,7 @@ const QuestionBank = () => {
                   <button
                     key={i}
                     onClick={() => { setCurrentIndex(i); setShowExplanation(mode === "study" && selectedAnswers[i] !== undefined); }}
-                    className={`w-9 h-9 rounded-lg text-xs font-semibold border transition-colors ${
+                    className={`w-9 h-9 rounded-lg text-xs font-semibold border transition-colors relative ${
                       current ? "border-primary bg-primary text-primary-foreground" :
                       flagged ? "border-gold bg-gold/10 text-gold" :
                       answered ? "border-primary/30 bg-primary/5 text-primary" :
@@ -912,13 +1094,16 @@ const QuestionBank = () => {
                     }`}
                   >
                     {i + 1}
+                    {flagged && !current && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-gold rounded-full" />
+                    )}
                   </button>
                 );
               })}
             </div>
             <div className="flex gap-4 mt-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/5 border border-primary/30" /> Answered</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gold/10 border border-gold" /> Flagged</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gold/10 border border-gold" /> Bookmarked</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-border" /> Unanswered</span>
             </div>
           </CardContent>
@@ -932,20 +1117,36 @@ const QuestionBank = () => {
             <Badge variant="secondary">Question {currentIndex + 1} of {totalQuestions}</Badge>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="capitalize">{question.difficulty}</Badge>
+              {/* Bookmark for review — session-only, personal */}
               <button
                 onClick={toggleFlag}
-                className={`p-1.5 rounded transition-colors ${
-                  flaggedQuestions.has(currentIndex) ? "text-gold bg-gold/10" : "text-muted-foreground hover:text-gold"
+                title={flaggedQuestions.has(currentIndex) ? "Remove bookmark" : "Bookmark to revisit later"}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  flaggedQuestions.has(currentIndex) ? "text-gold bg-gold/10" : "text-muted-foreground hover:text-gold hover:bg-gold/5"
                 }`}
               >
-                <Flag size={16} />
+                <Flag size={14} />
+                {flaggedQuestions.has(currentIndex) ? "Bookmarked" : "Bookmark"}
               </button>
             </div>
           </div>
 
           {/* Image */}
           {question.image_url && (
-            <img src={question.image_url} alt="" className="rounded-lg max-h-64 object-contain mb-6" />
+            <div className="relative group mb-6">
+              <img
+                src={question.image_url}
+                alt=""
+                className="rounded-lg max-h-64 object-contain cursor-zoom-in hover:opacity-95 transition-opacity"
+                onClick={() => setZoomImage(question.image_url)}
+              />
+              <button
+                onClick={() => setZoomImage(question.image_url)}
+                className="absolute bottom-2 right-2 bg-black/60 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <ZoomIn size={14} />
+              </button>
+            </div>
           )}
 
           {/* Question */}
@@ -981,17 +1182,44 @@ const QuestionBank = () => {
             <div className="mt-6 p-4 rounded-lg bg-navy/5 border-l-4 border-navy">
               <p className="text-sm font-semibold text-foreground mb-1">Explanation</p>
               <p className="text-sm text-muted-foreground leading-relaxed">{question.explanation}</p>
+              {question.explanation_image_url && (
+                <img
+                  src={question.explanation_image_url}
+                  alt=""
+                  className="rounded-lg max-h-48 object-contain mt-3 cursor-zoom-in hover:opacity-90 transition-opacity"
+                  onClick={() => setZoomImage(question.explanation_image_url)}
+                />
+              )}
             </div>
           )}
+
+          {/* Report Issue — visible after answering in study mode, or always in exam mode */}
+          <button
+            onClick={() => setReportOpen(true)}
+            className="flex items-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-amber-600 transition-colors"
+          >
+            <AlertTriangle size={13} />
+            Something wrong with this question? Report an issue
+          </button>
 
           {/* Navigation */}
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
             <Button variant="outline" size="sm" onClick={handlePrev} disabled={currentIndex === 0}>
               <ChevronLeft size={16} className="mr-1" /> Previous
             </Button>
-            <span className="text-xs text-muted-foreground">
-              {currentIndex + 1} / {totalQuestions}
-            </span>
+            <div className="flex items-center gap-3">
+              {flaggedCount > 0 && (
+                <button
+                  onClick={jumpToNextFlagged}
+                  className="flex items-center gap-1 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+                >
+                  <Flag size={12} /> Next bookmarked
+                </button>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {currentIndex + 1} / {totalQuestions}
+              </span>
+            </div>
             <Button variant="outline" size="sm" onClick={handleNext} disabled={currentIndex === totalQuestions - 1}>
               Next <ChevronRight size={16} className="ml-1" />
             </Button>
@@ -1006,11 +1234,24 @@ const QuestionBank = () => {
             <DialogTitle>Submit Exam?</DialogTitle>
             <DialogDescription>
               You have answered {answeredCount} of {totalQuestions} questions.
-              {flaggedQuestions.size > 0 && ` ${flaggedQuestions.size} question(s) flagged for review.`}
+              {flaggedCount > 0 && ` ${flaggedCount} question(s) bookmarked for review.`}
               {answeredCount < totalQuestions && ` ${totalQuestions - answeredCount} question(s) unanswered.`}
             </DialogDescription>
           </DialogHeader>
+          {flaggedCount > 0 && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-gold/10 border border-gold/20">
+              <Flag size={14} className="text-gold" />
+              <span className="text-sm text-foreground">
+                You have {flaggedCount} bookmarked question{flaggedCount > 1 ? 's' : ''} — would you like to review {flaggedCount > 1 ? 'them' : 'it'} first?
+              </span>
+            </div>
+          )}
           <div className="flex gap-3 justify-end mt-4">
+            {flaggedCount > 0 && (
+              <Button variant="outline" onClick={() => { setShowSubmitConfirm(false); jumpToNextFlagged(); }}>
+                <Flag size={14} className="mr-1 text-gold" /> Review Bookmarked
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setShowSubmitConfirm(false)}>Continue Exam</Button>
             <Button className="bg-gold text-gold-foreground hover:bg-gold/90" onClick={handleSubmitExam}>
               Submit Exam
@@ -1018,6 +1259,19 @@ const QuestionBank = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Report Issue Dialog */}
+      {user && (
+        <ReportIssueDialog
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          questionId={question.id}
+          userId={user.id}
+        />
+      )}
+
+      {/* Image Zoom */}
+      {zoomImage && <ImageZoom src={zoomImage} onClose={() => setZoomImage(null)} />}
     </div>
   );
 };

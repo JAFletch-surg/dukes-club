@@ -55,6 +55,7 @@ const MemberProfile = () => {
     show_training_stage: true,
     show_subspecialty_interests: true,
     show_social_links: false,
+    allow_messages: true,
   });
 
   // Load profile data
@@ -309,6 +310,7 @@ const MemberProfile = () => {
                       { key: "show_training_stage", label: "Show training stage", desc: "Display your current training level" },
                       { key: "show_subspecialty_interests", label: "Show subspecialty interests", desc: "Display your areas of interest" },
                       { key: "show_social_links", label: "Show social links", desc: "Display your Twitter/X and LinkedIn" },
+                      { key: "allow_messages", label: "Allow direct messages", desc: "Other members can send you private messages" },
                     ].map((toggle) => (
                       <div key={toggle.key} className="flex items-center justify-between">
                         <div>

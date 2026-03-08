@@ -1,17 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { Video, Plus, Edit, Trash2, Save, Loader, X } from 'lucide-react'
+import { Video, Plus, Edit, Trash2, Save, Loader, X, RefreshCw, Check } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
+import { createClient } from '@/lib/supabase/client'
 
 const STATUSES = ['draft', 'published', 'archived']
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }
 
 export default function VideosAdmin() {
-  const { data: videos, loading, create, update, remove } = useSupabaseTable<any>('videos', 'created_at', false)
+  const { data: videos, loading, create, update, remove, refetch } = useSupabaseTable<any>('videos', 'created_at', false)
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<any>(null)
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
@@ -45,13 +48,46 @@ export default function VideosAdmin() {
 
   const fmtDur = (s: number) => s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '—'
 
+  const handleSync = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/vimeo/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        showToast(result.error || 'Sync failed', 'error')
+      } else {
+        setSyncResult(result)
+        showToast(`Synced: ${result.created} new, ${result.updated} updated`)
+        refetch()
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Sync failed', 'error')
+    }
+    setSyncing(false)
+  }
+
   return (
     <div>
       {toast && <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg text-white text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.msg}</div>}
 
       <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-serif font-bold text-slate-800">Videos</h1><p className="text-sm text-gray-500 mt-1">{videos.length} videos</p></div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Video</button>
+        <div><h1 className="text-2xl font-serif font-bold text-slate-800">Videos</h1><p className="text-sm text-gray-500 mt-1">{videos.length} videos{syncResult ? ` · Last sync: ${syncResult.created} new, ${syncResult.updated} updated` : ''}</p></div>
+        <div className="flex items-center gap-2">
+          <button onClick={handleSync} disabled={syncing} className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+            {syncing ? <Loader className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+            {syncing ? 'Syncing...' : 'Sync from Vimeo'}
+          </button>
+          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Video</button>
+        </div>
       </div>
 
       {loading ? <div className="flex justify-center py-16"><Loader className="animate-spin text-gray-400" size={28} /></div>
@@ -68,7 +104,16 @@ export default function VideosAdmin() {
             </tr></thead>
             <tbody>{videos.map((v: any) => (
               <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                <td className="px-4 py-3 font-medium max-w-[250px] truncate">{v.title}</td>
+                <td className="px-4 py-3 font-medium max-w-[250px]">
+                  <div className="flex items-center gap-3">
+                    {v.thumbnail_url ? (
+                      <img src={v.thumbnail_url} alt="" className="w-16 h-10 rounded object-cover shrink-0 bg-gray-100" />
+                    ) : (
+                      <div className="w-16 h-10 rounded bg-gray-100 flex items-center justify-center shrink-0"><Video size={14} className="text-gray-300" /></div>
+                    )}
+                    <span className="truncate">{v.title}</span>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{v.vimeo_id || '—'}</td>
                 <td className="px-4 py-3 text-gray-500">{fmtDur(v.duration_seconds)}</td>
                 <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${v.is_members_only ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>{v.is_members_only ? 'Members' : 'Public'}</span></td>

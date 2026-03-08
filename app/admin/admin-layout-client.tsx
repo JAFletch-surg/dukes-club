@@ -5,35 +5,46 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3, Calendar, Newspaper, Video, Globe, UserCheck,
-  GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark, LogOut, Layout
+  GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark, LogOut, Layout, FileText, X
 } from 'lucide-react'
 import { useAuth } from '@/lib/use-auth'
 
-const navItems = [
-  { href: '/admin', label: 'Dashboard', icon: BarChart3 },
-  { type: 'divider', label: 'CONTENT' },
-  { href: '/admin/events', label: 'Events', icon: Calendar },
-  { href: '/admin/posts', label: 'News & Posts', icon: Newspaper },
-  { href: '/admin/videos', label: 'Videos', icon: Video },
-  { href: '/admin/fellowships', label: 'Fellowships', icon: Globe },
-  { type: 'divider', label: 'PEOPLE' },
-  { href: '/admin/team', label: 'Executive Team', icon: UserCheck },
-  { href: '/admin/faculty', label: 'Faculty', icon: GraduationCap },
-  { href: '/admin/members', label: 'Members', icon: Users },
-  { type: 'divider', label: 'ORGANISATION' },
-  { href: '/admin/institutions', label: 'Institutions', icon: Landmark },
-  { href: '/admin/sponsors', label: 'Sponsors', icon: Building2 },
-] as const
-
-const LOGO_URL = 'https://wdajcvoqpcxtqpfmzndj.supabase.co/storage/v1/object/public/media/Dukes%20club%20modern%20title%20white.png'
+const navSections = [
+  {
+    label: 'CONTENT',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: BarChart3, end: true },
+      { href: '/admin/events', label: 'Events', icon: Calendar },
+      { href: '/admin/posts', label: 'News & Posts', icon: Newspaper },
+      { href: '/admin/videos', label: 'Videos', icon: Video },
+      { href: '/admin/questions', label: 'Questions', icon: FileText },
+      { href: '/admin/fellowships', label: 'Fellowships', icon: Globe },
+    ],
+  },
+  {
+    label: 'PEOPLE',
+    items: [
+      { href: '/admin/team', label: 'Executive Team', icon: UserCheck },
+      { href: '/admin/faculty', label: 'Faculty', icon: GraduationCap },
+      { href: '/admin/members', label: 'Members', icon: Users },
+    ],
+  },
+  {
+    label: 'ORGANISATION',
+    items: [
+      { href: '/admin/institutions', label: 'Institutions', icon: Landmark },
+      { href: '/admin/sponsors', label: 'Sponsors', icon: Building2 },
+    ],
+  },
+]
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
 
-  const isActive = (href: string) => {
-    if (href === '/admin') return pathname === '/admin'
+  const isActive = (href: string, end?: boolean) => {
+    if (end) return pathname === href
     return pathname.startsWith(href)
   }
 
@@ -41,95 +52,129 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     ? profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)
     : '?'
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#F1F1F3', display: 'flex', fontFamily: 'Montserrat, -apple-system, sans-serif', color: '#181820' }}>
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="px-5 pt-6 pb-5 border-b border-white/[0.08]">
+        <Link href="/admin" className="block">
+          <img
+            src="/images/logo-white.png"
+            alt="The Dukes' Club"
+            className="h-10 max-w-[180px] object-contain"
+          />
+        </Link>
+        <div className="flex items-center gap-2 mt-3">
+          <div className="w-5 h-px bg-gold" />
+          <p className="text-gold/80 text-[11px] font-semibold tracking-[0.2em]">ADMIN PANEL</p>
+        </div>
+      </div>
 
-      {/* ── Sidebar ─────────────────────────────── */}
-      <aside style={{
-        position: 'fixed', top: 0, left: 0, bottom: 0, width: 260, background: '#0F1F3D', color: '#F5F8FC',
-        zIndex: 50, display: 'flex', flexDirection: 'column',
-        transform: sidebarOpen ? 'translateX(0)' : undefined,
-      }}>
-        {/* Logo */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <Link href="/admin" style={{ display: 'block', textDecoration: 'none' }}>
-            <img
-              src={LOGO_URL}
-              alt="The Dukes' Club"
-              style={{ height: 36, maxWidth: 180, objectFit: 'contain' }}
-            />
-            <div style={{ fontSize: 10, color: 'rgba(245,248,252,0.4)', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 6 }}>
-              Admin Panel
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-5">
+        {navSections.map((section) => (
+          <div key={section.label}>
+            <p className="text-white/25 text-[10px] font-bold tracking-[0.18em] uppercase px-3 mb-1.5">
+              {section.label}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href, (item as any).end)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                      active
+                        ? 'text-gold bg-gold/10 border-l-[3px] border-gold -ml-px shadow-sm'
+                        : 'text-white/55 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Icon size={18} strokeWidth={active ? 2 : 1.5} />
+                    {item.label}
+                  </Link>
+                )
+              })}
             </div>
-          </Link>
-        </div>
+          </div>
+        ))}
+      </nav>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, paddingTop: 8, overflowY: 'auto' }}>
-          {navItems.map((item, i) => {
-            if ('type' in item && item.type === 'divider') {
-              return <div key={i} style={{ padding: '20px 20px 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,248,252,0.25)' }}>{item.label}</div>
-            }
-            if (!('href' in item)) return null
-            const Icon = item.icon
-            const active = isActive(item.href)
-            return (
-              <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', fontSize: 14, fontWeight: active ? 600 : 400,
-                  textDecoration: 'none', transition: 'all 0.15s',
-                  color: active ? '#E5A718' : 'rgba(245,248,252,0.55)',
-                  background: active ? 'rgba(229,167,24,0.1)' : 'transparent',
-                  borderRight: active ? '3px solid #E5A718' : '3px solid transparent',
-                }}>
-                <Icon size={18} strokeWidth={active ? 2 : 1.5} />
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
+      {/* Footer */}
+      <div className="px-3 py-3 border-t border-white/[0.08] space-y-0.5">
+        <Link
+          href="/members"
+          className="flex items-center gap-3 px-3 py-2.5 text-[13px] text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+        >
+          <Layout size={16} /> Members Portal
+        </Link>
+        <Link
+          href="/"
+          className="flex items-center gap-3 px-3 py-2.5 text-[13px] text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+        >
+          <ChevronLeft size={16} /> Back to Site
+        </Link>
+        <button
+          onClick={signOut}
+          className="flex items-center gap-3 px-3 py-2.5 text-[13px] text-white/40 hover:text-white transition-colors rounded-lg hover:bg-white/5 w-full text-left"
+        >
+          <LogOut size={16} /> Logout
+        </button>
+      </div>
+    </>
+  )
 
-        {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Link href="/members" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(245,248,252,0.5)', textDecoration: 'none', padding: '6px 0', transition: 'color 0.15s' }}>
-            <Layout size={14} /> Members Portal
-          </Link>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(245,248,252,0.5)', textDecoration: 'none', padding: '6px 0', transition: 'color 0.15s' }}>
-            <ChevronLeft size={14} /> Back to Site
-          </Link>
-          <button
-            onClick={signOut}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgba(245,248,252,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left', fontFamily: 'inherit', transition: 'color 0.15s' }}
-          >
-            <LogOut size={14} /> Logout
-          </button>
-        </div>
+  return (
+    <div className="min-h-screen bg-[#F1F1F3] flex" style={{ fontFamily: 'Montserrat, -apple-system, sans-serif' }}>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex lg:flex-col fixed top-0 left-0 bottom-0 w-[260px] bg-navy z-50">
+        {sidebarContent}
       </aside>
 
-      {/* Mobile overlay */}
-      {sidebarOpen && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 40 }} onClick={() => setSidebarOpen(false)} />}
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+          <aside className="relative w-[260px] h-full bg-navy flex flex-col z-10">
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
 
-      {/* ── Main ────────────────────────────────── */}
-      <div style={{ flex: 1, marginLeft: 260, minHeight: '100vh' }}>
+      {/* Main */}
+      <div className="flex-1 lg:ml-[260px] min-h-screen">
         {/* Top bar */}
-        <header style={{ position: 'sticky', top: 0, zIndex: 30, background: '#fff', borderBottom: '1px solid #D1D1D6', padding: '0 32px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={() => setSidebarOpen(true)} style={{ display: 'none', padding: 8, border: 'none', background: 'none', cursor: 'pointer' }}>
-            <Menu size={20} color="#181820" />
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#DB2424' }}>
-            <Shield size={14} /> Admin Mode
+        <header className="sticky top-0 z-30 bg-white border-b border-[#D1D1D6] px-4 lg:px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-[#181820]"
+            >
+              <Menu size={22} />
+            </button>
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-red-600">
+              <Shield size={14} /> Admin Mode
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#181820' }}>
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] font-semibold text-[#181820] hidden sm:inline">
               {profile?.full_name || 'Admin'}
             </span>
-            <div style={{ width: 32, height: 32, background: '#0F1F3D', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F5F8FC', fontSize: 11, fontWeight: 700 }}>
+            <div className="w-8 h-8 bg-navy rounded-full flex items-center justify-center text-white text-[11px] font-bold">
               {initials}
             </div>
           </div>
         </header>
 
-        <main style={{ padding: '28px 32px', maxWidth: 1400 }}>{children}</main>
+        <main className="p-4 lg:p-8 max-w-[1400px]">{children}</main>
       </div>
     </div>
   )

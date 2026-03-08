@@ -1,8 +1,10 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
+import { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
+
+// ─── Types ───────────────────────────────────────────────────────────
 
 interface Profile {
   id: string
@@ -29,6 +31,8 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>
 }
 
+// ─── Context ─────────────────────────────────────────────────────────
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
@@ -46,112 +50,134 @@ export function useAuth() {
   return useContext(AuthContext)
 }
 
+// ─── Provider ────────────────────────────────────────────────────────
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-  }, [])
+  // Single Supabase client for the lifetime of this provider.
+  // useRef keeps it stable across re-renders without retriggering effects.
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
+
+  // ── Fetch profile ────────────────────────────────────────────────
+
+  const fetchProfile = useCallback(
+    async (userId: string): Promise<Profile | null> => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (error) {
+          console.error('[Auth] Profile fetch failed:', error.message)
+          return null
+        }
+        return data as Profile
+      } catch (err) {
+        console.error('[Auth] Profile fetch exception:', err)
+        return null
+      }
+    },
+    [supabase]
+  )
+
+  // ── Public refresh (e.g. after user edits their own profile) ─────
 
   const refreshProfile = useCallback(async () => {
-    if (user) {
-      await fetchProfile(user.id)
-    }
+    if (!user) return
+    const freshProfile = await fetchProfile(user.id)
+    if (freshProfile) setProfile(freshProfile)
   }, [user, fetchProfile])
 
+  // ── Single effect: onAuthStateChange as the sole source of truth ─
+  //
+  // Supabase v2 fires INITIAL_SESSION synchronously on subscribe,
+  // so we don't need a separate getSession() / getUser() init flow.
+  // This eliminates the race condition between init() and the
+  // auth listener that caused flickering and stale state.
+
   useEffect(() => {
-    let cancelled = false
-    const supabase = createClient()
+    let mounted = true
 
-    async function init() {
-      try {
-        // getSession reads from local storage — instant, no network call
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (cancelled) return
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, session: Session | null) => {
+        if (!mounted) return
 
-        if (session?.user) {
-          setUser(session.user)
-          await fetchProfile(session.user.id)
-          if (!cancelled) setLoading(false)
-          
-          // Verify with getUser in background (network call)
-          const { data: { user: verifiedUser } } = await supabase.auth.getUser()
-          if (cancelled) return
-          if (verifiedUser) {
-            setUser(verifiedUser)
-          } else {
-            setUser(null)
-            setProfile(null)
-          }
-        } else {
-          // No cached session — try getUser as fallback
-          const { data: { user: freshUser } } = await supabase.auth.getUser()
-          if (cancelled) return
-          if (freshUser) {
-            setUser(freshUser)
-            await fetchProfile(freshUser.id)
-          } else {
-            setUser(null)
-            setProfile(null)
-          }
-          if (!cancelled) setLoading(false)
-        }
-      } catch (e) {
-        if (!cancelled) setLoading(false)
-      }
-    }
+        const currentUser = session?.user ?? null
+        setUser(currentUser)
 
-    init()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: any) => {
-        if (cancelled) return
-        const u = session?.user ?? null
-        setUser(u)
-        if (u) {
-          await fetchProfile(u.id)
+        if (currentUser) {
+          const profileData = await fetchProfile(currentUser.id)
+          if (!mounted) return
+          setProfile(profileData)
         } else {
           setProfile(null)
         }
-        if (!cancelled) setLoading(false)
+
+        // Loading → false ONCE, after we've resolved both user + profile
+        if (mounted) setLoading(false)
       }
     )
 
+    // Safety net: if onAuthStateChange never fires (edge case),
+    // clear loading after 5 seconds so the UI isn't stuck
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('[Auth] Timed out waiting for auth state — clearing loading')
+        setLoading(false)
+      }
+    }, 5000)
+
     return () => {
-      cancelled = true
+      mounted = false
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
-  }, [fetchProfile])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps — runs once on mount; supabase is stable via ref
 
-  const signOut = async () => {
-    const supabase = createClient()
+  // ── Sign out ─────────────────────────────────────────────────────
+
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
     window.location.href = '/'
-  }
+  }, [supabase])
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
-  const isEditor = profile?.role === 'editor' || isAdmin
-  const isMember = profile?.role === 'member' || isEditor
-  const isTrainee = profile?.role === 'trainee' || isMember
+  // ── Role derivations ─────────────────────────────────────────────
+
+  const role = profile?.role
+  const isAdmin = role === 'admin' || role === 'super_admin'
+  const isEditor = role === 'editor' || isAdmin
+  const isMember = role === 'member' || isEditor
+  const isTrainee = role === 'trainee' || isMember
   const isPending = profile?.approval_status === 'pending'
 
+  // ── Render ───────────────────────────────────────────────────────
+
   return (
-    <AuthContext.Provider value={{
-      user, profile, loading, signOut,
-      isAdmin, isEditor, isMember, isTrainee, isPending,
-      refreshProfile,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        signOut,
+        isAdmin,
+        isEditor,
+        isMember,
+        isTrainee,
+        isPending,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
