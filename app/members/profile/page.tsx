@@ -13,8 +13,6 @@ import { Camera, Shield, Trash2, Bell, AlertTriangle, Check, Loader2 } from "luc
 import { useAuth } from "@/lib/use-auth";
 import { createClient } from "@/lib/supabase/client";
 
-const supabase = createClient();
-
 const regions = [
   "Mersey", "Wessex", "North East Thames", "North West", "Yorkshire",
   "South West", "South Wales", "Scotland", "Republic of Ireland",
@@ -34,6 +32,7 @@ const subspecialtyOptions = [
 
 const MemberProfile = () => {
   const { profile, user } = useAuth();
+  const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

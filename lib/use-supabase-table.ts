@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export function useSupabaseTable<T extends { id: string }>(
@@ -11,7 +11,8 @@ export function useSupabaseTable<T extends { id: string }>(
   const [data, setData] = useState<T[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
+  const supabaseRef = useRef(createClient())
+  const supabase = supabaseRef.current
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -27,7 +28,7 @@ export function useSupabaseTable<T extends { id: string }>(
       setData((rows as T[]) || [])
     }
     setLoading(false)
-  }, [table, orderCol, ascending])
+  }, [supabase, table, orderCol, ascending])
 
   useEffect(() => {
     fetchData()

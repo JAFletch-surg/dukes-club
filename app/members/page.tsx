@@ -9,10 +9,9 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import EventsCalendar from "@/components/EventsCalendar";
 
-const supabase = createClient();
-
 const MembersDashboard = () => {
   const { profile, user, loading: authLoading } = useAuth();
+  const supabase = createClient();
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [allEvents, setAllEvents] = useState<any[]>([]);
   const [calendarDates, setCalendarDates] = useState<any[]>([]);

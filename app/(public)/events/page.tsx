@@ -13,8 +13,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import EventsCalendar from "@/components/EventsCalendar";
 
-const supabase = createClient();
-
 const subspecialties = [
   "Cancer - Colon", "Cancer - Rectal", "Cancer - Anal", "Cancer - Advanced",
   "Peritoneal Malignancy", "IBD", "Abdominal Wall", "Pelvic Floor",
@@ -103,6 +101,7 @@ const FilterTagButton = ({ label, active, onClick }: { label: string; active: bo
 
 const EventsPage = () => {
   const { user } = useAuth();
+  const supabase = createClient();
   const [events, setEvents] = useState<any[]>([]);
   const [calendarDates, setCalendarDates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
