@@ -1,8 +1,6 @@
 'use client'
 import Link from "next/link"
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { sendEmail } from "@/lib/emails/send-email"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -75,40 +73,36 @@ const RegisterPage = () => {
     }
 
     setIsLoading(true)
-    const supabase = createClient()
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          full_name: formData.fullName,
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
           region: formData.region,
-          training_stage: formData.trainingStage,
-          acpgbi_number: formData.acpgbiNumber || null,
-          directory_visible: directoryVisible,
-        },
-        emailRedirectTo: `${window.location.origin}/login?verified=true`,
-      },
-    })
+          trainingStage: formData.trainingStage,
+          acpgbiNumber: formData.acpgbiNumber || null,
+          directoryVisible,
+        }),
+      })
 
-    setIsLoading(false)
+      const result = await res.json()
 
-    if (signUpError) {
-      if (signUpError.message.includes('already registered')) {
-        setError("An account with this email already exists. Try signing in instead.")
-      } else {
-        setError(signUpError.message)
+      if (!res.ok) {
+        setError(result.error || 'Registration failed. Please try again.')
+        setIsLoading(false)
+        return
       }
+    } catch {
+      setError('Network error. Please check your connection and try again.')
+      setIsLoading(false)
       return
     }
 
-    // Send welcome email (fire and forget — don't block registration)
-    sendEmail({
-      type: 'welcome',
-      to: formData.email,
-      data: { name: formData.fullName },
-    }).catch((err) => console.error('Welcome email failed:', err))
+    setIsLoading(false)
 
     const approved = isApprovedDomain(formData.email)
     setApprovalType(approved ? "auto" : "pending")
