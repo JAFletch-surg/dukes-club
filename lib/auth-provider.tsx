@@ -90,8 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ── Resolve auth state (shared by init and listener) ─────────────
 
   const resolveAuth = useCallback(
-    async (session: Session | null) => {
-      const currentUser = session?.user ?? null
+    async (currentUser: User | null) => {
       setUser(currentUser)
 
       if (currentUser) {
@@ -115,25 +114,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (freshProfile) setProfile(freshProfile)
   }, [user, fetchProfile])
 
-  // ── Initialise: explicit getSession + onAuthStateChange listener ─
+  // ── Initialise: getUser() for server-validated auth ──────────────
   //
-  // We use getSession() as the primary init because on statically
-  // prerendered pages (Vercel), onAuthStateChange may not fire
-  // INITIAL_SESSION reliably. getSession() reads from cookies which
-  // the middleware has already validated server-side with getUser().
+  // We use getUser() instead of getSession() because getUser()
+  // contacts the Supabase Auth server and validates the token.
+  // getSession() only reads from local storage and can return
+  // expired/revoked tokens, leading to a "stale session" where
+  // the UI thinks it's authenticated but data fetches fail.
   //
-  // onAuthStateChange then handles subsequent events: sign in,
+  // onAuthStateChange handles subsequent events: sign in,
   // sign out, token refresh.
 
   useEffect(() => {
     let mounted = true
 
-    // 1. Explicit init — reads session from cookies, always resolves
+    // 1. Server-validated init via getUser()
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { user: validatedUser }, error } = await supabase.auth.getUser()
         if (mounted && !resolvedRef.current) {
-          await resolveAuth(session)
+          if (error || !validatedUser) {
+            await resolveAuth(null)
+          } else {
+            await resolveAuth(validatedUser)
+          }
         }
       } catch (err) {
         console.error('[Auth] Init failed:', err)
@@ -147,11 +151,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, session: Session | null) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return
-        // Skip INITIAL_SESSION if we already resolved via getSession
-        if (_event === 'INITIAL_SESSION' && resolvedRef.current) return
-        await resolveAuth(session)
+        // Skip INITIAL_SESSION if we already resolved via getUser
+        if (event === 'INITIAL_SESSION' && resolvedRef.current) return
+
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setProfile(null)
+          return
+        }
+
+        await resolveAuth(session?.user ?? null)
       }
     )
 
@@ -160,6 +171,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [supabase, resolveAuth])
+
+  // ── Visibility change: re-validate session when tab regains focus ─
+  //
+  // When a user switches tabs, locks their device, or the browser
+  // throttles the background tab, the Supabase auto-refresh timer
+  // may not fire. When the user returns, the access token could be
+  // expired. This listener proactively re-validates on focus return.
+
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return
+
+      // Re-validate with the server — this also triggers a token
+      // refresh if the access token is expired but the refresh
+      // token is still valid
+      const { data: { user: freshUser }, error } = await supabase.auth.getUser()
+
+      if (error || !freshUser) {
+        // Session is truly dead — clear client state
+        setUser(null)
+        setProfile(null)
+      } else if (freshUser.id !== user?.id) {
+        // User changed (rare) or was null and is now valid
+        await resolveAuth(freshUser)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [supabase, user?.id, resolveAuth])
 
   // ── Sign out ─────────────────────────────────────────────────────
 

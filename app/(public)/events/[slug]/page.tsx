@@ -14,8 +14,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { sendEmail } from "@/lib/emails/send-email";
 
-const supabase = createClient();
-
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -43,6 +41,7 @@ const AnimatedSection = ({ children, className, delay = 0 }: { children: React.R
 const EventDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { user, profile } = useAuth();
+  const supabase = createClient();
   const [event, setEvent] = useState<any>(null);
   const [faculty, setFaculty] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,7 +134,6 @@ const EventDetailPage = () => {
     setApplying(true);
     setApplyError('');
     try {
-      const supabase = createClient();
       const { error } = await supabase.from('event_bookings').insert({
         event_id: event.id,
         user_id: user.id,

@@ -55,8 +55,6 @@ interface MemberProfile {
 
 // ─── Helpers ─────────────────────────────────────────
 
-const supabase = createClient()
-
 const getInitials = (name: string) => {
   const cleaned = name.replace(/^(Dr|Mr|Mrs|Ms|Prof|Miss)\s+/i, '')
   return cleaned.split(' ').filter(Boolean).map(p => p[0]).join('').slice(0, 2).toUpperCase()
@@ -145,6 +143,7 @@ function NewDMDialog({ open, onClose, onSelect, currentUserId }: {
   const [search, setSearch] = useState('')
   const [members, setMembers] = useState<MemberProfile[]>([])
   const [loading, setLoading] = useState(false)
+  const supabase = createClient()
 
   useEffect(() => {
     if (!open) return
@@ -213,6 +212,7 @@ function NewDMDialog({ open, onClose, onSelect, currentUserId }: {
 
 function MessagesContent() {
   const { user, profile, isAdmin } = useAuth()
+  const supabase = createClient()
 
   // State
   const [conversations, setConversations] = useState<ConversationWithMeta[]>([])
