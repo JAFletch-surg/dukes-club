@@ -48,7 +48,7 @@ const MemberProfile = () => {
   const [acpgbiNumber, setAcpgbiNumber] = useState('');
   const [subspecialties, setSubspecialties] = useState<string[]>([]);
   const [directorySettings, setDirectorySettings] = useState({
-    visible: false,
+    visible: true,
     show_email: false,
     show_hospital: true,
     show_region: true,

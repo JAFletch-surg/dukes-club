@@ -84,9 +84,9 @@ const MemberDirectory = () => {
       if (error) {
         console.error('[Directory] Load failed:', error.message);
       } else {
-        // Only include members who have opted into the directory
+        // Show members by default — only hide if they explicitly opted out
         const visible = (data || []).filter((m: any) =>
-          m.directory_settings?.visible === true
+          m.directory_settings?.visible !== false
         );
         setMembers(visible);
       }
