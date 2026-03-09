@@ -480,6 +480,7 @@ export default function QuestionsAdmin() {
           <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{search || filterTopic || filterDiff || filterStatus ? 'Try adjusting your filters' : 'Add your first question to get started'}</p>
         </div>
       ) : (
+        <>
         {/* Desktop table */}
         <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
@@ -575,6 +576,7 @@ export default function QuestionsAdmin() {
             Showing {filtered.length} of {questions.length} questions
           </div>
         </div>
+        </>
       )}
 
       {/* Mobile FAB */}

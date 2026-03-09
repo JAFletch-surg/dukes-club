@@ -120,6 +120,7 @@ export default function InstitutionsAdmin() {
           <p style={{ fontSize: 13, color: C.secondary, marginTop: 4 }}>Add your first institution to start linking them to fellowships and events</p>
         </div>
       ) : (
+        <>
         {/* Desktop table */}
         <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
@@ -178,6 +179,7 @@ export default function InstitutionsAdmin() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Mobile FAB */}

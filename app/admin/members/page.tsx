@@ -249,6 +249,7 @@ export default function MembersAdmin() {
           <Users size={36} className="mx-auto mb-3 opacity-40" /><p>No members found</p>
         </div>
       ) : (
+        <>
         {/* Desktop table */}
         <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
@@ -381,6 +382,7 @@ export default function MembersAdmin() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Edit Modal */}

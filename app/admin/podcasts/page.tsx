@@ -101,6 +101,7 @@ export default function PodcastsAdmin() {
           <p style={{ fontSize: 16, fontWeight: 600, color: '#181820' }}>No podcasts found</p>
         </div>
       ) : (
+        <>
         {/* Desktop table */}
         <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
@@ -166,6 +167,7 @@ export default function PodcastsAdmin() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Mobile FAB */}
