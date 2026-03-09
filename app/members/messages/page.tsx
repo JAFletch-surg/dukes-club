@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -208,10 +208,10 @@ function NewDMDialog({ open, onClose, onSelect, currentUserId }: {
 }
 
 // ═════════════════════════════════════════════════════
-// MAIN MESSAGES PAGE
+// MESSAGES CONTENT (wrapped in Suspense by the page)
 // ═════════════════════════════════════════════════════
 
-export default function MessagesPage() {
+function MessagesContent() {
   const { user, profile, isAdmin } = useAuth()
 
   // State
@@ -853,5 +853,21 @@ export default function MessagesPage() {
       <NewChannelDialog open={showNewChannel} onClose={() => setShowNewChannel(false)} onCreate={handleCreateChannel} />
       <NewDMDialog open={showNewDM} onClose={() => setShowNewDM(false)} onSelect={handleStartDM} currentUserId={user.id} />
     </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════
+// PAGE EXPORT (Suspense wrapper for useSearchParams)
+// ═════════════════════════════════════════════════════
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <Loader2 className="animate-spin text-muted-foreground" size={28} />
+      </div>
+    }>
+      <MessagesContent />
+    </Suspense>
   )
 }
