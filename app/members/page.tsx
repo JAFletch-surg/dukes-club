@@ -20,6 +20,7 @@ const MembersDashboard = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [questionStats, setQuestionStats] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     // Don't fetch until auth has resolved on the client
@@ -91,6 +92,36 @@ const MembersDashboard = () => {
             .maybeSingle();
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
+
+          // Fetch unread message count across all conversations
+          const { data: myConvs } = await supabase
+            .from('conversation_participants')
+            .select('conversation_id')
+            .eq('user_id', user.id);
+
+          if (myConvs && myConvs.length > 0) {
+            let totalUnread = 0;
+            for (const conv of myConvs) {
+              const { data: readData } = await supabase
+                .from('message_reads')
+                .select('last_read_at')
+                .eq('conversation_id', conv.conversation_id)
+                .eq('user_id', user.id)
+                .single();
+
+              const lastReadAt = readData?.last_read_at || '1970-01-01';
+
+              const { count } = await supabase
+                .from('messages')
+                .select('id', { count: 'exact', head: true })
+                .eq('conversation_id', conv.conversation_id)
+                .neq('sender_id', user.id)
+                .gt('created_at', lastReadAt);
+
+              totalUnread += count || 0;
+            }
+            setUnreadCount(totalUnread);
+          }
         }
       } catch (err) {
         console.error('[Dashboard] Failed to load data:', err);
@@ -171,6 +202,28 @@ const MembersDashboard = () => {
           </Card>
         ))}
       </div>
+
+      {/* Unread messages banner */}
+      {unreadCount > 0 && (
+        <Link href="/members/messages" className="block">
+          <Card className="border border-gold/30 bg-gold/5 hover:bg-gold/10 transition-colors cursor-pointer">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center">
+                  <MessageSquare size={18} className="text-gold" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    You have {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Tap to view your conversations</p>
+                </div>
+              </div>
+              <ArrowRight size={18} className="text-gold shrink-0" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {/* Two-column grid */}
       <div className="grid lg:grid-cols-2 gap-6">
