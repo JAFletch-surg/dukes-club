@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Service role for server-side DB operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const VIMEO_TOKEN = process.env.VIMEO_ACCESS_TOKEN
 const VIMEO_API = 'https://api.vimeo.com'
@@ -80,6 +81,7 @@ async function fetchAllVimeoVideos(): Promise<VimeoVideo[]> {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     // Auth check — only admins can trigger sync
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {

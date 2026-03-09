@@ -4,17 +4,19 @@ import crypto from 'crypto'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { passwordResetEmail } from '@/lib/emails/templates'
 
-// Service-role client — can query profiles without RLS
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 const TOKEN_EXPIRY_HOURS = 1
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const { email } = await request.json()
 
     if (!email) {

@@ -372,21 +372,26 @@ export default function EventsAdmin() {
     <div style={{ fontFamily: 'Montserrat, -apple-system, sans-serif' }}>
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 200, padding: '12px 20px', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,.15)', background: toast.type === 'ok' ? '#16a34a' : '#DB2424' }}>{toast.msg}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F1F3D' }}>Events</h1>
-          <p style={{ fontSize: 14, color: '#504F58', marginTop: 4 }}>{events.length} events in database</p>
+          <h1 className="text-2xl md:text-[28px] font-bold text-[#0F1F3D]">Events</h1>
+          <p className="text-sm text-[#504F58] mt-1">{events.length} events in database</p>
         </div>
-        <button onClick={openNew} style={S.btn}><Plus size={16} strokeWidth={2.5} /> Add Event</button>
+        <button onClick={openNew} style={S.btn} className="hidden sm:flex"><Plus size={16} strokeWidth={2.5} /> Add Event</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-        <input style={{ ...S.input, maxWidth: 300 }} placeholder="Search events..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select style={{ ...S.select, maxWidth: 180 }} value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+      <div className="flex gap-3 mb-5 flex-wrap">
+        <input style={S.input} className="!max-w-full sm:!max-w-[300px] flex-1" placeholder="Search events..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select style={S.select} className="!max-w-[180px]" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
           <option value="">All Types</option>
           {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
         </select>
       </div>
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full bg-[#0F1F3D] text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform">
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}><Loader className="animate-spin" size={28} color="#D1D1D6" /></div>
@@ -397,7 +402,9 @@ export default function EventsAdmin() {
           <p style={{ fontSize: 14, color: '#504F58', marginTop: 4 }}>Create your first event to get started</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #F1F1F3' }}>
@@ -482,11 +489,60 @@ export default function EventsAdmin() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <div className="md:hidden space-y-3">
+          {filtered.map((e: any) => (
+            <div key={e.id} className="bg-white rounded-xl border border-[#E4E4E8] p-3.5 active:bg-gray-50">
+              <div className="flex items-start gap-3">
+                {e.featured_image_url ? (
+                  <img src={e.featured_image_url} alt="" className="w-12 h-9 object-cover rounded shrink-0" />
+                ) : (
+                  <div className="w-12 h-9 rounded bg-[#F1F1F3] flex items-center justify-center shrink-0">
+                    <Image size={14} color="#D1D1D6" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#181820] leading-snug truncate">
+                    {isStreamingType(e.event_type) && <Radio size={11} className="inline mr-1 text-red-600" />}
+                    {e.title}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-[#504F58]">
+                    <span>{fmtDate(e.starts_at)}</span>
+                    <span>·</span>
+                    <span>{e.price_pence === 0 ? 'Free' : `£${(e.price_pence / 100).toFixed(2)}`}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#F1F1F3]">
+                <div className="flex items-center gap-1.5">
+                  <span style={S.badge(
+                    isStreamingType(e.event_type) ? '#EFF6FF' : '#F5F3FF',
+                    isStreamingType(e.event_type) ? '#2563EB' : '#7C3AED'
+                  )}>{e.event_type}</span>
+                  <span style={S.badge(
+                    e.status === 'published' ? '#f0fdf4' : e.status === 'draft' ? '#fefce8' : '#f3f4f6',
+                    e.status === 'published' ? '#16a34a' : e.status === 'draft' ? '#a16207' : '#666'
+                  )}>{e.status}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => openEdit(e)} className="p-2 rounded-lg bg-[#F3F4F6] text-[#504F58]">
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(e.id)} disabled={deleting === e.id} className="p-2 rounded-lg bg-white border border-[#E4E4E8] text-[#D1D1D6]">
+                    {deleting === e.id ? <Loader className="animate-spin" size={14} /> : <Trash2 size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
       )}
 
       {editing !== null && (
-        <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 24, paddingBottom: 24, overflowY: 'auto' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', margin: '0 16px' }}>
+        <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto' }} className="p-3 md:p-6">
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '1px solid #E4E4E8' }}>
               <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0F1F3D' }}>{editing === 'new' ? 'Create Event' : 'Edit Event'}</h2>
               <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6', padding: 4 }}><X size={20} /></button>

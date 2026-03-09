@@ -557,15 +557,20 @@ export default function PostsAdmin() {
     <div style={{ fontFamily: 'Montserrat, sans-serif' }}>
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 200, padding: '12px 20px', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,.15)', background: toast.type === 'ok' ? '#16a34a' : C.destructive }}>{toast.msg}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 28, fontWeight: 700, color: C.navy }}>News & Posts</h1>
-          <p style={{ fontSize: 14, color: C.secondary, marginTop: 4 }}>{posts.length} posts in database</p>
+          <h1 className="text-2xl md:text-[28px] font-bold" style={{ color: C.navy }}>News & Posts</h1>
+          <p className="text-sm mt-1" style={{ color: C.secondary }}>{posts.length} posts in database</p>
         </div>
-        <button onClick={openNew} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}><Plus size={16} strokeWidth={2.5} /> New Post</button>
+        <button onClick={openNew} className="hidden sm:flex items-center gap-2" style={{ padding: '10px 20px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}><Plus size={16} strokeWidth={2.5} /> New Post</button>
       </div>
 
-      <input style={{ ...S.input, maxWidth: 400, marginBottom: 24 }} placeholder="Search posts..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input style={S.input} className="!max-w-full sm:!max-w-[400px] mb-5" placeholder="Search posts..." value={search} onChange={(e) => setSearch(e.target.value)} />
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform" style={{ background: C.navy, color: C.navyFg }}>
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       {/* Table */}
       {loading ? <div style={{ textAlign: 'center', padding: 80 }}><Loader className="animate-spin" size={28} color={C.muted} /></div>
@@ -575,7 +580,9 @@ export default function PostsAdmin() {
           <p style={{ fontSize: 16, fontWeight: 600, color: C.fg }}>No posts found</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead><tr style={{ borderBottom: `2px solid ${C.bg}` }}>
               {['Post', 'Category', 'Author', 'Published', 'Status', 'Views', 'Actions'].map(h => (
@@ -610,12 +617,43 @@ export default function PostsAdmin() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <div className="md:hidden space-y-3">
+          {filtered.map((p: any) => (
+            <div key={p.id} className="bg-white rounded-xl border border-[#E4E4E8] p-3.5 active:bg-gray-50">
+              <div className="flex items-start gap-3">
+                {p.featured_image_url && <img src={p.featured_image_url} alt="" className="w-12 h-9 object-cover rounded shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-snug truncate" style={{ color: C.fg }}>{p.title}</p>
+                  {p.excerpt && <p className="text-xs mt-0.5 truncate" style={{ color: C.secondary }}>{p.excerpt}</p>}
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#F1F1F3]">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span style={S.badge('#FEF3C7', '#92400E')}>{p.category || 'General'}</span>
+                  <span style={S.badge(p.status === 'published' ? '#f0fdf4' : '#fefce8', p.status === 'published' ? '#16a34a' : '#a16207')}>{p.status}</span>
+                  {p.published_at && <span className="text-[11px]" style={{ color: C.secondary }}>{new Date(p.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => openEdit(p)} className="p-2 rounded-lg bg-[#F3F4F6]" style={{ color: C.secondary }}>
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(p.id)} disabled={deleting === p.id} className="p-2 rounded-lg bg-white border border-[#E4E4E8]" style={{ color: C.muted }}>
+                    {deleting === p.id ? <Loader className="animate-spin" size={14} /> : <Trash2 size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
       )}
 
       {/* ── Modal ──────────────────────────────────── */}
       {editing !== null && (
-        <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 16, paddingBottom: 16, overflowY: 'auto' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 860, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', margin: '0 16px' }}>
+        <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto' }} className="p-3 md:p-4">
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 860, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', borderRadius: '20px 20px 0 0', zIndex: 10 }}>
               <h2 style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 22, fontWeight: 700, color: C.navy }}>{editing === 'new' ? 'New Post' : 'Edit Post'}</h2>
@@ -645,7 +683,7 @@ export default function PostsAdmin() {
               <AuthorPicker value={form.author} onChange={(a) => setForm({ ...form, author: a })} />
 
               {/* Category + Status row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
                   <label style={S.label}>Category</label>
                   <select style={S.select} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>

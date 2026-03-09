@@ -199,29 +199,35 @@ export default function AdminVideosPage() {
 
   /* ═══ RENDER ═════════════════════════════════════ */
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 1200, fontFamily: 'Montserrat, sans-serif' }}>
+    <div className="max-w-[1200px] font-sans">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: C.fg, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h1 className="text-2xl md:text-[26px] font-extrabold flex items-center gap-2.5" style={{ color: C.fg }}>
             <Video size={26} /> Videos
           </h1>
-          <p style={{ color: C.secondary, fontSize: 14, marginTop: 4 }}>
+          <p className="text-sm mt-1" style={{ color: C.secondary }}>
             {videos.length} video{videos.length !== 1 ? 's' : ''} in library
           </p>
         </div>
         <button
           onClick={openNew}
+          className="hidden sm:flex"
           style={{
-            display: 'flex', alignItems: 'center', gap: 8,
+            alignItems: 'center', gap: 8,
             padding: '10px 20px', background: C.navy, color: C.navyFg,
             border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'Montserrat, sans-serif',
+            cursor: 'pointer',
           }}
         >
           <Plus size={18} /> Add Video
         </button>
       </div>
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform" style={{ background: C.navy, color: C.navyFg }}>
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -255,7 +261,9 @@ export default function AdminVideosPage() {
 
       {/* Table */}
       {!loading && (
-        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${C.border}`, overflow: 'hidden', overflowX: 'auto' }}>
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 14, border: `1px solid ${C.border}`, overflow: 'hidden', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#F9FAFB', borderBottom: `1px solid ${C.border}` }}>
@@ -359,6 +367,53 @@ export default function AdminVideosPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <div className="md:hidden space-y-3">
+          {filtered.map(v => (
+            <div key={v.id} className="bg-white rounded-xl border border-[#E4E4E8] p-3.5 active:bg-gray-50">
+              <div className="flex items-start gap-3">
+                <div className="w-16 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: C.navy }}>
+                  {v.thumbnail_url ? (
+                    <img src={v.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Video size={14} color="rgba(255,255,255,0.3)" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-snug truncate" style={{ color: C.fg }}>{v.title}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: '#999' }}>
+                    {v.speaker && <span>{v.speaker} · </span>}
+                    {fmtDuration(v.duration_seconds)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#F1F1F3]">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <StatusBadge status={v.status} />
+                  {v.category && <span style={S.badge('#EEF2FF', '#4338CA')}>{v.category}</span>}
+                  {v.is_members_only && <span style={{ ...S.badge('#FFF7ED', '#C2410C'), fontSize: 10 }}>Members</span>}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => openEdit(v)} className="p-2 rounded-lg bg-[#F3F4F6]" style={{ color: C.primary }}>
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(v)} className="p-2 rounded-lg bg-white border border-[#E4E4E8]" style={{ color: C.destructive }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && !loading && (
+            <div className="text-center py-12 text-sm" style={{ color: '#999' }}>
+              {search || filterStatus !== 'all' || filterCategory !== 'all'
+                ? 'No videos match your filters.'
+                : 'No videos yet. Tap + to get started.'}
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {/* ═══ EDIT / ADD MODAL ══════════════════════════ */}
@@ -500,7 +555,7 @@ export default function AdminVideosPage() {
               </div>
 
               {/* Duration + Status + Date row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label style={S.label}>Duration (sec)</label>
                   <input

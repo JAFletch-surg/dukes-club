@@ -10,11 +10,12 @@ import {
   passwordResetEmail,
 } from '@/lib/emails/templates'
 
-// Use service role for server-side operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
@@ -22,6 +23,7 @@ type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' |
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     // Verify the request is authenticated (either from server or admin)
     const authHeader = request.headers.get('authorization')
     const internalSecret = request.headers.get('x-internal-secret')

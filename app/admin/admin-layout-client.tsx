@@ -174,7 +174,36 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
           </div>
         </header>
 
-        <main className="p-4 lg:p-8 max-w-[1400px]">{children}</main>
+        <main className="p-4 lg:p-8 pb-20 lg:pb-8 max-w-[1400px]">{children}</main>
+
+        {/* Mobile bottom nav */}
+        {!sidebarOpen && (
+          <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-navy border-t border-white/10 safe-area-bottom">
+            <div className="flex justify-around items-center h-14">
+              {[
+                { href: '/admin', label: 'Dashboard', icon: BarChart3, end: true },
+                { href: '/admin/events', label: 'Events', icon: Calendar },
+                { href: '/admin/posts', label: 'Posts', icon: Newspaper },
+                { href: '/admin/members', label: 'Members', icon: Users },
+              ].map((item) => {
+                const Icon = item.icon
+                const active = isActive(item.href, item.end)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-medium transition-colors ${
+                      active ? 'text-gold' : 'text-white/50'
+                    }`}
+                  >
+                    <Icon size={20} strokeWidth={active ? 2 : 1.5} />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          </nav>
+        )}
       </div>
     </div>
   )
