@@ -255,7 +255,7 @@ export default function AdminVideosPage() {
 
       {/* Table */}
       {!loading && (
-        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${C.border}`, overflow: 'hidden', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#F9FAFB', borderBottom: `1px solid ${C.border}` }}>
