@@ -6,7 +6,7 @@ import { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-interface Profile {
+export interface Profile {
   id: string
   full_name: string
   email: string
@@ -51,11 +51,24 @@ export function useAuth() {
 }
 
 // ─── Provider ────────────────────────────────────────────────────────
+//
+// Accepts an optional initialUser from the server (via getUser() in a
+// Server Component like the root layout). This eliminates the loading
+// flash on first render — the client hydrates with the server-validated
+// user immediately, then onAuthStateChange keeps it in sync.
+//
+// See: https://supabase.com/docs/guides/auth/server-side/nextjs
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+interface AuthProviderProps {
+  initialUser?: User | null
+  initialProfile?: Profile | null
+  children: React.ReactNode
+}
+
+export function AuthProvider({ initialUser = null, initialProfile = null, children }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(initialUser)
+  const [profile, setProfile] = useState<Profile | null>(initialProfile)
+  const [loading, setLoading] = useState(!initialUser)
 
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
@@ -144,27 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [supabase, resolveAuth])
-
-  // ── Visibility change: manage auto-refresh lifecycle ────────────
-  //
-  // When the tab is hidden, the browser throttles timers so
-  // Supabase's auto-refresh may not fire. Using the official
-  // startAutoRefresh / stopAutoRefresh API ensures the refresh
-  // timer restarts immediately when the tab regains focus and
-  // triggers a token refresh if the access token has expired.
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        supabase.auth.startAutoRefresh()
-      } else {
-        supabase.auth.stopAutoRefresh()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [supabase])
 
   // ── Sign out ─────────────────────────────────────────────────────
 
