@@ -344,6 +344,18 @@ const CCTNote = ({ children }: { children: React.ReactNode }) => (
 )
 
 
+/* ─── Types ─── */
+interface ExamEvent {
+  id: string
+  title: string
+  slug: string
+  starts_at: string
+  location: string | null
+  event_type: string | null
+  price_pence: number | null
+  member_price_pence: number | null
+}
+
 /* ═══════════════════════════════════
    PAGE COMPONENT
 ═══════════════════════════════════ */
@@ -354,7 +366,7 @@ export default function ExamsPage() {
   const [resourcesOpen, setResourcesOpen] = useState(false)
 
   /* ─── Supabase events (for the events strip) ─── */
-  const [events, setEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<ExamEvent[]>([])
   useEffect(() => {
     const supabase = createClient()
     supabase
@@ -363,7 +375,7 @@ export default function ExamsPage() {
       .gte("starts_at", new Date().toISOString())
       .order("starts_at", { ascending: true })
       .limit(3)
-      .then(({ data }) => { if (data) setEvents(data) })
+      .then(({ data }: { data: ExamEvent[] | null }) => { if (data) setEvents(data) })
   }, [])
 
   const formatPrice = (pence: number | null) => {
