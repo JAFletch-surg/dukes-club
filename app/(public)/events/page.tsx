@@ -37,9 +37,56 @@ const formatDate = (dateStr: string) => {
 };
 
 const EventCard = ({ event }: { event: any }) => (
-  <div className="group rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy">
-    <Link href={`/events/${event.slug}`} className="block">
-      <div className="h-24 md:h-auto md:aspect-[4/3] overflow-hidden">
+  <Link href={`/events/${event.slug}`} className="block group">
+    {/* Mobile: horizontal card */}
+    <div className="md:hidden flex rounded-lg border border-navy-foreground/30 overflow-hidden bg-navy hover:border-gold/40 transition-colors">
+      <div className="w-28 shrink-0 overflow-hidden">
+        {event.featured_image_url ? (
+          <img src={event.featured_image_url} alt={event.title} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full bg-navy-foreground/10 flex items-center justify-center">
+            <CalendarDays size={24} className="text-gold/40" />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center gap-1.5">
+        <div className="flex flex-wrap gap-1">
+          <Badge className="bg-gold/20 text-gold border-gold/30 text-[9px] px-1.5 py-0">
+            {event.event_type}
+          </Badge>
+          {(event.subspecialties || []).slice(0, 2).map((sub: string) => (
+            <Badge key={sub} variant="outline" className="border-navy-foreground/30 text-navy-foreground/60 text-[9px] px-1.5 py-0">
+              {sub}
+            </Badge>
+          ))}
+        </div>
+        <h3 className="text-sm font-sans font-semibold text-navy-foreground leading-tight line-clamp-2">{event.title}</h3>
+        <div className="flex items-center gap-3 text-xs text-navy-foreground/60">
+          <span className="flex items-center gap-1">
+            <CalendarDays size={11} className="text-gold shrink-0" />
+            {formatDate(event.starts_at)}
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin size={11} className="text-gold shrink-0" />
+            {event.location}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-xs text-navy-foreground/60">
+          <PoundSterling size={11} className="text-gold shrink-0" />
+          <span>
+            {formatPrice(event.price_pence)}
+            {event.member_price_pence != null && event.member_price_pence !== event.price_pence && ` (${formatPrice(event.member_price_pence)} members)`}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center pr-3">
+        <ArrowRight size={16} className="text-navy-foreground/30 group-hover:text-gold transition-colors" />
+      </div>
+    </div>
+
+    {/* Desktop/tablet: original vertical card */}
+    <div className="hidden md:block rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy">
+      <div className="aspect-[4/3] overflow-hidden">
         {event.featured_image_url ? (
           <img src={event.featured_image_url} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
         ) : (
@@ -48,42 +95,42 @@ const EventCard = ({ event }: { event: any }) => (
           </div>
         )}
       </div>
-    </Link>
-    <div className="p-6">
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30 text-[10px]">
-          {event.event_type}
-        </Badge>
-        {(event.subspecialties || []).slice(0, 3).map((sub: string) => (
-          <Badge key={sub} variant="outline" className="border-navy-foreground/30 text-navy-foreground/70 text-[10px]">
-            {sub}
+      <div className="p-6">
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30 text-[10px]">
+            {event.event_type}
           </Badge>
-        ))}
+          {(event.subspecialties || []).slice(0, 3).map((sub: string) => (
+            <Badge key={sub} variant="outline" className="border-navy-foreground/30 text-navy-foreground/70 text-[10px]">
+              {sub}
+            </Badge>
+          ))}
+        </div>
+        <h3 className="text-lg font-sans font-semibold text-navy-foreground mb-3">{event.title}</h3>
+        <div className="space-y-1.5 mb-3">
+          <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
+            <CalendarDays size={14} className="text-gold shrink-0" />
+            <span>{formatDate(event.starts_at)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
+            <MapPin size={14} className="text-gold shrink-0" />
+            <span>{event.location}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
+            <PoundSterling size={14} className="text-gold shrink-0" />
+            <span>
+              {formatPrice(event.price_pence)}
+              {event.member_price_pence != null && event.member_price_pence !== event.price_pence && ` (${formatPrice(event.member_price_pence)} members)`}
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-navy-foreground/70 mb-4 line-clamp-2">{event.description_plain}</p>
+        <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors">
+          Read more <ArrowRight size={14} />
+        </span>
       </div>
-      <h3 className="text-lg font-sans font-semibold text-navy-foreground mb-3">{event.title}</h3>
-      <div className="space-y-1.5 mb-3">
-        <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
-          <CalendarDays size={14} className="text-gold shrink-0" />
-          <span>{formatDate(event.starts_at)}</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
-          <MapPin size={14} className="text-gold shrink-0" />
-          <span>{event.location}</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
-          <PoundSterling size={14} className="text-gold shrink-0" />
-          <span>
-            {formatPrice(event.price_pence)}
-            {event.member_price_pence != null && event.member_price_pence !== event.price_pence && ` (${formatPrice(event.member_price_pence)} members)`}
-          </span>
-        </div>
-      </div>
-      <p className="text-sm text-navy-foreground/70 mb-4 line-clamp-2">{event.description_plain}</p>
-      <Link href={`/events/${event.slug}`} className="inline-flex items-center gap-1 text-sm font-medium text-gold hover:text-gold/80 transition-colors">
-        Read more <ArrowRight size={14} />
-      </Link>
     </div>
-  </div>
+  </Link>
 );
 
 const FilterTagButton = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
@@ -351,12 +398,56 @@ const EventsPage = () => {
                   {/* Featured Event */}
                   {featuredEvent && (
                     <div>
-                      <div className="flex items-center gap-2 mb-4">
+                      <div className="flex items-center gap-2 mb-3 md:mb-4">
                         <Star size={16} className="text-gold fill-gold" />
                         <p className="text-gold font-semibold text-sm tracking-widest uppercase">Featured Event</p>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-0 rounded-lg border-2 border-navy-foreground overflow-hidden bg-navy">
-                        <div className="aspect-[4/3] md:aspect-auto overflow-hidden">
+
+                      {/* Mobile: compact featured card */}
+                      <Link href={`/events/${featuredEvent.slug}`} className="md:hidden block group">
+                        <div className="rounded-lg border border-gold/40 overflow-hidden bg-navy">
+                          <div className="h-32 overflow-hidden relative">
+                            {featuredEvent.featured_image_url ? (
+                              <img src={featuredEvent.featured_image_url} alt={featuredEvent.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-navy-foreground/10 flex items-center justify-center">
+                                <CalendarDays size={32} className="text-gold/30" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/40 to-transparent" />
+                            <div className="absolute bottom-2 left-3 flex flex-wrap gap-1">
+                              <Badge className="bg-gold/20 text-gold border-gold/30 text-[9px] px-1.5 py-0 backdrop-blur-sm">{featuredEvent.event_type}</Badge>
+                              {(featuredEvent.subspecialties || []).slice(0, 2).map((sub: string) => (
+                                <Badge key={sub} variant="outline" className="border-navy-foreground/40 text-navy-foreground/80 text-[9px] px-1.5 py-0 backdrop-blur-sm">{sub}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="p-3 space-y-2">
+                            <h2 className="text-base font-sans font-bold text-navy-foreground leading-tight">{featuredEvent.title}</h2>
+                            <div className="flex items-center gap-3 text-xs text-navy-foreground/70">
+                              <span className="flex items-center gap-1">
+                                <CalendarDays size={11} className="text-gold shrink-0" />
+                                {formatDate(featuredEvent.starts_at)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MapPin size={11} className="text-gold shrink-0" />
+                                {featuredEvent.location}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <PoundSterling size={11} className="text-gold shrink-0" />
+                                {formatPrice(featuredEvent.price_pence)}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors">
+                              Register Now <ArrowRight size={14} />
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+
+                      {/* Desktop/tablet: original two-column featured card */}
+                      <div className="hidden md:grid grid-cols-2 gap-0 rounded-lg border-2 border-navy-foreground overflow-hidden bg-navy">
+                        <div className="overflow-hidden">
                           {featuredEvent.featured_image_url ? (
                             <img src={featuredEvent.featured_image_url} alt={featuredEvent.title} className="w-full h-full object-cover" />
                           ) : (
@@ -365,14 +456,14 @@ const EventsPage = () => {
                             </div>
                           )}
                         </div>
-                        <div className="p-6 md:p-8 flex flex-col justify-center">
+                        <div className="p-8 flex flex-col justify-center">
                           <div className="flex flex-wrap gap-1.5 mb-4">
                             <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30">{featuredEvent.event_type}</Badge>
                             {(featuredEvent.subspecialties || []).map((sub: string) => (
                               <Badge key={sub} variant="outline" className="border-navy-foreground/30 text-navy-foreground/70">{sub}</Badge>
                             ))}
                           </div>
-                          <h2 className="text-xl md:text-2xl font-sans font-bold text-navy-foreground mb-3">{featuredEvent.title}</h2>
+                          <h2 className="text-2xl font-sans font-bold text-navy-foreground mb-3">{featuredEvent.title}</h2>
                           <div className="space-y-1.5 mb-4">
                             <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
                               <CalendarDays size={14} className="text-gold shrink-0" /><span>{formatDate(featuredEvent.starts_at)}</span>
@@ -409,7 +500,7 @@ const EventsPage = () => {
                       </div>
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                           {paginatedEvents.map((event) => <EventCard key={event.id} event={event} />)}
                         </div>
 

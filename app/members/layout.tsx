@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/lib/use-auth";
+import { createClient } from "@/lib/supabase/client";
 
 const navSections = [
   {
@@ -63,8 +64,52 @@ const bottomNavItems = [
 const MembersLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { profile, signOut, isAdmin } = useAuth();
+  const { profile, user, signOut, isAdmin } = useAuth();
   const initials = profile?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?';
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread message count for sidebar badge
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+
+    async function fetchUnread() {
+      const { data: myConvs } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user!.id);
+
+      if (!myConvs || myConvs.length === 0) return;
+
+      let total = 0;
+      for (const conv of myConvs) {
+        const { data: readData } = await supabase
+          .from('message_reads')
+          .select('last_read_at')
+          .eq('conversation_id', conv.conversation_id)
+          .eq('user_id', user!.id)
+          .single();
+
+        const lastReadAt = readData?.last_read_at || '1970-01-01';
+
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', conv.conversation_id)
+          .neq('sender_id', user!.id)
+          .gt('created_at', lastReadAt);
+
+        total += count || 0;
+      }
+      setUnreadCount(total);
+    }
+
+    fetchUnread();
+
+    // Re-check when navigating back to update badge
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Lock body scroll when sidebar is open
   useEffect(() => {
@@ -137,6 +182,11 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
                   >
                     <item.icon size={18} />
                     <span>{item.title}</span>
+                    {item.path === '/members/messages' && unreadCount > 0 && (
+                      <span className="ml-auto bg-gold text-gold-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
