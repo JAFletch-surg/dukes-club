@@ -22,68 +22,85 @@ const MembersDashboard = () => {
   const [questionStats, setQuestionStats] = useState<any>(null);
 
   useEffect(() => {
+    // Don't fetch until auth has resolved on the client
+    if (authLoading) return;
+
     async function fetchDashboardData() {
-      // Fetch upcoming published events
-      const { data: events } = await supabase
-        .from('events')
-        .select('id, title, slug, starts_at, location, member_price_pence, price_pence')
-        .eq('status', 'published')
-        .gte('starts_at', new Date().toISOString())
-        .order('starts_at', { ascending: true })
-        .limit(3);
+      try {
+        // Check client-side auth state
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[Dashboard] Session exists:', !!session, 'User from context:', !!user);
 
-      if (events) setUpcomingEvents(events);
+        // Fetch upcoming published events
+        const { data: events, error: eventsErr } = await supabase
+          .from('events')
+          .select('id, title, slug, starts_at, location, member_price_pence, price_pence')
+          .eq('status', 'published')
+          .gte('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(3);
 
-      // Fetch ALL published events (for calendar)
-      const { data: allEventsData } = await supabase
-        .from('events')
-        .select('id, title, slug, starts_at, ends_at, location, event_type, price_pence')
-        .eq('status', 'published')
-        .order('starts_at', { ascending: true });
-      if (allEventsData) setAllEvents(allEventsData);
+        if (eventsErr) console.error('[Dashboard] Events error:', eventsErr.message);
+        if (events) setUpcomingEvents(events);
 
-      // Fetch external calendar dates
-      const { data: calDates } = await supabase
-        .from('calendar_dates')
-        .select('*')
-        .order('start_date', { ascending: true });
-      if (calDates) setCalendarDates(calDates);
+        // Fetch ALL published events (for calendar)
+        const { data: allEventsData, error: allEventsErr } = await supabase
+          .from('events')
+          .select('id, title, slug, starts_at, ends_at, location, event_type, price_pence')
+          .eq('status', 'published')
+          .order('starts_at', { ascending: true });
+        if (allEventsErr) console.error('[Dashboard] All events error:', allEventsErr.message);
+        if (allEventsData) setAllEvents(allEventsData);
 
-      // Fetch latest published videos
-      const { data: videos } = await supabase
-        .from('videos')
-        .select('id, title, speaker, duration_seconds, category, thumbnail_url')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (videos) setLatestVideos(videos);
-
-      // Fetch user's event bookings and question stats
-      if (user) {
-        const { data: bookings } = await supabase
-          .from('event_bookings')
-          .select('*, events!event_bookings_event_id_fkey(title, slug, starts_at, ends_at, location, event_type, zoom_url)')
-          .eq('user_id', user.id)
-          .neq('status', 'cancelled')
-          .order('created_at', { ascending: false });
-
-        if (bookings) setMyBookings(bookings);
-
-        // Fetch question stats
-        const { data: qStats } = await supabase
-          .from('user_question_stats')
+        // Fetch external calendar dates
+        const { data: calDates, error: calErr } = await supabase
+          .from('calendar_dates')
           .select('*')
-          .eq('user_id', user.id)
-          .single();
-        if (qStats) setQuestionStats(qStats);
-      }
+          .order('start_date', { ascending: true });
+        if (calErr) console.error('[Dashboard] Calendar error:', calErr.message);
+        if (calDates) setCalendarDates(calDates);
 
-      setLoadingData(false);
+        // Fetch latest published videos
+        const { data: videos, error: videosErr } = await supabase
+          .from('videos')
+          .select('id, title, speaker, duration_seconds, category, thumbnail_url')
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (videosErr) console.error('[Dashboard] Videos error:', videosErr.message);
+        if (videos) setLatestVideos(videos);
+
+        // Fetch user's event bookings and question stats
+        if (user) {
+          const { data: bookings, error: bookingsErr } = await supabase
+            .from('event_bookings')
+            .select('*, events!event_bookings_event_id_fkey(title, slug, starts_at, ends_at, location, event_type, zoom_url)')
+            .eq('user_id', user.id)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false });
+
+          if (bookingsErr) console.error('[Dashboard] Bookings error:', bookingsErr.message);
+          if (bookings) setMyBookings(bookings);
+
+          // Fetch question stats - use maybeSingle() since user may not have stats yet
+          const { data: qStats, error: qStatsErr } = await supabase
+            .from('user_question_stats')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
+          if (qStats) setQuestionStats(qStats);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Failed to load data:', err);
+      } finally {
+        setLoadingData(false);
+      }
     }
 
     fetchDashboardData();
-  }, [user]);
+  }, [user, authLoading]);
 
   const handleCancelBooking = async (bookingId: string) => {
     if (!confirm('Are you sure you want to cancel this application? This cannot be undone.')) return;

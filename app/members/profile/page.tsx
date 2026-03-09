@@ -14,10 +14,11 @@ import { useAuth } from "@/lib/use-auth";
 import { createClient } from "@/lib/supabase/client";
 
 const regions = [
-  "Mersey", "Wessex", "North East Thames", "North West", "Yorkshire",
-  "South West", "South Wales", "Scotland", "Republic of Ireland",
-  "East Anglia", "SE Thames", "Oxford", "Northern", "North West Thames",
-  "West Midlands", "North Wales", "East Midlands", "Northern Ireland",
+  "North East", "North West (Mersey)", "North West (North Western)",
+  "Yorkshire and the Humber", "East Midlands", "West Midlands",
+  "East of England", "London", "Kent, Surrey and Sussex", "Thames Valley",
+  "Wessex", "South West (Peninsula)", "South West (Severn)",
+  "Scotland", "Wales", "Northern Ireland", "Republic of Ireland",
 ];
 
 const trainingStages = [
@@ -47,7 +48,7 @@ const MemberProfile = () => {
   const [acpgbiNumber, setAcpgbiNumber] = useState('');
   const [subspecialties, setSubspecialties] = useState<string[]>([]);
   const [directorySettings, setDirectorySettings] = useState({
-    visible: false,
+    visible: true,
     show_email: false,
     show_hospital: true,
     show_region: true,

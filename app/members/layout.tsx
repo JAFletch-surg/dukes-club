@@ -1,13 +1,12 @@
 'use client'
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Home, Video, Play, Mic, BookOpen, FileText, Globe, Users,
-  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink, Award, MessageSquare,
+  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink, Award, MessageSquare, Calendar,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/use-auth";
@@ -52,11 +51,30 @@ const navSections = [
   },
 ];
 
+// Bottom nav items for mobile — the 5 most important sections
+const bottomNavItems = [
+  { title: "Home", path: "/members", icon: Home, end: true },
+  { title: "Videos", path: "/members/videos", icon: Video },
+  { title: "Questions", path: "/members/questions", icon: FileText },
+  { title: "Events", path: "/events", icon: Calendar },
+  { title: "Profile", path: "/members/profile", icon: Settings },
+];
+
 const MembersLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const { profile, signOut, isAdmin } = useAuth();
   const initials = profile?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?';
+
+  // Lock body scroll when sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   const isActive = (path: string, end?: boolean) => {
     if (end) return pathname === path;
@@ -151,28 +169,63 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
         {sidebarContent}
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-foreground/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="relative w-[260px] h-full bg-navy flex flex-col z-10">
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
+      {/* Mobile Sidebar Overlay — animated */}
+      <div
+        className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
+          sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="absolute inset-0 bg-foreground/50" onClick={() => setSidebarOpen(false)} />
+        <aside
+          className={`relative w-[280px] h-full bg-navy flex flex-col z-10 shadow-2xl transition-transform duration-300 ease-out ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="absolute top-5 right-4 text-navy-foreground/40 hover:text-navy-foreground transition-colors z-20"
+          >
+            <X size={20} />
+          </button>
+          {sidebarContent}
+        </aside>
+      </div>
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Bar */}
-        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 shrink-0">
+        {/* Mobile Header — navy branded */}
+        <header className="lg:hidden bg-navy shrink-0">
+          <div className="flex items-center justify-between px-4 h-14">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="text-navy-foreground/70 hover:text-navy-foreground transition-colors"
+              >
+                <Menu size={22} />
+              </button>
+              <Link href="/members" className="flex items-center gap-2">
+                <img src="/images/logo-white.png" alt="Dukes' Club" className="h-7 object-contain" />
+              </Link>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/members/profile">
+                <Avatar className="h-8 w-8 ring-2 ring-navy-foreground/20">
+                  <AvatarFallback className="bg-gold text-gold-foreground text-xs font-semibold">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+            </div>
+          </div>
+          {/* Gold accent line */}
+          <div className="h-[2px] bg-gradient-to-r from-gold via-gold/60 to-transparent" />
+        </header>
+
+        {/* Desktop Header */}
+        <header className="hidden lg:flex h-14 bg-card border-b border-border items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-3">
-            <button
-              className="lg:hidden text-foreground"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu size={22} />
-            </button>
-            <div className="relative hidden sm:block">
+            <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search..."
@@ -181,7 +234,7 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-foreground hidden sm:inline">
+            <span className="text-sm font-medium text-foreground">
               {profile?.full_name || 'Member'}
             </span>
             <Avatar className="h-8 w-8">
@@ -192,10 +245,35 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
           </div>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        {/* Content — add bottom padding on mobile for bottom nav */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
+          <div className="flex items-center justify-around h-16 px-2 safe-area-pb">
+            {bottomNavItems.map((item) => {
+              const active = isActive(item.path, item.end);
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-0 ${
+                    active
+                      ? "text-gold"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+                  <span className={`text-[10px] font-medium truncate ${active ? "text-gold" : ""}`}>
+                    {item.title}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

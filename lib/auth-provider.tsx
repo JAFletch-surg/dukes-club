@@ -125,11 +125,10 @@ export function AuthProvider({ initialUser = null, initialProfile = null, childr
 
   // ── Auth state: single source of truth via onAuthStateChange ─────
   //
-  // onAuthStateChange fires INITIAL_SESSION synchronously when the
-  // listener is registered, giving us the stored session. It then
-  // fires SIGNED_IN, TOKEN_REFRESHED, SIGNED_OUT as they happen.
-  // This is the recommended Supabase pattern — no separate
-  // getUser() / getSession() call that can race with the listener.
+  // IMPORTANT: The callback must NOT be async — Supabase warns that
+  // async callbacks can interfere with token refresh. Instead we
+  // schedule resolveAuth via setTimeout so it runs outside the
+  // auth state change handler.
 
   useEffect(() => {
     let mounted = true
@@ -137,8 +136,10 @@ export function AuthProvider({ initialUser = null, initialProfile = null, childr
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
+      (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return
+
+        console.log('[Auth] onAuthStateChange:', event, 'session:', !!session)
 
         if (event === 'SIGNED_OUT') {
           setUser(null)
@@ -147,8 +148,10 @@ export function AuthProvider({ initialUser = null, initialProfile = null, childr
           return
         }
 
-        // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED
-        await resolveAuth(session?.user ?? null)
+        // Schedule outside the callback to avoid blocking token refresh
+        setTimeout(() => {
+          if (mounted) resolveAuth(session?.user ?? null)
+        }, 0)
       }
     )
 
@@ -157,6 +160,28 @@ export function AuthProvider({ initialUser = null, initialProfile = null, childr
       subscription.unsubscribe()
     }
   }, [supabase, resolveAuth])
+
+  // ── Recover session when tab becomes visible again ─────────────
+  //
+  // Browsers throttle timers in background tabs, so the Supabase
+  // auto-refresh can miss its window. When the user returns to the
+  // tab, we manually check and refresh the session.
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[Auth] Tab visible — refreshing session')
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            setUser(session.user)
+          }
+        })
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [supabase])
 
   // ── Sign out ─────────────────────────────────────────────────────
 

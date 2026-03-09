@@ -26,10 +26,11 @@ const trainingStages = [
 ]
 
 const regions = [
-  "Mersey", "Wessex", "North East Thames", "North West", "Yorkshire",
-  "South West", "South Wales", "Scotland", "Republic of Ireland",
-  "East Anglia", "SE Thames", "Oxford", "Northern", "North West Thames",
-  "West Midlands", "North Wales", "East Midlands", "Northern Ireland",
+  "North East", "North West (Mersey)", "North West (North Western)",
+  "Yorkshire and the Humber", "East Midlands", "West Midlands",
+  "East of England", "London", "Kent, Surrey and Sussex", "Thames Valley",
+  "Wessex", "South West (Peninsula)", "South West (Severn)",
+  "Scotland", "Wales", "Northern Ireland", "Republic of Ireland",
 ]
 
 const RegisterPage = () => {
@@ -37,6 +38,7 @@ const RegisterPage = () => {
     fullName: "", email: "", password: "", confirmPassword: "",
     acpgbiNumber: "", region: "", trainingStage: "",
   })
+  const [directoryVisible, setDirectoryVisible] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -84,6 +86,7 @@ const RegisterPage = () => {
           region: formData.region,
           training_stage: formData.trainingStage,
           acpgbi_number: formData.acpgbiNumber || null,
+          directory_visible: directoryVisible,
         },
         emailRedirectTo: `${window.location.origin}/login?verified=true`,
       },
@@ -278,6 +281,19 @@ const RegisterPage = () => {
             />
             <p className="text-xs text-muted-foreground">If you&apos;re a paying Dukes&apos; Club member via ACPGBI, enter your membership number for full access</p>
           </div>
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={directoryVisible}
+              onChange={(e) => setDirectoryVisible(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border accent-gold"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">Show me in the Member Directory</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Other members can see your name, region and training stage. You can change this later in your profile.</p>
+            </div>
+          </label>
 
           <Button
             type="submit"
