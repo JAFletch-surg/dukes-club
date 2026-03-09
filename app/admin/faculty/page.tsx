@@ -88,14 +88,14 @@ export default function FacultyAdmin() {
     <div>
       {toast && <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg text-white text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.msg}</div>}
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-sans font-bold text-slate-800">Faculty</h1>
           <p className="text-sm text-gray-500 mt-1">
             {search ? `${filtered.length} of ${faculty.length}` : faculty.length} faculty members
           </p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Faculty</button>
+        <button onClick={openNew} className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Faculty</button>
       </div>
 
       <div className="relative mb-5 max-w-sm">
@@ -118,7 +118,9 @@ export default function FacultyAdmin() {
           )}
         </div>
       )
-      : <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      : <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-100">
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>
@@ -157,7 +159,41 @@ export default function FacultyAdmin() {
               </tr>
             ))}</tbody>
           </table>
-        </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {filtered.map((f: any) => (
+              <div key={f.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  {f.photo_url && f.photo_url.startsWith('http') ? (
+                    <img src={f.photo_url} alt={f.full_name} className="w-10 h-10 rounded-full object-cover bg-gray-100" />
+                  ) : (
+                    <div className="w-10 h-10 bg-emerald-700 text-white rounded-full flex items-center justify-center text-xs font-bold">{initials(f.full_name || '?')}</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-slate-800 truncate">{f.full_name}</p>
+                    <p className="text-xs text-gray-500 truncate">{f.position_title || '—'}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => openEdit(f)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Edit size={15} /></button>
+                    <button onClick={() => handleDelete(f.id)} disabled={deleting === f.id} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600">{deleting === f.id ? <Loader className="animate-spin" size={15} /> : <Trash2 size={15} />}</button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {f.hospital && <span className="text-xs text-gray-500">{f.hospital}</span>}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${f.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{f.is_active ? 'Active' : 'Inactive'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      }
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700">
+        <Plus size={24} />
+      </button>
       }
 
       {editing !== null && (
@@ -167,7 +203,7 @@ export default function FacultyAdmin() {
               <h2 className="text-lg font-sans font-bold">{editing === 'new' ? 'Add Faculty' : 'Edit Faculty'}</h2>
               <button onClick={() => setEditing(null)} className="p-1 rounded hover:bg-gray-100"><X size={18} /></button>
             </div>
-            <div className="px-6 py-5 space-y-4">
+            <div className="p-4 sm:px-6 sm:py-5 space-y-4">
 
               {/* Photo Upload */}
               <div>
@@ -218,13 +254,13 @@ export default function FacultyAdmin() {
               </div>
 
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">Full Name *</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="block text-xs font-semibold text-gray-700 mb-1">Position / Title</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.position_title} onChange={(e) => setForm({ ...form, position_title: e.target.value })} placeholder="e.g. Consultant Surgeon" /></div>
                 <div><label className="block text-xs font-semibold text-gray-700 mb-1">Hospital</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })} placeholder="e.g. St Mark's Hospital" /></div>
               </div>
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">Email</label><input type="email" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">Bio</label><textarea className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Short biography..." /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="block text-xs font-semibold text-gray-700 mb-1">Sort Order</label><input type="number" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} /></div>
                 <div className="flex items-end pb-1"><label className="flex items-center gap-2 text-sm font-medium text-gray-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="rounded" />Active</label></div>
               </div>

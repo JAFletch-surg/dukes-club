@@ -324,14 +324,14 @@ export default function QuestionsAdmin() {
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 200, padding: '12px 20px', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,.15)', background: toast.type === 'ok' ? '#16a34a' : '#DB2424' }}>{toast.msg}</div>}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-7">
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F1F3D' }}>Question Bank</h1>
           <p style={{ fontSize: 14, color: '#504F58', marginTop: 4 }}>
             {questions.length} questions · {counts.published} published · {counts.draft} drafts · {counts.withImages} with images
           </p>
         </div>
-        <button onClick={openNew} style={S.btn}><Plus size={16} strokeWidth={2.5} /> Add Question</button>
+        <button onClick={openNew} className="hidden sm:flex" style={{ ...S.btn }}><Plus size={16} strokeWidth={2.5} /> Add Question</button>
       </div>
 
       {/* ══ REPORTED ISSUES BANNER ══════════════════════════════════ */}
@@ -480,7 +480,8 @@ export default function QuestionsAdmin() {
           <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{search || filterTopic || filterDiff || filterStatus ? 'Try adjusting your filters' : 'Add your first question to get started'}</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #F1F1F3' }}>
@@ -538,7 +539,48 @@ export default function QuestionsAdmin() {
             Showing {filtered.length} of {questions.length} questions
           </div>
         </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map((q: any) => {
+            const isFlagged = flaggedQuestionIds.has(q.id)
+            return (
+              <div key={q.id} style={{ background: isFlagged ? '#FEF2F2' : '#fff', borderRadius: 12, border: `1px solid ${isFlagged ? '#FECACA' : '#D1D1D6'}`, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, color: '#181820', fontSize: 14, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {isFlagged && <Flag size={14} style={{ color: '#DC2626', display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} />}
+                      {q.image_url && <ImageIcon size={14} style={{ color: '#C49A6C', display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} />}
+                      {q.question_text}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    <button onClick={() => openEdit(q)} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#504F58' }}><Edit size={16} /></button>
+                    <button onClick={() => handleDelete(q.id)} disabled={deleting === q.id} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6' }}>
+                      {deleting === q.id ? <Loader className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={diffBadge(q.difficulty)}>{q.difficulty}</span>
+                  <span style={S.badge(q.status === 'published' ? '#f0fdf4' : q.status === 'archived' ? '#F3F4F6' : '#fefce8', q.status === 'published' ? '#16a34a' : q.status === 'archived' ? '#666' : '#a16207')}>{q.status}</span>
+                  {q.reviewed && <span style={S.badge('#EFF6FF', '#2563EB')}>✓</span>}
+                  {isFlagged && <span style={S.badge('#FEF2F2', '#DC2626')}>reported</span>}
+                  <span style={{ fontSize: 11, color: '#888' }}>{getTopicName(q.topic_id)}</span>
+                </div>
+              </div>
+            )
+          })}
+          <div style={{ fontSize: 12, color: '#888', textAlign: 'center', padding: 8 }}>
+            Showing {filtered.length} of {questions.length} questions
+          </div>
+        </div>
       )}
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center" style={{ ...S.btn, padding: 0, borderRadius: '50%' }}>
+        <Plus size={24} />
+      </button>
 
       {/* ── Preview ──────────────────────────────── */}
       {previewing && editing !== null && (
@@ -558,7 +600,7 @@ export default function QuestionsAdmin() {
                 <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6', padding: 4 }}><X size={20} /></button>
               </div>
             </div>
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+            <div className="p-4 sm:px-7 sm:py-6" style={{ display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
 
               {/* Question image */}
               <ImageUploadBox value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} folder="questions" label="Question Image (clinical photos, radiology, diagrams)" />
@@ -589,7 +631,7 @@ export default function QuestionsAdmin() {
               <ImageUploadBox value={form.explanation_image_url} onChange={(url) => setForm({ ...form, explanation_image_url: url })} folder="questions/explanations" label="Explanation Image (optional — diagrams, algorithms, reference images)" height={120} />
 
               {/* Classification */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label style={S.label}>Topic</label>
                   <select style={S.select} value={form.topic_id} onChange={(e) => setForm({ ...form, topic_id: e.target.value })}>
@@ -607,7 +649,7 @@ export default function QuestionsAdmin() {
                 <div><label style={S.label}>Subtopic (optional)</label><input style={S.input} value={form.subtopic} onChange={(e) => setForm({ ...form, subtopic: e.target.value })} placeholder="e.g. TNM Staging, Lynch Syndrome" /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
                   <label style={S.label}>Difficulty</label>
                   <select style={S.select} value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })}>
@@ -628,7 +670,7 @@ export default function QuestionsAdmin() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'end' }}>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3.5 sm:items-end">
                 <div><label style={S.label}>Source</label><input style={S.input} value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="e.g. Original, Past Paper 2024, Contributed" /></div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 600, color: '#181820', cursor: 'pointer', paddingBottom: 8 }}>
                   <input type="checkbox" checked={form.reviewed} onChange={(e) => setForm({ ...form, reviewed: e.target.checked })} style={{ width: 18, height: 18 }} />
