@@ -400,7 +400,10 @@ function MessagesContent() {
 
         // If it's in the active conversation, add to messages
         if (newMsg.conversation_id === activeConvId) {
-          // Fetch sender profile
+          // Skip if this is our own message (already added optimistically)
+          if (newMsg.sender_id === user.id) return
+
+          // Fetch sender profile for other people's messages
           supabase
             .from('profiles')
             .select('full_name, avatar_url')
@@ -410,15 +413,13 @@ function MessagesContent() {
               setMessages(prev => [...prev, { ...newMsg, sender: senderProfile }])
               setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
 
-              // Mark as read if we're viewing this conversation
-              if (newMsg.sender_id !== user.id) {
-                supabase.from('message_reads').upsert({
-                  conversation_id: newMsg.conversation_id,
-                  user_id: user.id,
-                  last_read_message_id: newMsg.id,
-                  last_read_at: new Date().toISOString(),
-                }, { onConflict: 'conversation_id,user_id' })
-              }
+              // Mark as read
+              supabase.from('message_reads').upsert({
+                conversation_id: newMsg.conversation_id,
+                user_id: user.id,
+                last_read_message_id: newMsg.id,
+                last_read_at: new Date().toISOString(),
+              }, { onConflict: 'conversation_id,user_id' })
             })
         } else {
           // Increment unread for another conversation
@@ -442,15 +443,37 @@ function MessagesContent() {
     const content = newMessage.trim()
     setNewMessage('')
 
-    await supabase.from('messages').insert({
+    const now = new Date().toISOString()
+
+    // Optimistically add the message to the UI immediately
+    const optimisticMsg = {
+      id: `optimistic-${Date.now()}`,
       conversation_id: activeConvId,
       sender_id: user.id,
       content,
-    })
+      is_deleted: false,
+      created_at: now,
+      sender: { full_name: profile?.full_name || 'You', avatar_url: profile?.avatar_url || null },
+    }
+    setMessages(prev => [...prev, optimisticMsg])
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+
+    const { data: inserted } = await supabase.from('messages').insert({
+      conversation_id: activeConvId,
+      sender_id: user.id,
+      content,
+    }).select('id').single()
+
+    // Replace optimistic message with real one (update id so realtime won't duplicate)
+    if (inserted) {
+      setMessages(prev => prev.map(m =>
+        m.id === optimisticMsg.id ? { ...m, id: inserted.id } : m
+      ))
+    }
 
     // Update conversation last_message_at
     await supabase.from('conversations').update({
-      last_message_at: new Date().toISOString(),
+      last_message_at: now,
     }).eq('id', activeConvId)
 
     setSending(false)
