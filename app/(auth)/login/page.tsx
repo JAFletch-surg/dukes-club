@@ -33,7 +33,7 @@ const LoginForm = () => {
     setIsLoading(true)
     const supabase = createClient()
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -50,23 +50,24 @@ const LoginForm = () => {
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
+    const signedInUser = data.user
+    if (signedInUser) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, approval_status')
-        .eq('id', user.id)
+        .eq('id', signedInUser.id)
         .single()
 
       if (profile?.approval_status === 'pending') {
-        router.push('/pending-approval')
+        // Full navigation ensures middleware runs with fresh auth cookies
+        window.location.href = '/pending-approval'
         return
       }
 
       if (['admin', 'super_admin', 'editor'].includes(profile?.role || '')) {
-        router.push(redirect.startsWith('/admin') ? redirect : '/admin')
+        window.location.href = redirect.startsWith('/admin') ? redirect : '/admin'
       } else {
-        router.push(redirect.startsWith('/members') ? redirect : '/members')
+        window.location.href = redirect.startsWith('/members') ? redirect : '/members'
       }
     }
   }
