@@ -23,63 +23,67 @@ const MembersDashboard = () => {
 
   useEffect(() => {
     async function fetchDashboardData() {
-      // Fetch upcoming published events
-      const { data: events } = await supabase
-        .from('events')
-        .select('id, title, slug, starts_at, location, member_price_pence, price_pence')
-        .eq('status', 'published')
-        .gte('starts_at', new Date().toISOString())
-        .order('starts_at', { ascending: true })
-        .limit(3);
+      try {
+        // Fetch upcoming published events
+        const { data: events } = await supabase
+          .from('events')
+          .select('id, title, slug, starts_at, location, member_price_pence, price_pence')
+          .eq('status', 'published')
+          .gte('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(3);
 
-      if (events) setUpcomingEvents(events);
+        if (events) setUpcomingEvents(events);
 
-      // Fetch ALL published events (for calendar)
-      const { data: allEventsData } = await supabase
-        .from('events')
-        .select('id, title, slug, starts_at, ends_at, location, event_type, price_pence')
-        .eq('status', 'published')
-        .order('starts_at', { ascending: true });
-      if (allEventsData) setAllEvents(allEventsData);
+        // Fetch ALL published events (for calendar)
+        const { data: allEventsData } = await supabase
+          .from('events')
+          .select('id, title, slug, starts_at, ends_at, location, event_type, price_pence')
+          .eq('status', 'published')
+          .order('starts_at', { ascending: true });
+        if (allEventsData) setAllEvents(allEventsData);
 
-      // Fetch external calendar dates
-      const { data: calDates } = await supabase
-        .from('calendar_dates')
-        .select('*')
-        .order('start_date', { ascending: true });
-      if (calDates) setCalendarDates(calDates);
-
-      // Fetch latest published videos
-      const { data: videos } = await supabase
-        .from('videos')
-        .select('id, title, speaker, duration_seconds, category, thumbnail_url')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (videos) setLatestVideos(videos);
-
-      // Fetch user's event bookings and question stats
-      if (user) {
-        const { data: bookings } = await supabase
-          .from('event_bookings')
-          .select('*, events!event_bookings_event_id_fkey(title, slug, starts_at, ends_at, location, event_type, zoom_url)')
-          .eq('user_id', user.id)
-          .neq('status', 'cancelled')
-          .order('created_at', { ascending: false });
-
-        if (bookings) setMyBookings(bookings);
-
-        // Fetch question stats
-        const { data: qStats } = await supabase
-          .from('user_question_stats')
+        // Fetch external calendar dates
+        const { data: calDates } = await supabase
+          .from('calendar_dates')
           .select('*')
-          .eq('user_id', user.id)
-          .single();
-        if (qStats) setQuestionStats(qStats);
-      }
+          .order('start_date', { ascending: true });
+        if (calDates) setCalendarDates(calDates);
 
-      setLoadingData(false);
+        // Fetch latest published videos
+        const { data: videos } = await supabase
+          .from('videos')
+          .select('id, title, speaker, duration_seconds, category, thumbnail_url')
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (videos) setLatestVideos(videos);
+
+        // Fetch user's event bookings and question stats
+        if (user) {
+          const { data: bookings } = await supabase
+            .from('event_bookings')
+            .select('*, events!event_bookings_event_id_fkey(title, slug, starts_at, ends_at, location, event_type, zoom_url)')
+            .eq('user_id', user.id)
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: false });
+
+          if (bookings) setMyBookings(bookings);
+
+          // Fetch question stats - use maybeSingle() since user may not have stats yet
+          const { data: qStats } = await supabase
+            .from('user_question_stats')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (qStats) setQuestionStats(qStats);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Failed to load data:', err);
+      } finally {
+        setLoadingData(false);
+      }
     }
 
     fetchDashboardData();
