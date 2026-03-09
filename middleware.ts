@@ -12,6 +12,7 @@ export const config = {
     '/login',
     '/register',
     '/forgot-password',
+    '/reset-password',
     '/pending-approval',
   ],
 }

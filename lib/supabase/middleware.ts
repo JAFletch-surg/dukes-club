@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
   const isAdminRoute = pathname.startsWith('/admin')
   const isMembersRoute = pathname.startsWith('/members')
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname.startsWith('/forgot-password')
+  const isResetPassword = pathname.startsWith('/reset-password')
 
   // Helper: redirect while preserving refreshed auth cookies
   function redirectWithCookies(destination: string, searchParams?: Record<string, string>) {
@@ -57,8 +58,8 @@ export async function updateSession(request: NextRequest) {
     return redirectWithCookies('/login', { redirect: pathname })
   }
 
-  // Already logged in → redirect away from auth pages
-  if (user && isAuthRoute) {
+  // Already logged in → redirect away from auth pages (but not reset-password)
+  if (user && isAuthRoute && !isResetPassword) {
     return redirectWithCookies('/members')
   }
 
