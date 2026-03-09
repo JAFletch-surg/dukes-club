@@ -395,7 +395,7 @@ function AddressGeocoder({ address, city, country, latitude, longitude, onChange
       </div>
 
       {/* City / Country (always editable) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-3.5">
         <div><label style={S.label}>City</label><input style={S.input} value={city} onChange={(e) => onChange({ city: e.target.value })} /></div>
         <div><label style={S.label}>Country</label><input style={S.input} value={country} onChange={(e) => onChange({ country: e.target.value })} /></div>
       </div>
@@ -618,13 +618,18 @@ export default function FellowshipsAdmin() {
     <div style={{ fontFamily: 'Montserrat, sans-serif' }}>
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 200, padding: '12px 20px', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,.15)', background: toast.type === 'ok' ? '#16a34a' : C.destructive }}>{toast.msg}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 28, fontWeight: 700, color: C.navy }}>Fellowships</h1>
           <p style={{ fontSize: 14, color: C.secondary, marginTop: 4 }}>{fellowships.length} fellowships in database</p>
         </div>
-        <button onClick={openNew} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}><Plus size={16} strokeWidth={2.5} /> Add Fellowship</button>
+        <button onClick={openNew} className="hidden sm:flex items-center gap-2" style={{ padding: '10px 20px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}><Plus size={16} strokeWidth={2.5} /> Add Fellowship</button>
       </div>
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform" style={{ background: C.navy, color: C.navyFg }}>
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       <input style={{ ...S.input, maxWidth: 400, marginBottom: 24 }} placeholder="Search fellowships..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
@@ -636,7 +641,9 @@ export default function FellowshipsAdmin() {
           <p style={{ fontSize: 16, fontWeight: 600, color: C.fg }}>No fellowships found</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead><tr style={{ borderBottom: `2px solid ${C.bg}` }}>
               {['Fellowship', 'Location', 'Duration', 'Supervisors', 'Status', 'Actions'].map(h => (
@@ -670,6 +677,52 @@ export default function FellowshipsAdmin() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <div className="md:hidden space-y-3">
+          {filtered.map((f: any) => (
+            <div key={f.id} className="bg-white rounded-xl border border-[#E4E4E8] p-3.5 active:bg-gray-50">
+              <div className="flex items-start gap-3">
+                {f.featured_image_url && (
+                  <img src={f.featured_image_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-snug" style={{ color: C.fg }}>{f.name}</p>
+                  {f.hospitals?.length > 0 && (
+                    <p className="text-[11px] mt-0.5" style={{ color: C.secondary }}>{f.hospitals.join(', ')}</p>
+                  )}
+                  <div className="flex items-center gap-1 mt-1 text-[11px]" style={{ color: '#999' }}>
+                    <MapPin size={10} className="shrink-0" />
+                    <span>{[f.city, f.country].filter(Boolean).join(', ') || '—'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#F1F1F3]">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span style={S.badge(f.status === 'published' ? '#f0fdf4' : '#fefce8', f.status === 'published' ? '#16a34a' : '#a16207')}>{f.status}</span>
+                  <span style={S.badge(C.primaryBg, C.primary)}>{f.duration}</span>
+                  {f.supervisors?.length > 0 && (
+                    <span className="text-[10px]" style={{ color: C.secondary }}>{f.supervisors[0]}{f.supervisors.length > 1 ? ` +${f.supervisors.length - 1}` : ''}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => openEdit(f)} className="p-2 rounded-lg bg-[#F3F4F6]" style={{ color: C.primary }}>
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(f.id)} disabled={deleting === f.id} className="p-2 rounded-lg bg-white border border-[#E4E4E8]" style={{ color: C.destructive }}>
+                    {deleting === f.id ? <Loader className="animate-spin" size={14} /> : <Trash2 size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && !loading && (
+            <div className="text-center py-12 text-sm" style={{ color: '#999' }}>
+              {search ? 'No fellowships match your search.' : 'No fellowships yet. Tap + to get started.'}
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {/* ── Modal ──────────────────────────────────── */}
@@ -677,12 +730,12 @@ export default function FellowshipsAdmin() {
         <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 16, paddingBottom: 16, overflowY: 'auto' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', margin: '0 16px' }}>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', borderRadius: '20px 20px 0 0', zIndex: 10 }}>
+            <div className="flex justify-between items-center p-4 sm:px-7 sm:py-5 border-b border-[#eee] sticky top-0 bg-white rounded-t-[20px] z-10">
               <h2 style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 22, fontWeight: 700, color: C.navy }}>{editing === 'new' ? 'Add Fellowship' : 'Edit Fellowship'}</h2>
               <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, padding: 4 }}><X size={20} /></button>
             </div>
 
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
+            <div className="p-4 sm:px-7 sm:py-6" style={{ display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
 
               <ImageUploadBox value={form.featured_image_url} onChange={(url) => setForm({ ...form, featured_image_url: url })} folder="fellowships" label="Promotional Image" />
               <div><label style={S.label}>Fellowship Name *</label><input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value, slug: slugify(e.target.value) })} placeholder="e.g. St Mark's Hospital Colorectal Fellowship" /></div>
@@ -728,12 +781,12 @@ export default function FellowshipsAdmin() {
               <div style={S.section}>
                 <div style={S.sectionTitle}><Clock size={16} /> Details</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div><label style={S.label}>Duration</label><select style={S.select} value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })}>{DURATIONS.map(d => <option key={d}>{d}</option>)}</select></div>
                     <div><label style={S.label}>Status</label><select style={S.select} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></div>
                     <div><label style={S.label}>Salary (£/year)</label><input style={S.input} type="number" value={form.salary_per_annum} onChange={(e) => setForm({ ...form, salary_per_annum: e.target.value })} placeholder="e.g. 55000" /></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 600, color: C.fg, cursor: 'pointer' }}><input type="checkbox" checked={form.accommodation_available} onChange={(e) => setForm({ ...form, accommodation_available: e.target.checked })} style={{ width: 18, height: 18 }} />Accommodation Available</label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 600, color: C.fg, cursor: 'pointer' }}><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} style={{ width: 18, height: 18 }} />Active listing</label>
                   </div>
@@ -758,7 +811,7 @@ export default function FellowshipsAdmin() {
               {/* On Call */}
               <div style={S.section}>
                 <div style={S.sectionTitle}><Clock size={16} /> On-Call Commitment</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div><label style={S.label}>Weekday On-Call</label><select style={S.select} value={form.on_call_weekday} onChange={(e) => setForm({ ...form, on_call_weekday: e.target.value })}>{ON_CALL_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
                   <div><label style={S.label}>Weekend Day</label><select style={S.select} value={form.on_call_weekend_day} onChange={(e) => setForm({ ...form, on_call_weekend_day: e.target.value })}>{ON_CALL_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
                   <div><label style={S.label}>Weekday Nights</label><select style={S.select} value={form.on_call_weekday_nights} onChange={(e) => setForm({ ...form, on_call_weekday_nights: e.target.value })}>{ON_CALL_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
@@ -777,7 +830,7 @@ export default function FellowshipsAdmin() {
             </div>
 
             {/* Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '18px 28px', borderTop: '1px solid #eee', background: '#fafafa', borderRadius: '0 0 20px 20px', position: 'sticky', bottom: 0 }}>
+            <div className="flex justify-end gap-3 p-4 sm:px-7 sm:py-5 border-t border-[#eee] bg-[#fafafa] rounded-b-[20px] sticky bottom-0">
               <button onClick={() => setEditing(null)} style={{ padding: '10px 20px', border: 'none', background: 'none', fontSize: 14, fontWeight: 600, color: C.secondary, cursor: 'pointer' }}>Cancel</button>
               <button onClick={handleSave} disabled={saving}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
