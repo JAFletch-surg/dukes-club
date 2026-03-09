@@ -150,7 +150,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
       )}
 
       {/* Main */}
-      <div className="flex-1 lg:ml-[260px] min-h-screen">
+      <div className="flex-1 lg:ml-[260px] min-h-screen min-w-0 overflow-x-hidden">
         {/* Top bar */}
         <header className="sticky top-0 z-30 bg-white border-b border-[#D1D1D6] px-4 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -174,7 +174,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
           </div>
         </header>
 
-        <main className="p-4 lg:p-8 pb-20 lg:pb-8 max-w-[1400px]">{children}</main>
+        <main className="p-4 lg:p-8 pb-20 lg:pb-8 max-w-[1400px] overflow-x-hidden">{children}</main>
 
         {/* Mobile bottom nav */}
         {!sidebarOpen && (
