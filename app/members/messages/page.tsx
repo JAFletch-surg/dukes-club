@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   MessageSquare, Send, Search, Hash, Users, Plus, ArrowLeft,
   Loader2, Check, CheckCheck, Smile, X, Settings, UserPlus,
-  ChevronDown, Circle,
+  ChevronDown, Circle, Paperclip, Image, FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/lib/use-auth'
+import { useImageUpload } from '@/lib/use-image-upload'
 
 // ─── Types ───────────────────────────────────────────
 
@@ -30,7 +31,7 @@ interface Conversation {
 
 interface ConversationWithMeta extends Conversation {
   other_user?: { id: string; full_name: string; avatar_url: string | null } | null
-  last_message?: { content: string; sender_name: string } | null
+  last_message?: { content: string; sender_name: string; attachment_type?: string | null } | null
   unread_count: number
   participant_count: number
 }
@@ -43,7 +44,12 @@ interface Message {
   is_deleted: boolean
   created_at: string
   sender?: { full_name: string; avatar_url: string | null }
+  attachment_url?: string | null
+  attachment_type?: 'image' | 'pdf' | null
+  attachment_name?: string | null
 }
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 interface MemberProfile {
   id: string
@@ -307,9 +313,14 @@ function MessagesContent() {
   const [showNewDM, setShowNewDM] = useState(false)
   const [showBrowseChannels, setShowBrowseChannels] = useState(false)
   const [showMobileSidebar, setShowMobileSidebar] = useState(true)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { upload: uploadFile, uploading: fileUploading } = useImageUpload()
 
   // ── Load conversations ─────────────────────────────
 
@@ -359,7 +370,7 @@ function MessagesContent() {
         // Get last message
         const { data: lastMsg } = await supabase
           .from('messages')
-          .select('content, sender_id, profile:profiles!messages_sender_id_profiles_fkey(full_name)')
+          .select('content, sender_id, attachment_type, profile:profiles!messages_sender_id_profiles_fkey(full_name)')
           .eq('conversation_id', conv.id)
           .eq('is_deleted', false)
           .order('created_at', { ascending: false })
@@ -369,6 +380,7 @@ function MessagesContent() {
         const last_message = lastMsg ? {
           content: lastMsg.content,
           sender_name: (lastMsg.profile as any)?.full_name || 'Unknown',
+          attachment_type: lastMsg.attachment_type,
         } : null
 
         // Get unread count
@@ -519,15 +531,39 @@ function MessagesContent() {
   // ── Send message ───────────────────────────────────
 
   const handleSend = async () => {
-    if (!user || !activeConvId || !newMessage.trim() || sending) return
+    if (!user || !activeConvId || sending) return
+    const hasText = newMessage.trim().length > 0
+    const hasFile = !!pendingFile
+    if (!hasText && !hasFile) return
+
     setSending(true)
     const content = newMessage.trim()
     setNewMessage('')
 
+    // Upload file if present
+    let attachment_url: string | null = null
+    let attachment_type: 'image' | 'pdf' | null = null
+    let attachment_name: string | null = null
+
+    if (pendingFile) {
+      attachment_type = pendingFile.type.startsWith('image/') ? 'image' : 'pdf'
+      attachment_name = pendingFile.name
+      const localPreview = pendingPreview
+
+      const url = await uploadFile(pendingFile, 'message-attachments')
+      if (!url) {
+        setSending(false)
+        setFileError('Upload failed. Please try again.')
+        return
+      }
+      attachment_url = url
+      clearPendingFile()
+    }
+
     const now = new Date().toISOString()
 
     // Optimistically add the message to the UI immediately
-    const optimisticMsg = {
+    const optimisticMsg: Message = {
       id: `optimistic-${Date.now()}`,
       conversation_id: activeConvId,
       sender_id: user.id,
@@ -535,15 +571,28 @@ function MessagesContent() {
       is_deleted: false,
       created_at: now,
       sender: { full_name: profile?.full_name || 'You', avatar_url: profile?.avatar_url || null },
+      attachment_url,
+      attachment_type,
+      attachment_name,
     }
     setMessages(prev => [...prev, optimisticMsg])
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
 
-    const { data: inserted } = await supabase.from('messages').insert({
+    const insertData: any = {
       conversation_id: activeConvId,
       sender_id: user.id,
       content,
-    }).select('id').single()
+    }
+    if (attachment_url) {
+      insertData.attachment_url = attachment_url
+      insertData.attachment_type = attachment_type
+      insertData.attachment_name = attachment_name
+    }
+
+    const { data: inserted } = await supabase.from('messages')
+      .insert(insertData)
+      .select('id')
+      .single()
 
     // Replace optimistic message with real one (update id so realtime won't duplicate)
     if (inserted) {
@@ -612,6 +661,45 @@ function MessagesContent() {
     })
     await loadConversations()
     selectConversation(convId)
+  }
+
+  // ── File attachment ───────────────────────────────
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (e.target) e.target.value = '' // reset so same file can be re-selected
+    if (!file) return
+
+    setFileError(null)
+
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError('File must be under 10MB')
+      return
+    }
+
+    const isImage = file.type.startsWith('image/')
+    const isPdf = file.type === 'application/pdf'
+
+    if (!isImage && !isPdf) {
+      setFileError('Only images and PDFs are supported')
+      return
+    }
+
+    setPendingFile(file)
+
+    if (isImage) {
+      const reader = new FileReader()
+      reader.onload = (ev) => setPendingPreview(ev.target?.result as string)
+      reader.readAsDataURL(file)
+    } else {
+      setPendingPreview(null)
+    }
+  }
+
+  const clearPendingFile = () => {
+    setPendingFile(null)
+    setPendingPreview(null)
+    setFileError(null)
   }
 
   // ── Filter conversations ───────────────────────────
@@ -722,7 +810,7 @@ function MessagesContent() {
                     </div>
                     {conv.last_message && (
                       <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        <span className="font-medium">{conv.last_message.sender_name.split(' ')[0]}:</span> {conv.last_message.content}
+                        <span className="font-medium">{conv.last_message.sender_name.split(' ')[0]}:</span> {conv.last_message.content || (conv.last_message.attachment_type === 'image' ? 'Sent a photo' : conv.last_message.attachment_type === 'pdf' ? 'Sent a PDF' : '')}
                       </p>
                     )}
                   </div>
@@ -764,7 +852,7 @@ function MessagesContent() {
                     </div>
                     {conv.last_message && (
                       <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        {conv.last_message.content}
+                        {conv.last_message.content || (conv.last_message.attachment_type === 'image' ? 'Sent a photo' : conv.last_message.attachment_type === 'pdf' ? 'Sent a PDF' : '')}
                       </p>
                     )}
                   </div>
@@ -895,13 +983,46 @@ function MessagesContent() {
                                   <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.created_at)}</span>
                                 </div>
                               )}
-                              <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
-                                isMe
-                                  ? 'bg-navy text-navy-foreground rounded-tr-md'
-                                  : 'bg-muted/50 text-foreground rounded-tl-md'
-                              }`}>
-                                {msg.content}
-                              </div>
+                              {/* Text bubble */}
+                              {msg.content && (
+                                <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
+                                  isMe
+                                    ? 'bg-navy text-navy-foreground rounded-tr-md'
+                                    : 'bg-muted/50 text-foreground rounded-tl-md'
+                                }`}>
+                                  {msg.content}
+                                </div>
+                              )}
+                              {/* Attachment */}
+                              {msg.attachment_url && msg.attachment_type === 'image' && (
+                                <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className={`block mt-1 ${!msg.content ? '' : ''}`}>
+                                  <img
+                                    src={msg.attachment_url}
+                                    alt={msg.attachment_name || 'Image'}
+                                    className="max-w-[240px] max-h-[240px] rounded-xl object-cover border border-border"
+                                  />
+                                </a>
+                              )}
+                              {msg.attachment_url && msg.attachment_type === 'pdf' && (
+                                <a
+                                  href={msg.attachment_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`flex items-center gap-2.5 px-3 py-2.5 mt-1 rounded-xl border border-border hover:bg-muted/30 transition-colors max-w-[240px] ${
+                                    isMe ? 'bg-navy/80' : 'bg-muted/30'
+                                  }`}
+                                >
+                                  <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                                    <FileText size={18} className="text-red-500" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className={`text-xs font-medium truncate ${isMe ? 'text-navy-foreground' : 'text-foreground'}`}>
+                                      {msg.attachment_name || 'Document.pdf'}
+                                    </p>
+                                    <p className={`text-[10px] ${isMe ? 'text-navy-foreground/60' : 'text-muted-foreground'}`}>PDF</p>
+                                  </div>
+                                </a>
+                              )}
                             </div>
                           </div>
                         )}
@@ -914,8 +1035,44 @@ function MessagesContent() {
             </div>
 
             {/* Composer */}
-            <div className="p-3 border-t border-border bg-card shrink-0">
-              <div className="flex items-end gap-2">
+            <div className="border-t border-border bg-card shrink-0">
+              {/* Pending file preview */}
+              {pendingFile && (
+                <div className="px-3 pt-3 pb-1">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+                    {pendingFile.type.startsWith('image/') && pendingPreview ? (
+                      <img src={pendingPreview} alt="Preview" className="h-10 w-10 rounded object-cover" />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-red-50 flex items-center justify-center">
+                        <FileText size={18} className="text-red-500" />
+                      </div>
+                    )}
+                    <span className="text-xs text-muted-foreground truncate flex-1">{pendingFile.name}</span>
+                    <button onClick={clearPendingFile} className="text-muted-foreground hover:text-foreground p-1">
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {fileError && (
+                <p className="px-4 pt-2 text-xs text-red-500">{fileError}</p>
+              )}
+              <div className="p-3 flex items-end gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf,application/pdf"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-10 w-10 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+                  title="Attach file"
+                  disabled={fileUploading}
+                >
+                  <Paperclip size={18} />
+                </button>
                 <div className="flex-1 relative">
                   <input
                     ref={inputRef}
@@ -929,16 +1086,16 @@ function MessagesContent() {
                         ? `Message #${activeConv.name}`
                         : `Message ${activeConv.other_user?.full_name || ''}`
                     }
-                    className="w-full px-4 py-2.5 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy pr-12"
+                    className="w-full px-4 py-2.5 text-sm border border-border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
                   />
                 </div>
                 <Button
                   onClick={handleSend}
-                  disabled={!newMessage.trim() || sending}
+                  disabled={(!newMessage.trim() && !pendingFile) || sending || fileUploading}
                   size="sm"
                   className="bg-navy text-navy-foreground hover:bg-navy/90 rounded-xl h-10 w-10 p-0"
                 >
-                  <Send size={16} />
+                  {fileUploading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                 </Button>
               </div>
             </div>
