@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   MessageSquare, Send, Search, Hash, Users, Plus, ArrowLeft,
   Loader2, Check, CheckCheck, Smile, X, Settings, UserPlus,
-  ChevronDown, Circle, Paperclip, Image, FileText,
+  ChevronDown, Circle, Paperclip, Image, FileText, Pencil, Trash2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/lib/use-auth'
@@ -610,6 +610,46 @@ function MessagesContent() {
     inputRef.current?.focus()
   }
 
+  // ── Edit / Delete message ────────────────────────
+
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+
+  const handleStartEdit = (msg: Message) => {
+    setEditingMsgId(msg.id)
+    setEditContent(msg.content)
+    setTimeout(() => editInputRef.current?.focus(), 50)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMsgId(null)
+    setEditContent('')
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingMsgId || !editContent.trim()) return
+    const trimmed = editContent.trim()
+
+    // Optimistic update
+    setMessages(prev => prev.map(m =>
+      m.id === editingMsgId ? { ...m, content: trimmed } : m
+    ))
+    setEditingMsgId(null)
+    setEditContent('')
+
+    await supabase.from('messages').update({ content: trimmed }).eq('id', editingMsgId)
+  }
+
+  const handleDeleteMessage = async (msgId: string) => {
+    // Optimistic: mark as deleted locally
+    setMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, is_deleted: true, content: '' } : m
+    ))
+
+    await supabase.from('messages').update({ is_deleted: true }).eq('id', msgId)
+  }
+
   // ── Create channel ─────────────────────────────────
 
   const handleCreateChannel = async (name: string, description: string) => {
@@ -961,7 +1001,7 @@ function MessagesContent() {
                         {msg.is_deleted ? (
                           <div className="py-1 px-3 text-xs text-muted-foreground italic">Message deleted</div>
                         ) : (
-                          <div className={`flex gap-2.5 ${showAvatar ? 'mt-3' : 'mt-0.5'} ${isMe ? 'flex-row-reverse' : ''}`}>
+                          <div className={`group flex gap-2.5 ${showAvatar ? 'mt-3' : 'mt-0.5'} ${isMe ? 'flex-row-reverse' : ''}`}>
                             {/* Avatar */}
                             <div className="w-8 shrink-0">
                               {showAvatar && !isMe && (
@@ -983,45 +1023,92 @@ function MessagesContent() {
                                   <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.created_at)}</span>
                                 </div>
                               )}
-                              {/* Text bubble */}
-                              {msg.content && (
-                                <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
-                                  isMe
-                                    ? 'bg-navy text-navy-foreground rounded-tr-md'
-                                    : 'bg-muted/50 text-foreground rounded-tl-md'
-                                }`}>
-                                  {msg.content}
-                                </div>
-                              )}
-                              {/* Attachment */}
-                              {msg.attachment_url && msg.attachment_type === 'image' && (
-                                <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className={`block mt-1 ${!msg.content ? '' : ''}`}>
-                                  <img
-                                    src={msg.attachment_url}
-                                    alt={msg.attachment_name || 'Image'}
-                                    className="max-w-[240px] max-h-[240px] rounded-xl object-cover border border-border"
+
+                              {/* Inline edit mode */}
+                              {editingMsgId === msg.id ? (
+                                <div className="flex items-center gap-1.5 w-full">
+                                  <input
+                                    ref={editInputRef}
+                                    value={editContent}
+                                    onChange={e => setEditContent(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleSaveEdit()
+                                      if (e.key === 'Escape') handleCancelEdit()
+                                    }}
+                                    className="flex-1 px-3 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
                                   />
-                                </a>
-                              )}
-                              {msg.attachment_url && msg.attachment_type === 'pdf' && (
-                                <a
-                                  href={msg.attachment_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`flex items-center gap-2.5 px-3 py-2.5 mt-1 rounded-xl border border-border hover:bg-muted/30 transition-colors max-w-[240px] ${
-                                    isMe ? 'bg-navy/80' : 'bg-muted/30'
-                                  }`}
-                                >
-                                  <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
-                                    <FileText size={18} className="text-red-500" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className={`text-xs font-medium truncate ${isMe ? 'text-navy-foreground' : 'text-foreground'}`}>
-                                      {msg.attachment_name || 'Document.pdf'}
-                                    </p>
-                                    <p className={`text-[10px] ${isMe ? 'text-navy-foreground/60' : 'text-muted-foreground'}`}>PDF</p>
-                                  </div>
-                                </a>
+                                  <button onClick={handleSaveEdit} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Save">
+                                    <Check size={15} />
+                                  </button>
+                                  <button onClick={handleCancelEdit} className="p-1 text-muted-foreground hover:bg-muted/50 rounded" title="Cancel">
+                                    <X size={15} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                  {/* Text bubble */}
+                                  {msg.content && (
+                                    <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
+                                      isMe
+                                        ? 'bg-navy text-navy-foreground rounded-tr-md'
+                                        : 'bg-muted/50 text-foreground rounded-tl-md'
+                                    }`}>
+                                      {msg.content}
+                                    </div>
+                                  )}
+                                  {/* Attachment */}
+                                  {msg.attachment_url && msg.attachment_type === 'image' && (
+                                    <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="block mt-1">
+                                      <img
+                                        src={msg.attachment_url}
+                                        alt={msg.attachment_name || 'Image'}
+                                        className="max-w-[240px] max-h-[240px] rounded-xl object-cover border border-border"
+                                      />
+                                    </a>
+                                  )}
+                                  {msg.attachment_url && msg.attachment_type === 'pdf' && (
+                                    <a
+                                      href={msg.attachment_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`flex items-center gap-2.5 px-3 py-2.5 mt-1 rounded-xl border border-border hover:bg-muted/30 transition-colors max-w-[240px] ${
+                                        isMe ? 'bg-navy/80' : 'bg-muted/30'
+                                      }`}
+                                    >
+                                      <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                                        <FileText size={18} className="text-red-500" />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className={`text-xs font-medium truncate ${isMe ? 'text-navy-foreground' : 'text-foreground'}`}>
+                                          {msg.attachment_name || 'Document.pdf'}
+                                        </p>
+                                        <p className={`text-[10px] ${isMe ? 'text-navy-foreground/60' : 'text-muted-foreground'}`}>PDF</p>
+                                      </div>
+                                    </a>
+                                  )}
+
+                                  {/* Edit / Delete actions (own messages only) */}
+                                  {isMe && !msg.id.startsWith('optimistic') && (
+                                    <div className={`absolute top-0 ${isMe ? '-left-16' : '-right-16'} hidden group-hover:flex items-center gap-0.5 bg-card border border-border rounded-lg shadow-sm px-0.5 py-0.5`}>
+                                      {msg.content && (
+                                        <button
+                                          onClick={() => handleStartEdit(msg)}
+                                          className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                                          title="Edit"
+                                        >
+                                          <Pencil size={13} />
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => handleDeleteMessage(msg.id)}
+                                        className="p-1.5 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
+                                        title="Delete"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
