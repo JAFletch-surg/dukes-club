@@ -135,6 +135,86 @@ function NewChannelDialog({ open, onClose, onCreate }: {
   )
 }
 
+// ─── Browse Channels Dialog ─────────────────────────
+
+function BrowseChannelsDialog({ open, onClose, onJoin, joinedIds, currentUserId }: {
+  open: boolean; onClose: () => void; onJoin: (convId: string) => void; joinedIds: Set<string>; currentUserId: string
+}) {
+  const [channels, setChannels] = useState<Conversation[]>([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    supabase
+      .from('conversations')
+      .select('*')
+      .eq('type', 'channel')
+      .eq('is_archived', false)
+      .order('name')
+      .then(({ data }) => {
+        setChannels(data || [])
+        setLoading(false)
+      })
+  }, [open])
+
+  const filtered = channels.filter(c =>
+    !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.description?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm max-h-[70vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Hash size={18} /> Browse Channels</DialogTitle>
+          <DialogDescription>Join channels to discuss topics with other members.</DialogDescription>
+        </DialogHeader>
+        <div className="relative mt-2">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search channels..." className="pl-9 h-9" />
+        </div>
+        <div className="flex-1 overflow-y-auto mt-2 -mx-2">
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" size={20} /></div>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No channels found</p>
+          ) : (
+            filtered.map(c => {
+              const joined = joinedIds.has(c.id)
+              return (
+                <div key={c.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                  <div className="w-9 h-9 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
+                    <Hash size={16} className="text-navy" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                    {c.description && (
+                      <p className="text-[11px] text-muted-foreground truncate">{c.description}</p>
+                    )}
+                  </div>
+                  {joined ? (
+                    <Badge variant="outline" className="text-[10px] shrink-0">Joined</Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => { onJoin(c.id); onClose() }}
+                      className="bg-navy text-navy-foreground hover:bg-navy/90 h-7 text-xs shrink-0"
+                    >
+                      Join
+                    </Button>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── New DM Dialog ───────────────────────────────────
 
 function NewDMDialog({ open, onClose, onSelect, currentUserId }: {
@@ -225,6 +305,7 @@ function MessagesContent() {
   const [convSearch, setConvSearch] = useState('')
   const [showNewChannel, setShowNewChannel] = useState(false)
   const [showNewDM, setShowNewDM] = useState(false)
+  const [showBrowseChannels, setShowBrowseChannels] = useState(false)
   const [showMobileSidebar, setShowMobileSidebar] = useState(true)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -548,6 +629,7 @@ function MessagesContent() {
   const dms = filteredConvs.filter(c => c.type === 'dm')
   const activeConv = conversations.find(c => c.id === activeConvId)
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread_count, 0)
+  const joinedChannelIds = useMemo(() => new Set(conversations.filter(c => c.type === 'channel').map(c => c.id)), [conversations])
 
   // ── Loading state ──────────────────────────────────
 
@@ -576,6 +658,13 @@ function MessagesContent() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-foreground">Messages</h2>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowBrowseChannels(true)}
+                className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                title="Browse channels"
+              >
+                <Hash size={18} />
+              </button>
               <button
                 onClick={() => setShowNewDM(true)}
                 className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
@@ -696,6 +785,9 @@ function MessagesContent() {
               <p className="text-sm font-medium text-muted-foreground">No conversations yet</p>
               <p className="text-xs text-muted-foreground/70 mt-1">Start a new message or join a channel</p>
               <div className="flex flex-col gap-2 mt-4">
+                <Button size="sm" variant="outline" onClick={() => setShowBrowseChannels(true)} className="mx-auto">
+                  <Hash size={14} className="mr-1.5" /> Browse Channels
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowNewDM(true)} className="mx-auto">
                   <UserPlus size={14} className="mr-1.5" /> New Message
                 </Button>
@@ -875,6 +967,7 @@ function MessagesContent() {
       {/* ── Dialogs ─────────────────────────────── */}
       <NewChannelDialog open={showNewChannel} onClose={() => setShowNewChannel(false)} onCreate={handleCreateChannel} />
       <NewDMDialog open={showNewDM} onClose={() => setShowNewDM(false)} onSelect={handleStartDM} currentUserId={user.id} />
+      <BrowseChannelsDialog open={showBrowseChannels} onClose={() => setShowBrowseChannels(false)} onJoin={handleJoinChannel} joinedIds={joinedChannelIds} currentUserId={user.id} />
     </div>
   )
 }
