@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL } from '@/lib/resend'
-import { welcomeEmail } from '@/lib/emails/templates'
+import { welcomeEmail, adminNewRegistrationEmail } from '@/lib/emails/templates'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
+const APPROVED_DOMAINS = ['nhs.net', 'nhs.uk', 'doctors.org.uk']
+const APPROVED_SUFFIX = '.ac.uk'
+
+function isApprovedDomain(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase() || ''
+  return APPROVED_DOMAINS.includes(domain) || domain.endsWith(APPROVED_SUFFIX)
+}
 
 function getSupabase() {
   return createClient(
@@ -26,6 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabase()
+    const approved = isApprovedDomain(email)
 
     // Generate a signup confirmation link using the admin API.
     // This creates the user AND returns a confirmation URL without
@@ -57,6 +66,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: linkError.message }, { status: 400 })
     }
 
+    const userId = linkData?.user?.id
+
+    // Auto-approve NHS/approved-domain users server-side
+    if (approved && userId) {
+      const { error: approveError } = await supabase
+        .from('profiles')
+        .update({ approval_status: 'approved', role: 'trainee' })
+        .eq('id', userId)
+
+      if (approveError) {
+        console.error('Auto-approve error:', approveError)
+      }
+    }
+
     // The action_link from generateLink contains the confirmation token.
     // We need to transform it so it routes through our auth callback.
     const confirmUrl = linkData?.properties?.action_link
@@ -78,6 +101,40 @@ export async function POST(request: NextRequest) {
     if (sendError) {
       console.error('Resend error:', sendError)
       // User was created but email failed — log but don't fail the request
+    }
+
+    // For non-approved domains, notify admins that a new registration needs review
+    if (!approved) {
+      try {
+        const { data: admins } = await supabase
+          .from('profiles')
+          .select('email')
+          .in('role', ['admin', 'super_admin'])
+
+        const adminEmails = (admins || [])
+          .map((a: { email: string | null }) => a.email)
+          .filter(Boolean) as string[]
+
+        if (adminEmails.length > 0) {
+          const adminEmail = adminNewRegistrationEmail({
+            userName: fullName,
+            userEmail: email,
+            region,
+            trainingStage,
+            siteUrl: SITE_URL,
+          })
+
+          await resend.emails.send({
+            from: FROM_EMAIL,
+            to: adminEmails,
+            subject: adminEmail.subject,
+            html: adminEmail.html,
+          })
+        }
+      } catch (adminNotifyError) {
+        console.error('Admin notification error:', adminNotifyError)
+        // Don't fail registration if admin notification fails
+      }
     }
 
     return NextResponse.json({ success: true })
