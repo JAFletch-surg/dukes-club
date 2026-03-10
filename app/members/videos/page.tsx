@@ -109,7 +109,7 @@ function CommentItem({
   }
 
   return (
-    <div className={`${depth > 0 ? "ml-10" : ""}`}>
+    <div className={`${depth > 0 ? "ml-6 sm:ml-10" : ""}`}>
       <div className={`py-4 ${depth === 0 ? "border-b border-border" : ""} ${comment.is_pinned ? "bg-gold/5 -mx-4 px-4 rounded-lg border border-gold/20" : ""}`}>
         {comment.is_pinned && (
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gold mb-2">
@@ -138,7 +138,7 @@ function CommentItem({
             </p>
 
             {/* Actions */}
-            <div className="flex items-center gap-3 mt-2">
+            <div className="flex items-center gap-2 sm:gap-3 mt-2 flex-wrap">
               <button
                 onClick={() => onLike(comment.id)}
                 className={`flex items-center gap-1 text-xs transition-colors ${
@@ -218,7 +218,7 @@ function CommentItem({
           {depth === 0 && comment.replies.length > 2 && (
             <button
               onClick={() => setShowReplies(!showReplies)}
-              className="flex items-center gap-1.5 ml-11 text-xs font-medium text-primary hover:underline py-1"
+              className="flex items-center gap-1.5 ml-7 sm:ml-11 text-xs font-medium text-primary hover:underline py-1"
             >
               <CornerDownRight size={12} />
               {showReplies ? "Hide" : "Show"} {comment.replies.length} {comment.replies.length === 1 ? "reply" : "replies"}
@@ -744,7 +744,7 @@ const VideoArchive = () => {
                 {fmtDuration(video.duration_seconds)}
               </span>
             </div>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               {video.tags && video.tags.length > 0 && (
                 <div className="flex gap-1 flex-wrap mb-2">
                   {video.tags.slice(0, 3).map(tag => (

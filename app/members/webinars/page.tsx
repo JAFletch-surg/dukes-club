@@ -338,7 +338,7 @@ export default function LiveWebinars() {
 
               return (
                 <Card key={event.id} className="border hover:shadow-md transition-shadow">
-                  <CardContent className="p-5 space-y-3">
+                  <CardContent className="p-3 sm:p-5 space-y-2 sm:space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-sm font-semibold text-foreground leading-snug">{event.title}</h3>
                       <Badge variant="outline" className="text-[10px] shrink-0">
@@ -351,7 +351,7 @@ export default function LiveWebinars() {
                     )}
 
                     {event.description_plain && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{event.description_plain}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{event.description_plain}</p>
                     )}
 
                     {event.subspecialties && event.subspecialties.length > 0 && (
@@ -384,7 +384,7 @@ export default function LiveWebinars() {
                     <div className="space-y-2">
                       {/* Zoom/Vimeo join details for approved attendees */}
                       {isApproved && (
-                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-2.5 sm:p-3 space-y-2">
                           <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                             <Check size={13} className="text-green-600" /> You&apos;re registered
                           </p>
@@ -394,27 +394,30 @@ export default function LiveWebinars() {
                               href={event.zoom_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-navy text-navy-foreground text-sm font-semibold hover:bg-navy/90 transition-colors"
+                              className="flex items-center justify-center gap-2 w-full py-2 sm:py-2.5 rounded-lg bg-navy text-navy-foreground text-sm font-semibold hover:bg-navy/90 transition-colors"
                             >
                               <ExternalLink size={14} /> Join on Zoom
                             </a>
                           )}
 
-                          {event.zoom_meeting_id && (
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">Meeting ID: <span className="font-mono text-foreground">{event.zoom_meeting_id}</span></span>
-                              <button onClick={() => handleCopy(event.zoom_meeting_id!, `mid-${event.id}`)} className="text-muted-foreground hover:text-foreground">
-                                {copiedField === `mid-${event.id}` ? <CheckCheck size={13} className="text-green-600" /> : <Copy size={13} />}
-                              </button>
-                            </div>
-                          )}
-
-                          {event.zoom_passcode && (
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">Passcode: <span className="font-mono text-foreground">{event.zoom_passcode}</span></span>
-                              <button onClick={() => handleCopy(event.zoom_passcode!, `pc-${event.id}`)} className="text-muted-foreground hover:text-foreground">
-                                {copiedField === `pc-${event.id}` ? <CheckCheck size={13} className="text-green-600" /> : <Copy size={13} />}
-                              </button>
+                          {(event.zoom_meeting_id || event.zoom_passcode) && (
+                            <div className="space-y-1.5">
+                              {event.zoom_meeting_id && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground truncate mr-2">Meeting ID: <span className="font-mono text-foreground">{event.zoom_meeting_id}</span></span>
+                                  <button onClick={() => handleCopy(event.zoom_meeting_id!, `mid-${event.id}`)} className="text-muted-foreground hover:text-foreground shrink-0">
+                                    {copiedField === `mid-${event.id}` ? <CheckCheck size={13} className="text-green-600" /> : <Copy size={13} />}
+                                  </button>
+                                </div>
+                              )}
+                              {event.zoom_passcode && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground truncate mr-2">Passcode: <span className="font-mono text-foreground">{event.zoom_passcode}</span></span>
+                                  <button onClick={() => handleCopy(event.zoom_passcode!, `pc-${event.id}`)} className="text-muted-foreground hover:text-foreground shrink-0">
+                                    {copiedField === `pc-${event.id}` ? <CheckCheck size={13} className="text-green-600" /> : <Copy size={13} />}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -519,7 +522,7 @@ export default function LiveWebinars() {
                     )}
                   </div>
 
-                  <CardContent className="p-4">
+                  <CardContent className="p-3 sm:p-4">
                     {event.subspecialties && event.subspecialties.length > 0 && (
                       <div className="flex gap-1 flex-wrap mb-2">
                         {event.subspecialties.slice(0, 3).map(t => (

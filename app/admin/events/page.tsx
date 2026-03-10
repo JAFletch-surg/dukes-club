@@ -36,9 +36,12 @@ function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-function parseCSV(text: string): { time: string; title: string }[] {
+interface TimetableEntry { time: string; title: string }
+interface TimetableDay { day: string; label: string; entries: TimetableEntry[] }
+
+function parseCSV(text: string): TimetableEntry[] {
   const lines = text.trim().split('\n')
-  const rows: { time: string; title: string }[] = []
+  const rows: TimetableEntry[] = []
   for (const line of lines) {
     const sep = line.includes('\t') ? '\t' : ','
     const parts = line.split(sep).map(s => s.trim().replace(/^["']|["']$/g, ''))
@@ -50,6 +53,24 @@ function parseCSV(text: string): { time: string; title: string }[] {
     }
   }
   return rows
+}
+
+/** Convert legacy flat timetable to multi-day format */
+function normaliseTimetable(raw: any, startsAt?: string): TimetableDay[] {
+  if (!Array.isArray(raw) || raw.length === 0) return []
+  // Already multi-day format
+  if (raw[0] && typeof raw[0] === 'object' && 'day' in raw[0] && 'entries' in raw[0]) {
+    return raw as TimetableDay[]
+  }
+  // Legacy flat format — wrap in single day
+  const day = startsAt ? startsAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
+  return [{ day, label: '', entries: raw as TimetableEntry[] }]
+}
+
+/** Flatten multi-day timetable for DB storage (returns null if empty) */
+function serialiseTimetable(days: TimetableDay[]): TimetableDay[] | null {
+  const nonEmpty = days.filter(d => d.entries.length > 0)
+  return nonEmpty.length > 0 ? nonEmpty : null
 }
 
 /* ── Searchable Faculty Picker ──────────────────── */
@@ -223,7 +244,8 @@ export default function EventsAdmin() {
     stream_type: 'zoom', zoom_url: '', zoom_meeting_id: '', zoom_passcode: '',
     vimeo_live_id: '', vimeo_live_embed_url: '',
     subspecialties: [] as string[],
-    timetable_data: [] as { time: string; title: string }[],
+    timetable_data: [] as TimetableDay[],
+    activeTimetableDay: 0,
     // Application fields
     applications_enabled: false,
     eligibility_criteria: '',
@@ -256,7 +278,8 @@ export default function EventsAdmin() {
       zoom_passcode: e.zoom_passcode || '',
       vimeo_live_id: e.vimeo_live_id || '', vimeo_live_embed_url: e.vimeo_live_embed_url || '',
       subspecialties: Array.isArray(e.subspecialties) ? e.subspecialties : [],
-      timetable_data: Array.isArray(e.timetable_data) ? e.timetable_data : [],
+      timetable_data: normaliseTimetable(e.timetable_data, e.starts_at),
+      activeTimetableDay: 0,
       // Application fields
       applications_enabled: e.applications_enabled || false,
       eligibility_criteria: e.eligibility_criteria || '',
@@ -293,7 +316,7 @@ export default function EventsAdmin() {
         access_level: form.access_level,
         featured_image_url: form.featured_image_url || null,
         subspecialties: form.subspecialties,
-        timetable_data: form.timetable_data.length > 0 ? form.timetable_data : null,
+        timetable_data: serialiseTimetable(form.timetable_data),
         published_at: form.status === 'published' ? new Date().toISOString() : null,
         // Application fields
         applications_enabled: form.applications_enabled,
@@ -779,57 +802,149 @@ export default function EventsAdmin() {
 
               <div style={S.section}>
                 <p style={S.sectionTitle}>TIMETABLE / SCHEDULE</p>
-                <label style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '24px 16px', border: '2px dashed #7C3AED', borderRadius: 12,
-                  cursor: 'pointer', background: '#FAFAFF', transition: 'all 0.15s',
-                }}>
-                  <Upload size={24} color="#7C3AED" style={{ marginBottom: 8 }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#7C3AED' }}>Upload CSV Timetable</span>
-                  <span style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Click to select a .csv or .tsv file</span>
-                  <span style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Format: <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>09:00, Registration &amp; Coffee</code></span>
-                  <input type="file" accept=".csv,.tsv,.txt" style={{ display: 'none' }} onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    const reader = new FileReader()
-                    reader.onload = (ev) => {
-                      const text = ev.target?.result as string
-                      const rows = parseCSV(text)
-                      if (rows.length > 0) {
-                        setForm(prev => ({ ...prev, timetable_data: rows }))
-                        showToast(`Imported ${rows.length} timetable entries`)
-                      } else {
-                        showToast('No valid rows found. Format: time, title', 'error')
-                      }
-                    }
-                    reader.readAsText(file)
-                    e.target.value = ''
-                  }} />
-                </label>
+
+                {/* Day tabs */}
                 {form.timetable_data.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {form.timetable_data.map((entry, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input style={{ ...S.input, maxWidth: 90, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={entry.time}
-                          onChange={(e) => { const u = [...form.timetable_data]; u[i] = { ...u[i], time: e.target.value }; setForm({ ...form, timetable_data: u }) }} placeholder="09:00" />
-                        <input style={{ ...S.input, flex: 1 }} value={entry.title}
-                          onChange={(e) => { const u = [...form.timetable_data]; u[i] = { ...u[i], title: e.target.value }; setForm({ ...form, timetable_data: u }) }} placeholder="Session title" />
-                        <button type="button" onClick={() => setForm({ ...form, timetable_data: form.timetable_data.filter((_, j) => j !== i) })}
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0 }}><X size={14} /></button>
-                      </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {form.timetable_data.map((day, di) => (
+                      <button key={di} type="button"
+                        onClick={() => setForm(prev => ({ ...prev, activeTimetableDay: di }))}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          border: form.activeTimetableDay === di ? '2px solid #7C3AED' : '1.5px solid #D1D1D6',
+                          background: form.activeTimetableDay === di ? '#F3EEFF' : '#fff',
+                          color: form.activeTimetableDay === di ? '#7C3AED' : '#504F58',
+                        }}>
+                        {day.label || `Day ${di + 1}`}
+                        {day.day && <span style={{ fontWeight: 400, marginLeft: 4, opacity: 0.6 }}>({day.day})</span>}
+                      </button>
                     ))}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <button type="button" onClick={() => setForm({ ...form, timetable_data: [...form.timetable_data, { time: '', title: '' }] })}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #D1D1D6', borderRadius: 8, background: 'none', fontSize: 12, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>
-                    <Plus size={13} /> Add row
+
+                {/* Add Day button */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button type="button" onClick={() => {
+                    const startDate = form.starts_at ? new Date(form.starts_at) : new Date()
+                    const dayOffset = form.timetable_data.length
+                    const newDate = new Date(startDate)
+                    newDate.setDate(newDate.getDate() + dayOffset)
+                    const dayStr = newDate.toISOString().slice(0, 10)
+                    setForm(prev => ({
+                      ...prev,
+                      timetable_data: [...prev.timetable_data, { day: dayStr, label: `Day ${prev.timetable_data.length + 1}`, entries: [] }],
+                      activeTimetableDay: prev.timetable_data.length,
+                    }))
+                  }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #7C3AED', borderRadius: 8, background: '#FAFAFF', fontSize: 12, fontWeight: 600, color: '#7C3AED', cursor: 'pointer' }}>
+                    <Plus size={13} /> Add Day
                   </button>
                   {form.timetable_data.length > 0 && (
-                    <button type="button" onClick={() => setForm({ ...form, timetable_data: [] })}
-                      style={{ fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Clear all</button>
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, timetable_data: [], activeTimetableDay: 0 }))}
+                      style={{ fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Clear all days</button>
                   )}
                 </div>
+
+                {/* Active day editor */}
+                {form.timetable_data.length > 0 && form.timetable_data[form.activeTimetableDay] && (() => {
+                  const dayIdx = form.activeTimetableDay
+                  const activeDay = form.timetable_data[dayIdx]
+                  const updateDay = (updates: Partial<TimetableDay>) => {
+                    setForm(prev => {
+                      const days = [...prev.timetable_data]
+                      days[dayIdx] = { ...days[dayIdx], ...updates }
+                      return { ...prev, timetable_data: days }
+                    })
+                  }
+                  const updateEntry = (ei: number, field: 'time' | 'title', value: string) => {
+                    setForm(prev => {
+                      const days = [...prev.timetable_data]
+                      const entries = [...days[dayIdx].entries]
+                      entries[ei] = { ...entries[ei], [field]: value }
+                      days[dayIdx] = { ...days[dayIdx], entries }
+                      return { ...prev, timetable_data: days }
+                    })
+                  }
+                  const removeEntry = (ei: number) => {
+                    setForm(prev => {
+                      const days = [...prev.timetable_data]
+                      days[dayIdx] = { ...days[dayIdx], entries: days[dayIdx].entries.filter((_, j) => j !== ei) }
+                      return { ...prev, timetable_data: days }
+                    })
+                  }
+                  const removeDay = () => {
+                    setForm(prev => {
+                      const days = prev.timetable_data.filter((_, j) => j !== dayIdx)
+                      return { ...prev, timetable_data: days, activeTimetableDay: Math.max(0, dayIdx - 1) }
+                    })
+                  }
+
+                  return (
+                    <div style={{ border: '1px solid #E5E5EA', borderRadius: 10, padding: 16, background: '#FAFAFA', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {/* Day header: date + label */}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input type="date" style={{ ...S.input, maxWidth: 160 }} value={activeDay.day}
+                          onChange={(e) => updateDay({ day: e.target.value })} />
+                        <input style={{ ...S.input, flex: 1, minWidth: 120 }} value={activeDay.label}
+                          onChange={(e) => updateDay({ label: e.target.value })} placeholder="Day label, e.g. Day 1 — Lectures" />
+                        <button type="button" onClick={removeDay}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0, fontSize: 11, fontWeight: 600 }}>
+                          <Trash2 size={14} /> Remove day
+                        </button>
+                      </div>
+
+                      {/* CSV upload for this day */}
+                      <label style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        padding: '16px 12px', border: '2px dashed #7C3AED', borderRadius: 10,
+                        cursor: 'pointer', background: '#FAFAFF', transition: 'all 0.15s',
+                      }}>
+                        <Upload size={18} color="#7C3AED" style={{ marginBottom: 4 }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED' }}>Upload CSV for {activeDay.label || `Day ${dayIdx + 1}`}</span>
+                        <span style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Format: <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>09:00, Registration &amp; Coffee</code></span>
+                        <input type="file" accept=".csv,.tsv,.txt" style={{ display: 'none' }} onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = (ev) => {
+                            const text = ev.target?.result as string
+                            const rows = parseCSV(text)
+                            if (rows.length > 0) {
+                              updateDay({ entries: [...activeDay.entries, ...rows] })
+                              showToast(`Imported ${rows.length} entries into ${activeDay.label || `Day ${dayIdx + 1}`}`)
+                            } else {
+                              showToast('No valid rows found. Format: time, title', 'error')
+                            }
+                          }
+                          reader.readAsText(file)
+                          e.target.value = ''
+                        }} />
+                      </label>
+
+                      {/* Entries */}
+                      {activeDay.entries.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {activeDay.entries.map((entry, ei) => (
+                            <div key={ei} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <input style={{ ...S.input, maxWidth: 90, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={entry.time}
+                                onChange={(e) => updateEntry(ei, 'time', e.target.value)} placeholder="09:00" />
+                              <input style={{ ...S.input, flex: 1 }} value={entry.title}
+                                onChange={(e) => updateEntry(ei, 'title', e.target.value)} placeholder="Session title" />
+                              <button type="button" onClick={() => removeEntry(ei)}
+                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0 }}><X size={14} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add row */}
+                      <button type="button" onClick={() => updateDay({ entries: [...activeDay.entries, { time: '', title: '' }] })}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #D1D1D6', borderRadius: 8, background: 'none', fontSize: 12, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>
+                        <Plus size={13} /> Add row
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>
