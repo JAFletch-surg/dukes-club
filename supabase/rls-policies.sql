@@ -34,6 +34,18 @@ RETURNS boolean AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+-- Check if current user is a participant of a given conversation.
+-- SECURITY DEFINER so it bypasses RLS on conversation_participants,
+-- preventing infinite recursion when used inside RLS policies.
+CREATE OR REPLACE FUNCTION is_conversation_participant(conv_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM conversation_participants
+    WHERE conversation_id = conv_id
+      AND user_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 -- Find or create a DM conversation between two users.
 -- SECURITY DEFINER so it bypasses RLS (enforces its own auth checks).
 CREATE OR REPLACE FUNCTION find_or_create_dm(user_a uuid, user_b uuid)
@@ -658,11 +670,7 @@ CREATE POLICY "conversations_select_participant"
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = conversations.id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(id)
   );
 
 -- Channels: browsable by any approved member
@@ -684,19 +692,11 @@ CREATE POLICY "conversations_update_participant"
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = conversations.id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(id)
   )
   WITH CHECK (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = conversations.id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(id)
   );
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -710,26 +710,14 @@ DROP POLICY IF EXISTS "conversation_participants_select_own" ON conversation_par
 DROP POLICY IF EXISTS "conversation_participants_select_co_members" ON conversation_participants;
 DROP POLICY IF EXISTS "conversation_participants_insert_member" ON conversation_participants;
 
--- Allow users to see their own participation records (no circular reference)
-CREATE POLICY "conversation_participants_select_own"
+-- Allow users to see all participants in conversations they belong to.
+-- Uses SECURITY DEFINER helper to avoid infinite recursion.
+CREATE POLICY "conversation_participants_select_member"
   ON conversation_participants FOR SELECT
   TO authenticated
   USING (
     is_approved_member()
-    AND user_id = auth.uid()
-  );
-
--- Allow users to see other participants in conversations they belong to
-CREATE POLICY "conversation_participants_select_co_members"
-  ON conversation_participants FOR SELECT
-  TO authenticated
-  USING (
-    is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants AS cp
-      WHERE cp.conversation_id = conversation_participants.conversation_id
-        AND cp.user_id = auth.uid()
-    )
+    AND is_conversation_participant(conversation_id)
   );
 
 CREATE POLICY "conversation_participants_insert_member"
@@ -752,11 +740,7 @@ CREATE POLICY "messages_select_participant"
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = messages.conversation_id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(conversation_id)
   );
 
 CREATE POLICY "messages_insert_participant"
@@ -765,11 +749,7 @@ CREATE POLICY "messages_insert_participant"
   WITH CHECK (
     sender_id = auth.uid()
     AND is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = messages.conversation_id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(conversation_id)
   );
 
 CREATE POLICY "messages_update_own"
