@@ -26,7 +26,7 @@ const navSections = [
     items: [
       { href: '/admin/team', label: 'Executive Team', icon: UserCheck },
       { href: '/admin/faculty', label: 'Faculty', icon: GraduationCap },
-      { href: '/admin/members', label: 'Members', icon: Users },
+      { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
     ],
   },
   {
@@ -41,7 +41,7 @@ const navSections = [
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, isAdmin } = useAuth()
 
   const isActive = (href: string, end?: boolean) => {
     if (end) return pathname === href
@@ -77,7 +77,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
               {section.label}
             </p>
             <div className="space-y-0.5">
-              {section.items.map((item) => {
+              {section.items.filter((item) => !(item as any).adminOnly || isAdmin).map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href, (item as any).end)
                 return (
@@ -184,7 +184,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                 { href: '/admin', label: 'Dashboard', icon: BarChart3, end: true },
                 { href: '/admin/events', label: 'Events', icon: Calendar },
                 { href: '/admin/posts', label: 'Posts', icon: Newspaper },
-                { href: '/admin/members', label: 'Members', icon: Users },
+                ...(isAdmin ? [{ href: '/admin/members', label: 'Members', icon: Users }] : []),
               ].map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href, item.end)

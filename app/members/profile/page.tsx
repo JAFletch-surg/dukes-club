@@ -117,19 +117,27 @@ const MemberProfile = () => {
     setSavingAcpgbi(true);
     setSavedAcpgbi(false);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        acpgbi_number: acpgbiNumber || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const res = await fetch('/api/membership/submit-number', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ acpgbiNumber: acpgbiNumber || null }),
+      });
+
+      if (res.ok) {
+        setSavedAcpgbi(true);
+        setTimeout(() => setSavedAcpgbi(false), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to submit ACPGBI number:', err);
+    }
 
     setSavingAcpgbi(false);
-    if (!error) {
-      setSavedAcpgbi(true);
-      setTimeout(() => setSavedAcpgbi(false), 3000);
-    }
   };
 
   const handleSavePrivacy = async () => {

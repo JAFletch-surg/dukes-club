@@ -462,7 +462,53 @@ export function adminNewRegistrationEmail(params: {
   }
 }
 
-// 9. Certificate Ready
+// 9. Admin Notification — ACPGBI Membership Number Submitted
+// ─────────────────────────────────────────
+export function adminMembershipNumberEmail(params: {
+  userName: string
+  userEmail: string
+  acpgbiNumber: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { userName, userEmail, acpgbiNumber, siteUrl } = params
+
+  return {
+    subject: `ACPGBI number submitted — ${userName}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        Membership Number Submitted
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.7;">
+        A trainee has submitted their ACPGBI membership number for verification. Please review and upgrade their role to <strong>Member</strong> if valid.
+      </p>
+
+      <div style="background-color:#F9F8F5;border:1px solid #E8E6E1;border-radius:8px;padding:20px;margin:0 0 24px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;width:120px;">Name</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${userName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">Email</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${userEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">ACPGBI Number</td>
+            <td style="padding:6px 0;font-size:14px;color:#0F1F3D;font-weight:700;">${acpgbiNumber}</td>
+          </tr>
+        </table>
+      </div>
+
+      ${button('Review in Admin Panel', `${siteUrl}/admin/members`)}
+
+      <p style="margin:0;font-size:14px;color:#888;">
+        To verify, check the number against the ACPGBI membership register, then update the member's role to "member" in the admin panel.
+      </p>
+    `),
+  }
+}
+
+// 10. Certificate Ready
 // ─────────────────────────────────────────
 export function certificateReadyEmail(params: {
   name: string
