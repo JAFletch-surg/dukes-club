@@ -190,9 +190,9 @@ function FacultySearch({ faculty, assigned, onAdd }: {
 }
 
 const S = {
-  input: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
-  select: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
-  textarea: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif', minHeight: 100, resize: 'vertical' as const } as React.CSSProperties,
+  input: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
+  select: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
+  textarea: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif', minHeight: 100, resize: 'vertical' as const } as React.CSSProperties,
   label: { display: 'block', fontSize: 13, fontWeight: 700, color: '#181820', marginBottom: 6 } as React.CSSProperties,
   hint: { fontSize: 11, color: '#888', marginTop: 4 } as React.CSSProperties,
   badge: (bg: string, fg: string) => ({ display: 'inline-flex', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: bg, color: fg }) as React.CSSProperties,
@@ -566,11 +566,11 @@ export default function EventsAdmin() {
       {editing !== null && (
         <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto' }} className="p-3 md:p-6">
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '1px solid #E4E4E8' }}>
+            <div className="flex justify-between items-center px-4 py-4 sm:px-7 sm:py-5 border-b border-[#E4E4E8]">
               <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0F1F3D' }}>{editing === 'new' ? 'Create Event' : 'Edit Event'}</h2>
               <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6', padding: 4 }}><X size={20} /></button>
             </div>
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+            <div className="px-4 py-5 sm:px-7 sm:py-6" style={{ display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
 
               <div><label style={S.label}>Title *</label><input style={S.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: slugify(e.target.value) })} placeholder="Event title" /></div>
               <div><label style={S.label}>Slug</label><input style={{ ...S.input, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
@@ -601,19 +601,19 @@ export default function EventsAdmin() {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                 <div><label style={S.label}>Start Date/Time *</label><input style={S.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></div>
                 <div><label style={S.label}>End Date/Time</label><input style={S.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                 <div><label style={S.label}>Location</label><input style={S.input} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Venue name" /></div>
                 <div><label style={S.label}>Address</label><input style={S.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" /></div>
               </div>
 
               <div><label style={S.label}>Description</label><textarea style={S.textarea} value={form.description_plain} onChange={(e) => setForm({ ...form, description_plain: e.target.value })} placeholder="Event description..." /></div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
                 <div>
                   <label style={S.label}>Event Type</label>
                   <select style={S.select} value={form.event_type} onChange={(e) => setForm({ ...form, event_type: e.target.value })}>
@@ -692,7 +692,7 @@ export default function EventsAdmin() {
                   </div>
                   {(form.stream_type === 'zoom' || form.stream_type === 'hybrid') && (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                         <div><label style={S.label}>Zoom URL</label><input style={S.input} value={form.zoom_url} onChange={(e) => setForm({ ...form, zoom_url: e.target.value })} placeholder="https://zoom.us/j/..." /></div>
                         <div><label style={S.label}>Meeting ID</label><input style={S.input} value={form.zoom_meeting_id} onChange={(e) => setForm({ ...form, zoom_meeting_id: e.target.value })} /></div>
                       </div>
@@ -700,7 +700,7 @@ export default function EventsAdmin() {
                     </>
                   )}
                   {(form.stream_type === 'vimeo_live' || form.stream_type === 'hybrid') && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                       <div><label style={S.label}>Vimeo Live Event ID</label><input style={S.input} value={form.vimeo_live_id} onChange={(e) => setForm({ ...form, vimeo_live_id: e.target.value })} /></div>
                       <div><label style={S.label}>Vimeo Embed URL</label><input style={S.input} value={form.vimeo_live_embed_url} onChange={(e) => setForm({ ...form, vimeo_live_embed_url: e.target.value })} placeholder="https://vimeo.com/event/..." /></div>
                     </div>
@@ -708,10 +708,10 @@ export default function EventsAdmin() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-3.5">
                 <div><label style={S.label}>Price (pence)</label><input style={S.input} type="number" value={form.price_pence} onChange={(e) => setForm({ ...form, price_pence: Number(e.target.value) })} /><p style={S.hint}>0 = Free</p></div>
                 <div><label style={S.label}>Member Price (pence)</label><input style={S.input} type="number" value={form.member_price_pence} onChange={(e) => setForm({ ...form, member_price_pence: e.target.value })} /><p style={S.hint}>Leave blank for same as above</p></div>
-                <div><label style={S.label}>Booking URL</label><input style={S.input} value={form.booking_url} onChange={(e) => setForm({ ...form, booking_url: e.target.value })} placeholder="https://..." /></div>
+                <div className="col-span-2 sm:col-span-1"><label style={S.label}>Booking URL</label><input style={S.input} value={form.booking_url} onChange={(e) => setForm({ ...form, booking_url: e.target.value })} placeholder="https://..." /></div>
               </div>
 
               {/* APPLICATION SETTINGS — shown for workshops & courses */}
@@ -726,7 +726,7 @@ export default function EventsAdmin() {
 
                   {form.applications_enabled && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                         <div>
                           <label style={S.label}>Places Available</label>
                           <input style={S.input} type="number" value={form.places_available} onChange={(e) => setForm({ ...form, places_available: e.target.value })} placeholder="e.g. 20" />
@@ -971,7 +971,7 @@ export default function EventsAdmin() {
               </label>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '18px 28px', borderTop: '1px solid #E4E4E8', background: '#FAFAFA', borderRadius: '0 0 20px 20px' }}>
+            <div className="flex justify-end gap-3 px-4 py-4 sm:px-7 sm:py-4.5 border-t border-[#E4E4E8] bg-[#FAFAFA] rounded-b-[20px]">
               <button onClick={() => setEditing(null)} style={{ padding: '10px 20px', border: 'none', background: 'none', fontSize: 14, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>Cancel</button>
               <button onClick={handleSave} disabled={saving} style={{ ...S.btn, opacity: saving ? 0.5 : 1 }}>
                 {saving ? <Loader className="animate-spin" size={15} /> : <Save size={15} />}
