@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  CalendarDays, MapPin, PoundSterling, Users, User, Clock,
+  CalendarDays, MapPin, PoundSterling, Users, User, Clock, Lock,
   ArrowLeft, ExternalLink, Globe, Loader2, Check, X as XIcon,
 } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
 
 const formatDate = (dateStr: string) => {
@@ -367,6 +368,20 @@ const EventDetailPage = () => {
                               </Button>
                             </Link>
                             <p className="text-xs text-center text-navy-foreground/50 mt-2">Members only — <Link href="/register" className="text-gold underline">join now</Link></p>
+                          </div>
+                        ) : !canBookEvent(profile, event.event_type) ? (
+                          <div className="text-center space-y-3 py-2">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 text-amber-400 text-sm font-semibold">
+                              <Lock size={14} /> Full Members Only
+                            </div>
+                            <p className="text-xs text-navy-foreground/60 leading-relaxed">
+                              In-person courses are available to verified ACPGBI members. Submit your membership number to upgrade.
+                            </p>
+                            <Link href="/members/profile">
+                              <Button variant="gold" size="sm" className="w-full">
+                                Add Membership Number
+                              </Button>
+                            </Link>
                           </div>
                         ) : !showApplyForm ? (
                           <Button variant="gold" size="lg" className="w-full" onClick={() => setShowApplyForm(true)}>

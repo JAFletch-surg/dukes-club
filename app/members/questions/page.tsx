@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { isQuestionBankTrialExpired, getTrialDaysRemaining } from "@/lib/membership-gates";
 
 type Mode = "study" | "exam";
 type Screen = "setup" | "session" | "results";
@@ -209,7 +210,7 @@ function ReportIssueDialog({
 }
 
 const QuestionBank = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const supabase = createClient();
 
   // Data state
@@ -589,6 +590,41 @@ const QuestionBank = () => {
     return questions.length;
   })();
 
+  // === TRIAL EXPIRED GATE ===
+  const trialExpired = isQuestionBankTrialExpired(profile);
+  const daysRemaining = getTrialDaysRemaining(profile);
+
+  if (trialExpired) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 max-w-md mx-auto text-center space-y-6">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+          <BookOpen size={28} className="text-muted-foreground" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Question Bank Trial Ended</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Your 3-month free trial of the question bank has expired. Submit your ACPGBI membership number to upgrade to Full Member and regain unlimited access.
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          <a href="/members/profile">
+            <button className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors">
+              Add Membership Number
+            </button>
+          </a>
+          <a
+            href="https://www.acpgbi.org.uk/membership/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+          >
+            Learn about ACPGBI membership
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // === LOADING ===
   if (dataLoading) {
     return (
@@ -605,6 +641,17 @@ const QuestionBank = () => {
 
     return (
       <div className="space-y-6 max-w-3xl mx-auto">
+        {/* Trial remaining banner for trainees */}
+        {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 30 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+            <Clock size={16} className="text-amber-600 shrink-0" />
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''}</span> remaining on your free trial.{' '}
+              <a href="/members/profile" className="text-amber-900 underline font-medium">Add your ACPGBI number</a> for unlimited access.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Question Bank</h1>
