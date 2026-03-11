@@ -1003,82 +1003,26 @@ CREATE POLICY "calendar_dates_delete_admin"
   USING (is_admin());
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- SECTION 10: MEDIA TABLE
+-- FUTURE TABLES: media, podcasts
 -- ─────────────────────────────────────────────────────────────────────────────
-
--- ═══════════════════════════════════════════════════════════════════
--- TABLE: media
--- ═══════════════════════════════════════════════════════════════════
-
-ALTER TABLE media ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "media_select_admin" ON media;
-DROP POLICY IF EXISTS "media_insert_admin" ON media;
-DROP POLICY IF EXISTS "media_update_admin" ON media;
-DROP POLICY IF EXISTS "media_delete_admin" ON media;
-
-CREATE POLICY "media_select_admin"
-  ON media FOR SELECT
-  TO authenticated
-  USING (is_admin());
-
-CREATE POLICY "media_insert_admin"
-  ON media FOR INSERT
-  TO authenticated
-  WITH CHECK (is_admin());
-
-CREATE POLICY "media_update_admin"
-  ON media FOR UPDATE
-  TO authenticated
-  USING (is_admin())
-  WITH CHECK (is_admin());
-
-CREATE POLICY "media_delete_admin"
-  ON media FOR DELETE
-  TO authenticated
-  USING (is_admin());
-
--- ─────────────────────────────────────────────────────────────────────────────
--- SECTION 11: PODCASTS TABLE
--- ─────────────────────────────────────────────────────────────────────────────
-
--- ═══════════════════════════════════════════════════════════════════
--- TABLE: podcasts
--- ═══════════════════════════════════════════════════════════════════
-
-ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "podcasts_select_published" ON podcasts;
-DROP POLICY IF EXISTS "podcasts_select_admin" ON podcasts;
-DROP POLICY IF EXISTS "podcasts_insert_admin" ON podcasts;
-DROP POLICY IF EXISTS "podcasts_update_admin" ON podcasts;
-DROP POLICY IF EXISTS "podcasts_delete_admin" ON podcasts;
-
-CREATE POLICY "podcasts_select_published"
-  ON podcasts FOR SELECT
-  TO authenticated
-  USING (status = 'published' AND is_approved_member());
-
-CREATE POLICY "podcasts_select_admin"
-  ON podcasts FOR SELECT
-  TO authenticated
-  USING (is_admin());
-
-CREATE POLICY "podcasts_insert_admin"
-  ON podcasts FOR INSERT
-  TO authenticated
-  WITH CHECK (is_admin());
-
-CREATE POLICY "podcasts_update_admin"
-  ON podcasts FOR UPDATE
-  TO authenticated
-  USING (is_admin())
-  WITH CHECK (is_admin());
-
-CREATE POLICY "podcasts_delete_admin"
-  ON podcasts FOR DELETE
-  TO authenticated
-  USING (is_admin());
+-- These tables do not exist yet. When you create them, run the policies below.
+--
+-- ── media (admin-only CRUD for image management) ──
+--
+-- ALTER TABLE media ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "media_select_admin"  ON media FOR SELECT TO authenticated USING (is_admin());
+-- CREATE POLICY "media_insert_admin"  ON media FOR INSERT TO authenticated WITH CHECK (is_admin());
+-- CREATE POLICY "media_update_admin"  ON media FOR UPDATE TO authenticated USING (is_admin()) WITH CHECK (is_admin());
+-- CREATE POLICY "media_delete_admin"  ON media FOR DELETE TO authenticated USING (is_admin());
+--
+-- ── podcasts (published → approved members, admin CRUD) ──
+--
+-- ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "podcasts_select_published" ON podcasts FOR SELECT TO authenticated USING (status = 'published' AND is_approved_member());
+-- CREATE POLICY "podcasts_select_admin"     ON podcasts FOR SELECT TO authenticated USING (is_admin());
+-- CREATE POLICY "podcasts_insert_admin"     ON podcasts FOR INSERT TO authenticated WITH CHECK (is_admin());
+-- CREATE POLICY "podcasts_update_admin"     ON podcasts FOR UPDATE TO authenticated USING (is_admin()) WITH CHECK (is_admin());
+-- CREATE POLICY "podcasts_delete_admin"     ON podcasts FOR DELETE TO authenticated USING (is_admin());
 
 -- =============================================================================
 -- END OF RLS POLICIES
