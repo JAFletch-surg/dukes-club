@@ -593,9 +593,11 @@ CREATE POLICY "question_flags_update_admin"
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "conversations_select_participant" ON conversations;
+DROP POLICY IF EXISTS "conversations_select_channel" ON conversations;
 DROP POLICY IF EXISTS "conversations_insert_member" ON conversations;
 DROP POLICY IF EXISTS "conversations_update_participant" ON conversations;
 
+-- DMs: only visible to participants
 CREATE POLICY "conversations_select_participant"
   ON conversations FOR SELECT
   TO authenticated
@@ -606,6 +608,15 @@ CREATE POLICY "conversations_select_participant"
       WHERE conversation_participants.conversation_id = conversations.id
         AND conversation_participants.user_id = auth.uid()
     )
+  );
+
+-- Channels: browsable by any approved member
+CREATE POLICY "conversations_select_channel"
+  ON conversations FOR SELECT
+  TO authenticated
+  USING (
+    is_approved_member()
+    AND type = 'channel'
   );
 
 CREATE POLICY "conversations_insert_member"
@@ -640,9 +651,21 @@ CREATE POLICY "conversations_update_participant"
 ALTER TABLE conversation_participants ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "conversation_participants_select_member" ON conversation_participants;
+DROP POLICY IF EXISTS "conversation_participants_select_own" ON conversation_participants;
+DROP POLICY IF EXISTS "conversation_participants_select_co_members" ON conversation_participants;
 DROP POLICY IF EXISTS "conversation_participants_insert_member" ON conversation_participants;
 
-CREATE POLICY "conversation_participants_select_member"
+-- Allow users to see their own participation records (no circular reference)
+CREATE POLICY "conversation_participants_select_own"
+  ON conversation_participants FOR SELECT
+  TO authenticated
+  USING (
+    is_approved_member()
+    AND user_id = auth.uid()
+  );
+
+-- Allow users to see other participants in conversations they belong to
+CREATE POLICY "conversation_participants_select_co_members"
   ON conversation_participants FOR SELECT
   TO authenticated
   USING (
