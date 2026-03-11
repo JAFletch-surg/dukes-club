@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { Mic, Plus, Edit, Trash2, Save, Loader, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Mic, Plus, Edit, Trash2, Save, Loader, X, Search } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
+import { createClient } from '@/lib/supabase/client'
 
 const STATUSES = ['draft', 'published', 'archived']
 const TAGS = [
@@ -28,14 +29,134 @@ function getSpotifyEmbedUrl(url: string): string | null {
   return match ? `https://open.spotify.com/embed/episode/${match[1]}?utm_source=generator` : null
 }
 
+/* ── Faculty search (mirrors events page pattern) ── */
+function GuestFacultySearch({ faculty, onSelect }: {
+  faculty: any[]
+  onSelect: (f: any) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const matches = faculty.filter(f => {
+    if (!query) return true
+    const q = query.toLowerCase()
+    return (
+      f.full_name?.toLowerCase().includes(q) ||
+      f.hospital?.toLowerCase().includes(q) ||
+      f.position_title?.toLowerCase().includes(q)
+    )
+  })
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        border: '1.5px solid #D1D1D6', borderRadius: 10, padding: '0 12px',
+        background: '#fff',
+        ...(open ? { borderColor: '#7C3AED', boxShadow: '0 0 0 3px rgba(124,58,237,0.1)' } : {}),
+      }}>
+        <Search size={15} color="#999" style={{ flexShrink: 0 }} />
+        <input
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search faculty by name, hospital, or role..."
+          style={{
+            width: '100%', padding: '10px 0', border: 'none', fontSize: 14,
+            color: '#000', background: 'transparent', outline: 'none',
+            fontFamily: 'Montserrat, sans-serif',
+          }}
+        />
+        {query && (
+          <button type="button" onClick={() => { setQuery(''); setOpen(false) }}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#999', padding: 2, flexShrink: 0 }}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          marginTop: 4, background: '#fff', border: '1.5px solid #D1D1D6',
+          borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+          maxHeight: 240, overflowY: 'auto',
+        }}>
+          {matches.length === 0 ? (
+            <div style={{ padding: '16px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
+              No matching faculty found
+            </div>
+          ) : (
+            matches.slice(0, 20).map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => { onSelect(f); setQuery(''); setOpen(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '10px 14px', border: 'none', background: 'none',
+                  cursor: 'pointer', textAlign: 'left', fontSize: 13,
+                  borderBottom: '1px solid #F1F1F3', transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#F8F5FF')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+              >
+                {f.photo_url ? (
+                  <img src={f.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%', background: '#059669',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {f.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '?'}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#181820', lineHeight: 1.3 }}>{f.full_name}</div>
+                  <div style={{ fontSize: 11, color: '#888', lineHeight: 1.3, marginTop: 1 }}>
+                    {[f.position_title, f.hospital].filter(Boolean).join(' · ') || 'Faculty'}
+                  </div>
+                </div>
+                <Plus size={14} color="#7C3AED" style={{ flexShrink: 0 }} />
+              </button>
+            ))
+          )}
+          {matches.length > 20 && (
+            <div style={{ padding: '8px 14px', textAlign: 'center', color: '#999', fontSize: 11 }}>
+              Type to narrow down {matches.length} results...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PodcastsAdmin() {
   const { data: podcasts, loading, create, update, remove } = useSupabaseTable<any>('podcasts', 'created_at', false)
+  const [faculty, setFaculty] = useState<any[]>([])
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+
+  // Load faculty list
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('faculty').select('id, full_name, position_title, hospital, photo_url').order('full_name').then(({ data }: any) => setFaculty(data || []))
+  }, [])
 
   const emptyForm = {
     title: '', description: '', episode_number: 1,
@@ -196,6 +317,14 @@ export default function PodcastsAdmin() {
                 <div><label style={S.label}>Title *</label><input style={S.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Episode title" /></div>
               </div>
 
+              <div>
+                <label style={S.label}>Guest (select from faculty)</label>
+                <GuestFacultySearch faculty={faculty} onSelect={(f) => setForm({
+                  ...form,
+                  guest_name: f.full_name || '',
+                  guest_title: [f.position_title, f.hospital].filter(Boolean).join(', '),
+                })} />
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div><label style={S.label}>Guest Name</label><input style={S.input} value={form.guest_name} onChange={(e) => setForm({ ...form, guest_name: e.target.value })} /></div>
                 <div><label style={S.label}>Guest Title</label><input style={S.input} value={form.guest_title} onChange={(e) => setForm({ ...form, guest_title: e.target.value })} placeholder="e.g. Consultant, Royal London" /></div>
