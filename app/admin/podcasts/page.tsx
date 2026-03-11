@@ -186,8 +186,10 @@ export default function PodcastsAdmin() {
     if (!form.title) { showToast('Title is required', 'error'); return }
     setSaving(true)
     try {
+      const slug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
       const payload: any = {
         ...form,
+        slug,
         published_at: form.status === 'published' ? (form.published_at || new Date().toISOString()) : null,
       }
       if (editing === 'new') { await create(payload); showToast('Podcast created') }
