@@ -8,24 +8,28 @@
 CREATE TABLE IF NOT EXISTS podcasts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
+  slug TEXT,
   description TEXT,
+  body JSONB,
   episode_number INTEGER,
-  guest_name TEXT,
-  guest_title TEXT,
-  spotify_url TEXT,
+  season_number INTEGER,
   duration_seconds INTEGER DEFAULT 0,
-  tags TEXT[] DEFAULT '{}',
+  thumbnail_url TEXT,
+  subspecialties TEXT[] DEFAULT '{}',
+  is_members_only BOOLEAN DEFAULT true,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
   published_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  spotify_url TEXT,
+  guest_name TEXT,
+  guest_title TEXT
 );
 
--- Ensure spotify_url column exists (in case table was created with old schema)
+-- Ensure newer columns exist (in case table was created with old schema)
 ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS spotify_url TEXT;
-
--- Clean up old columns if they exist
-ALTER TABLE podcasts DROP COLUMN IF EXISTS audio_url;
-ALTER TABLE podcasts DROP COLUMN IF EXISTS external_url;
+ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS guest_name TEXT;
+ALTER TABLE podcasts ADD COLUMN IF NOT EXISTS guest_title TEXT;
 
 -- RLS Policies (published → approved members, admin CRUD)
 ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;

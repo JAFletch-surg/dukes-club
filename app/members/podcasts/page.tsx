@@ -37,7 +37,7 @@ export default function Podcasts() {
           p.title?.toLowerCase().includes(search.toLowerCase()) ||
           p.guest_name?.toLowerCase().includes(search.toLowerCase());
         const matchesTags = selectedTags.length === 0 ||
-          selectedTags.some((t) => (p.tags || []).includes(t));
+          selectedTags.some((t) => (p.subspecialties || []).includes(t));
         return matchesSearch && matchesTags;
       });
   }, [allPodcasts, search, selectedTags]);
@@ -134,9 +134,9 @@ export default function Podcasts() {
                     {podcast.description && (
                       <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{podcast.description}</p>
                     )}
-                    {(podcast.tags || []).length > 0 && (
+                    {(podcast.subspecialties || []).length > 0 && (
                       <div className="flex gap-1.5 flex-wrap mt-2">
-                        {podcast.tags.map((t: string) => (
+                        {podcast.subspecialties.map((t: string) => (
                           <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">{t}</span>
                         ))}
                       </div>

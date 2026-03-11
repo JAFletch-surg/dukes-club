@@ -162,7 +162,7 @@ export default function PodcastsAdmin() {
     title: '', description: '', episode_number: 1,
     guest_name: '', guest_title: '',
     spotify_url: '',
-    duration_seconds: 0, tags: [] as string[],
+    duration_seconds: 0, subspecialties: [] as string[],
     status: 'draft', published_at: '',
   }
   const [form, setForm] = useState(emptyForm)
@@ -175,7 +175,7 @@ export default function PodcastsAdmin() {
       guest_name: p.guest_name || '', guest_title: p.guest_title || '',
       spotify_url: p.spotify_url || '',
       duration_seconds: p.duration_seconds || 0,
-      tags: Array.isArray(p.tags) ? p.tags : [],
+      subspecialties: Array.isArray(p.subspecialties) ? p.subspecialties : [],
       status: p.status || 'draft',
       published_at: p.published_at?.slice(0, 10) || '',
     })
@@ -249,8 +249,8 @@ export default function PodcastsAdmin() {
                   <td style={{ padding: '14px 16px', color: '#504F58' }}>{fmtDur(p.duration_seconds)}</td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {(p.tags || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
-                      {(p.tags || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.tags.length - 2}</span>}
+                      {(p.subspecialties || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
+                      {(p.subspecialties || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.subspecialties.length - 2}</span>}
                     </div>
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -289,8 +289,8 @@ export default function PodcastsAdmin() {
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={S.badge(p.status === 'published' ? '#f0fdf4' : '#fefce8', p.status === 'published' ? '#16a34a' : '#a16207')}>{p.status}</span>
-                {(p.tags || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
-                {(p.tags || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.tags.length - 2}</span>}
+                {(p.subspecialties || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
+                {(p.subspecialties || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.subspecialties.length - 2}</span>}
               </div>
             </div>
           ))}
@@ -361,11 +361,11 @@ export default function PodcastsAdmin() {
                 <label style={S.label}>Tags</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {TAGS.map(t => {
-                    const selected = form.tags.includes(t)
+                    const selected = form.subspecialties.includes(t)
                     return (
                       <button key={t} type="button" onClick={() => {
-                        const tags = selected ? form.tags.filter(x => x !== t) : [...form.tags, t]
-                        setForm({ ...form, tags })
+                        const subspecialties = selected ? form.subspecialties.filter(x => x !== t) : [...form.subspecialties, t]
+                        setForm({ ...form, subspecialties })
                       }}
                         style={{ padding: '4px 12px', borderRadius: 20, border: selected ? '1.5px solid #7C3AED' : '1.5px solid #D1D1D6', background: selected ? '#F5F3FF' : '#fff', color: selected ? '#7C3AED' : '#504F58', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                         {t}
