@@ -81,7 +81,7 @@ BEGIN
   END IF;
 
   -- Create new DM
-  INSERT INTO conversations (type) VALUES ('dm') RETURNING id INTO _conv_id;
+  INSERT INTO conversations (type, created_by) VALUES ('dm', auth.uid()) RETURNING id INTO _conv_id;
   INSERT INTO conversation_participants (conversation_id, user_id, role)
   VALUES (_conv_id, user_a, 'owner'), (_conv_id, user_b, 'owner');
 
