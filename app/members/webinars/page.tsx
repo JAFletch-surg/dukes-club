@@ -488,71 +488,117 @@ export default function LiveWebinars() {
       {(statusFilter === 'all' || statusFilter === 'past') && past.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Past Webinars</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
             {past.map(event => {
               // Try to find a matching video recording
               const matchingVideo = videos.find(v =>
                 v.title.toLowerCase().includes(event.title.toLowerCase().slice(0, 20)) ||
                 event.title.toLowerCase().includes(v.title.toLowerCase().slice(0, 20))
               )
+              const thumbSrc = event.featured_image_url || matchingVideo?.thumbnail_url || ''
 
               return (
-                <Card key={event.id} className="border overflow-hidden hover:shadow-md transition-shadow group">
-                  {/* Thumbnail */}
-                  <div className="relative aspect-video bg-navy flex items-center justify-center">
-                    {event.featured_image_url || matchingVideo?.thumbnail_url ? (
-                      <img
-                        src={event.featured_image_url || matchingVideo?.thumbnail_url || ''}
-                        alt={event.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : null}
-                    {matchingVideo && (
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                        <Play size={32} className="text-white/80 group-hover:text-white transition-colors" />
+                <div key={event.id} className="group">
+                  {/* Mobile: horizontal card */}
+                  <Card className="sm:hidden border overflow-hidden hover:shadow-md transition-shadow">
+                    <CardContent className="p-0 flex">
+                      <div className="w-28 shrink-0 relative bg-navy flex items-center justify-center">
+                        {thumbSrc ? (
+                          <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Radio size={18} className="text-navy-foreground/40" />
+                        )}
+                        {matchingVideo && (
+                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                            <Play size={16} className="text-white/80" />
+                          </div>
+                        )}
+                        {matchingVideo && (
+                          <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[9px] font-mono px-1 py-0.5 rounded">
+                            {formatDuration(matchingVideo.duration_seconds)}
+                          </span>
+                        )}
                       </div>
-                    )}
-                    {!matchingVideo && !event.featured_image_url && (
-                      <Radio size={32} className="text-navy-foreground/40" />
-                    )}
-                    {matchingVideo && (
-                      <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">
-                        {formatDuration(matchingVideo.duration_seconds)}
-                      </span>
-                    )}
-                  </div>
+                      <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center gap-0.5">
+                        <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{event.title}</h3>
+                        {event.speakers.length > 0 && (
+                          <p className="text-[11px] text-muted-foreground truncate">{event.speakers.join(', ')}</p>
+                        )}
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>{formatDate(event.starts_at)}</span>
+                          {matchingVideo && (
+                            <span className="flex items-center gap-0.5"><Eye size={10} /> {matchingVideo.vimeo_plays}</span>
+                          )}
+                        </div>
+                        {matchingVideo ? (
+                          <Link
+                            href={`/members/videos?v=${matchingVideo.id}`}
+                            className="text-[11px] font-semibold text-primary flex items-center gap-1 mt-0.5"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <Video size={11} /> Watch Recording
+                          </Link>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground/50">Recording coming soon</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  <CardContent className="p-3 sm:p-4">
-                    {event.subspecialties && event.subspecialties.length > 0 && (
-                      <div className="flex gap-1 flex-wrap mb-2">
-                        {event.subspecialties.slice(0, 3).map(t => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">{t}</span>
-                        ))}
-                      </div>
-                    )}
-                    <h3 className="text-sm font-semibold text-foreground line-clamp-2">{event.title}</h3>
-                    {event.speakers.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">{event.speakers.join(', ')}</p>
-                    )}
-                    <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                      <span>{formatDate(event.starts_at)}</span>
+                  {/* Desktop: vertical card */}
+                  <Card className="hidden sm:block border overflow-hidden hover:shadow-md transition-shadow">
+                    {/* Thumbnail */}
+                    <div className="relative aspect-video bg-navy flex items-center justify-center">
+                      {thumbSrc ? (
+                        <img src={thumbSrc} alt={event.title} className="w-full h-full object-cover" />
+                      ) : null}
                       {matchingVideo && (
-                        <span className="flex items-center gap-1"><Eye size={12} /> {matchingVideo.vimeo_plays}</span>
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <Play size={32} className="text-white/80 group-hover:text-white transition-colors" />
+                        </div>
+                      )}
+                      {!matchingVideo && !event.featured_image_url && (
+                        <Radio size={32} className="text-navy-foreground/40" />
+                      )}
+                      {matchingVideo && (
+                        <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">
+                          {formatDuration(matchingVideo.duration_seconds)}
+                        </span>
                       )}
                     </div>
 
-                    {matchingVideo ? (
-                      <Link
-                        href={`/members/videos?v=${matchingVideo.id}`}
-                        className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted/30 transition-colors"
-                      >
-                        <Video size={13} /> Watch Recording
-                      </Link>
-                    ) : (
-                      <p className="mt-3 text-center text-[11px] text-muted-foreground/60">Recording coming soon</p>
-                    )}
-                  </CardContent>
-                </Card>
+                    <CardContent className="p-4">
+                      {event.subspecialties && event.subspecialties.length > 0 && (
+                        <div className="flex gap-1 flex-wrap mb-2">
+                          {event.subspecialties.slice(0, 3).map(t => (
+                            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">{t}</span>
+                          ))}
+                        </div>
+                      )}
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2">{event.title}</h3>
+                      {event.speakers.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">{event.speakers.join(', ')}</p>
+                      )}
+                      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                        <span>{formatDate(event.starts_at)}</span>
+                        {matchingVideo && (
+                          <span className="flex items-center gap-1"><Eye size={12} /> {matchingVideo.vimeo_plays}</span>
+                        )}
+                      </div>
+
+                      {matchingVideo ? (
+                        <Link
+                          href={`/members/videos?v=${matchingVideo.id}`}
+                          className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted/30 transition-colors"
+                        >
+                          <Video size={13} /> Watch Recording
+                        </Link>
+                      ) : (
+                        <p className="mt-3 text-center text-[11px] text-muted-foreground/60">Recording coming soon</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               )
             })}
           </div>
