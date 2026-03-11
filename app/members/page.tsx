@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Video, HelpCircle, Calendar, BarChart3, Play, MapPin, ArrowRight, Clock, Check, X as XIcon, Loader2, AlertCircle, Award, MessageSquare, ExternalLink } from "lucide-react";
+import { Video, HelpCircle, Calendar, BarChart3, Play, MapPin, ArrowRight, Clock, Check, X as XIcon, Loader2, AlertCircle, Award, MessageSquare, ExternalLink, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -178,6 +178,49 @@ const MembersDashboard = () => {
           Here&apos;s what&apos;s new in the Dukes&apos; Club community
         </p>
       </div>
+
+      {/* Membership upgrade prompt for trainees */}
+      {profile?.role === 'trainee' && (
+        <Card className="border border-gold/30 bg-gold/5">
+          <CardContent className="p-5 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center shrink-0">
+              <ShieldCheck size={20} className="text-gold" />
+            </div>
+            <div className="flex-1 min-w-0">
+              {!profile.acpgbi_number ? (
+                <>
+                  <h3 className="text-sm font-semibold text-foreground">Upgrade to Full Membership</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Submit your ACPGBI membership number to unlock full access to in-person courses, unlimited question bank, and more.
+                  </p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <Link href="/members/profile">
+                      <Button variant="gold" size="sm">
+                        Add Membership Number
+                      </Button>
+                    </Link>
+                    <a
+                      href="https://www.acpgbi.org.uk/membership/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                    >
+                      Learn about ACPGBI membership
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-sm font-semibold text-foreground">Membership Verification Pending</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Your ACPGBI membership number has been submitted and is being verified. You&apos;ll receive full Member access once confirmed.
+                  </p>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,6 +1,6 @@
 'use client'
 import Link from "next/link";
-import { BookOpen, Users, GraduationCap, Video, Globe, Award, Lock, Play, Map } from "lucide-react";
+import { BookOpen, Users, GraduationCap, Video, Globe, Award, Lock, Play, Map, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 
@@ -59,10 +59,59 @@ const BenefitsSection = () => {
           ))}
         </div>
 
+        {/* Membership Tiers */}
+        <div className="max-w-2xl mx-auto mb-12">
+          <h3 className="text-xl font-semibold text-white text-center mb-6">Membership Tiers</h3>
+          <div className="rounded-lg border border-white/20 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-white/10">
+                  <th className="text-left text-white/80 font-medium px-4 py-3"></th>
+                  <th className="text-center text-white font-semibold px-4 py-3">Trainee</th>
+                  <th className="text-center text-gold font-semibold px-4 py-3">Full Member</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {[
+                  { feature: "Webinar archive", trainee: true, member: true },
+                  { feature: "Question bank", trainee: "3-month trial", member: true },
+                  { feature: "Community & directory", trainee: true, member: true },
+                  { feature: "Fellowships directory", trainee: true, member: true },
+                  { feature: "In-person courses", trainee: false, member: true },
+                  { feature: "Annual Weekend", trainee: false, member: true },
+                ].map((row) => (
+                  <tr key={row.feature} className="bg-white/5">
+                    <td className="text-white/80 px-4 py-2.5">{row.feature}</td>
+                    <td className="text-center px-4 py-2.5">
+                      {row.trainee === true ? (
+                        <Check size={16} className="inline text-emerald-300" />
+                      ) : row.trainee === false ? (
+                        <X size={16} className="inline text-white/30" />
+                      ) : (
+                        <span className="text-xs text-amber-300">{row.trainee}</span>
+                      )}
+                    </td>
+                    <td className="text-center px-4 py-2.5">
+                      {row.member === true ? (
+                        <Check size={16} className="inline text-gold" />
+                      ) : (
+                        <X size={16} className="inline text-white/30" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-white/50 text-center mt-3">
+            Full membership requires a valid ACPGBI membership (£95/year)
+          </p>
+        </div>
+
         <div className="text-center">
           <Link href="/register">
             <Button variant="gold" size="lg">
-              Join Dukes' Club Today
+              Join Dukes&apos; Club Today
             </Button>
           </Link>
         </div>
