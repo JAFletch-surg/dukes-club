@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown } from 'lucide-react'
+import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { sendEmail } from '@/lib/emails/send-email'
+import { useAuth } from '@/lib/use-auth'
 
 const ROLES = ['pending', 'trainee', 'member', 'editor', 'admin', 'super_admin'] as const
 const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const
@@ -25,6 +26,9 @@ const APPROVAL_COLORS: Record<string, string> = {
 }
 
 export default function MembersAdmin() {
+  const { profile } = useAuth()
+  const canManageMembers = profile?.role === 'admin' || profile?.role === 'super_admin'
+
   const { data: members, loading, refetch } = useSupabaseTable<any>('profiles', 'created_at', false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -205,6 +209,20 @@ export default function MembersAdmin() {
   }
 
   const initials = (name: string) => (name || '?').split(' ').map(n => n[0]).join('').slice(0, 2)
+
+  if (!canManageMembers) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <Lock size={28} className="text-gray-400" />
+        </div>
+        <h2 className="text-xl font-serif font-bold text-slate-800 mb-2">Admin Access Required</h2>
+        <p className="text-sm text-gray-500 max-w-sm">
+          Member management is restricted to administrators. Contact a site admin if you need access.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div>
