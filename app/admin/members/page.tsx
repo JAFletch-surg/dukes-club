@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ChevronDown } from 'lucide-react'
+import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { sendEmail } from '@/lib/emails/send-email'
@@ -42,6 +42,7 @@ export default function MembersAdmin() {
     if (filter === 'pending' && m.approval_status !== 'pending') return false
     if (filter === 'approved' && m.approval_status !== 'approved') return false
     if (filter === 'rejected' && m.approval_status !== 'rejected') return false
+    if (filter === 'verify' && !(m.role === 'trainee' && m.acpgbi_number)) return false
     if (search) {
       const q = search.toLowerCase()
       return (m.full_name || '').toLowerCase().includes(q) ||
@@ -58,6 +59,7 @@ export default function MembersAdmin() {
     pending: members.filter((m: any) => m.approval_status === 'pending').length,
     approved: members.filter((m: any) => m.approval_status === 'approved').length,
     rejected: members.filter((m: any) => m.approval_status === 'rejected').length,
+    verify: members.filter((m: any) => m.role === 'trainee' && m.acpgbi_number).length,
   }
 
   // Quick approve (from pending → approved + trainee role)
@@ -116,6 +118,34 @@ export default function MembersAdmin() {
       refetch()
     } catch (e: any) {
       showToast(e.message || 'Failed to reject', 'error')
+    }
+    setUpdating(null)
+  }
+
+  // Quick verify ACPGBI (trainee → member)
+  const handleVerifyMembership = async (member: any) => {
+    setUpdating(member.id)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'member' })
+        .eq('id', member.id)
+
+      if (error) throw error
+
+      if (member.email) {
+        sendEmail({
+          type: 'approval',
+          to: member.email,
+          data: { name: member.full_name || 'Member' },
+        }).catch((err) => console.error('Verification email failed:', err))
+      }
+
+      showToast(`${member.full_name || 'Member'} verified as Member`)
+      refetch()
+    } catch (e: any) {
+      showToast(e.message || 'Failed to verify', 'error')
     }
     setUpdating(null)
   }
@@ -191,26 +221,37 @@ export default function MembersAdmin() {
           <h1 className="text-2xl font-serif font-bold text-slate-800">Members</h1>
           <p className="text-sm text-gray-500 mt-1">{members.length} registered members</p>
         </div>
-        {counts.pending > 0 && (
-          <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold border border-amber-200 animate-pulse">
-            {counts.pending} pending approval
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {counts.pending > 0 && (
+            <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold border border-amber-200 animate-pulse">
+              {counts.pending} pending approval
+            </span>
+          )}
+          {counts.verify > 0 && (
+            <button
+              onClick={() => setFilter('verify')}
+              className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold border border-amber-300 hover:bg-amber-100 transition-colors"
+            >
+              <ShieldCheck size={12} className="inline mr-1 -mt-0.5" />
+              {counts.verify} ACPGBI to verify
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters & Search */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
-        {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+        {(['all', 'pending', 'approved', 'rejected', 'verify'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               filter === f
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                ? f === 'verify' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-blue-500 bg-blue-50 text-blue-700'
                 : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >
-            {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
+            {f === 'all' ? 'All' : f === 'verify' ? 'Verify ACPGBI' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
           </button>
         ))}
         <div className="sm:ml-auto relative w-full sm:w-auto">
@@ -242,6 +283,25 @@ export default function MembersAdmin() {
         </div>
       )}
 
+      {/* Bulk verify banner */}
+      {filter === 'verify' && counts.verify > 0 && (
+        <div className="flex gap-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg items-center">
+          <ShieldCheck size={16} className="text-amber-700 shrink-0" />
+          <span className="text-sm font-semibold text-amber-800 flex-1">
+            {counts.verify} member{counts.verify !== 1 ? 's' : ''} submitted ACPGBI numbers for verification
+          </span>
+          <button
+            onClick={async () => {
+              const toVerify = members.filter((m: any) => m.role === 'trainee' && m.acpgbi_number)
+              for (const m of toVerify) await handleVerifyMembership(m)
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-600"
+          >
+            <ShieldCheck size={14} /> Verify All
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <div className="flex justify-center py-16"><Loader className="animate-spin text-gray-400" size={28} /></div>
@@ -269,7 +329,7 @@ export default function MembersAdmin() {
             </thead>
             <tbody>
               {filtered.map((m: any) => (
-                <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${m.approval_status === 'pending' ? 'bg-amber-50/30' : ''}`}>
+                <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${m.approval_status === 'pending' ? 'bg-amber-50/30' : m.role === 'trainee' && m.acpgbi_number ? 'bg-amber-50/20' : ''}`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-purple-700 text-white rounded-full flex items-center justify-center text-xs font-bold">
@@ -287,7 +347,11 @@ export default function MembersAdmin() {
                   </td>
                   <td className="px-4 py-3">
                     {m.acpgbi_number ? (
-                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">{m.acpgbi_number}</span>
+                      m.role === 'trainee' ? (
+                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-300 animate-pulse">{m.acpgbi_number}</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-200">{m.acpgbi_number}</span>
+                      )
                     ) : (
                       <span className="text-gray-300 text-xs">—</span>
                     )}
@@ -337,6 +401,17 @@ export default function MembersAdmin() {
                           <UserCheck size={12} /> Approve
                         </button>
                       )}
+                      {m.role === 'trainee' && m.acpgbi_number && (
+                        <button
+                          onClick={() => handleVerifyMembership(m)}
+                          disabled={updating === m.id}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-600 text-white rounded-md text-xs font-semibold hover:bg-amber-500 disabled:opacity-50"
+                          title="Verify ACPGBI & upgrade to Member"
+                        >
+                          {updating === m.id ? <Loader className="animate-spin" size={12} /> : <ShieldCheck size={12} />}
+                          Verify
+                        </button>
+                      )}
                       <button
                         onClick={() => openEdit(m)}
                         className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
@@ -370,7 +445,13 @@ export default function MembersAdmin() {
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[m.role] || ROLE_COLORS.pending}`}>{m.role}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${APPROVAL_COLORS[m.approval_status] || 'bg-gray-100 text-gray-500'}`}>{m.approval_status || 'unknown'}</span>
                 {m.region && <span className="text-xs text-gray-500">{m.region}</span>}
-                {m.acpgbi_number && <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">ACPGBI: {m.acpgbi_number}</span>}
+                {m.acpgbi_number && (
+                  m.role === 'trainee' ? (
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-300 animate-pulse">ACPGBI: {m.acpgbi_number}</span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-200">ACPGBI: {m.acpgbi_number}</span>
+                  )
+                )}
               </div>
               {m.approval_status === 'pending' && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
@@ -386,6 +467,13 @@ export default function MembersAdmin() {
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
                   <button onClick={() => handleApprove(m)} disabled={updating === m.id} className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white rounded-md text-xs font-semibold hover:bg-green-600 disabled:opacity-50">
                     <UserCheck size={12} /> Approve
+                  </button>
+                </div>
+              )}
+              {m.role === 'trainee' && m.acpgbi_number && m.approval_status !== 'pending' && (
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                  <button onClick={() => handleVerifyMembership(m)} disabled={updating === m.id} className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 text-white rounded-md text-xs font-semibold hover:bg-amber-500 disabled:opacity-50">
+                    {updating === m.id ? <Loader className="animate-spin" size={12} /> : <ShieldCheck size={12} />} Verify ACPGBI
                   </button>
                 </div>
               )}
