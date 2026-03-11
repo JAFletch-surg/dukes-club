@@ -34,6 +34,61 @@ RETURNS boolean AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+-- Find or create a DM conversation between two users.
+-- SECURITY DEFINER so it bypasses RLS (enforces its own auth checks).
+CREATE OR REPLACE FUNCTION find_or_create_dm(user_a uuid, user_b uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _conv_id uuid;
+BEGIN
+  -- Caller must be one of the two participants
+  IF auth.uid() IS NULL OR (auth.uid() <> user_a AND auth.uid() <> user_b) THEN
+    RAISE EXCEPTION 'Not authorised';
+  END IF;
+
+  -- Cannot DM yourself
+  IF user_a = user_b THEN
+    RAISE EXCEPTION 'Cannot create a DM with yourself';
+  END IF;
+
+  -- Both users must be approved members
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = user_a AND approval_status = 'approved') THEN
+    RAISE EXCEPTION 'User A is not an approved member';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = user_b AND approval_status = 'approved') THEN
+    RAISE EXCEPTION 'User B is not an approved member';
+  END IF;
+
+  -- Serialize concurrent creation for the same pair
+  PERFORM pg_advisory_xact_lock(
+    hashtext(LEAST(user_a::text, user_b::text) || GREATEST(user_a::text, user_b::text))
+  );
+
+  -- Find existing DM
+  SELECT cp1.conversation_id INTO _conv_id
+  FROM conversation_participants cp1
+  JOIN conversation_participants cp2 ON cp2.conversation_id = cp1.conversation_id
+  JOIN conversations c ON c.id = cp1.conversation_id
+  WHERE cp1.user_id = user_a AND cp2.user_id = user_b AND c.type = 'dm'
+  LIMIT 1;
+
+  IF _conv_id IS NOT NULL THEN
+    RETURN _conv_id;
+  END IF;
+
+  -- Create new DM
+  INSERT INTO conversations (type) VALUES ('dm') RETURNING id INTO _conv_id;
+  INSERT INTO conversation_participants (conversation_id, user_id, role)
+  VALUES (_conv_id, user_a, 'owner'), (_conv_id, user_b, 'owner');
+
+  RETURN _conv_id;
+END;
+$$;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 1: CORE USER TABLES
 -- ─────────────────────────────────────────────────────────────────────────────
