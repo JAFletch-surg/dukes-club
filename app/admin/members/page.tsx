@@ -47,7 +47,8 @@ export default function MembersAdmin() {
       return (m.full_name || '').toLowerCase().includes(q) ||
         (m.email || '').toLowerCase().includes(q) ||
         (m.region || '').toLowerCase().includes(q) ||
-        (m.role || '').toLowerCase().includes(q)
+        (m.role || '').toLowerCase().includes(q) ||
+        (m.acpgbi_number || '').toLowerCase().includes(q)
     }
     return true
   })
@@ -259,6 +260,7 @@ export default function MembersAdmin() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Region</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Stage</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">ACPGBI</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Joined</th>
@@ -282,6 +284,13 @@ export default function MembersAdmin() {
                     {m.training_stage ? (
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">{m.training_stage}</span>
                     ) : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {m.acpgbi_number ? (
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">{m.acpgbi_number}</span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[m.role] || ROLE_COLORS.pending}`}>
@@ -361,6 +370,7 @@ export default function MembersAdmin() {
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[m.role] || ROLE_COLORS.pending}`}>{m.role}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${APPROVAL_COLORS[m.approval_status] || 'bg-gray-100 text-gray-500'}`}>{m.approval_status || 'unknown'}</span>
                 {m.region && <span className="text-xs text-gray-500">{m.region}</span>}
+                {m.acpgbi_number && <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">ACPGBI: {m.acpgbi_number}</span>}
               </div>
               {m.approval_status === 'pending' && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
