@@ -1003,7 +1003,7 @@ CREATE POLICY "calendar_dates_delete_admin"
   USING (is_admin());
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- FUTURE TABLES: media, podcasts
+-- FUTURE TABLES: media
 -- ─────────────────────────────────────────────────────────────────────────────
 -- These tables do not exist yet. When you create them, run the policies below.
 --
@@ -1014,15 +1014,32 @@ CREATE POLICY "calendar_dates_delete_admin"
 -- CREATE POLICY "media_insert_admin"  ON media FOR INSERT TO authenticated WITH CHECK (is_admin());
 -- CREATE POLICY "media_update_admin"  ON media FOR UPDATE TO authenticated USING (is_admin()) WITH CHECK (is_admin());
 -- CREATE POLICY "media_delete_admin"  ON media FOR DELETE TO authenticated USING (is_admin());
---
--- ── podcasts (published → approved members, admin CRUD) ──
---
--- ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "podcasts_select_published" ON podcasts FOR SELECT TO authenticated USING (status = 'published' AND is_approved_member());
--- CREATE POLICY "podcasts_select_admin"     ON podcasts FOR SELECT TO authenticated USING (is_admin());
--- CREATE POLICY "podcasts_insert_admin"     ON podcasts FOR INSERT TO authenticated WITH CHECK (is_admin());
--- CREATE POLICY "podcasts_update_admin"     ON podcasts FOR UPDATE TO authenticated USING (is_admin()) WITH CHECK (is_admin());
--- CREATE POLICY "podcasts_delete_admin"     ON podcasts FOR DELETE TO authenticated USING (is_admin());
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PODCASTS TABLE (published → approved members, admin CRUD)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "podcasts_select_published" ON podcasts
+  FOR SELECT TO authenticated
+  USING (status = 'published' AND is_approved_member());
+
+CREATE POLICY "podcasts_select_admin" ON podcasts
+  FOR SELECT TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "podcasts_insert_admin" ON podcasts
+  FOR INSERT TO authenticated
+  WITH CHECK (is_admin());
+
+CREATE POLICY "podcasts_update_admin" ON podcasts
+  FOR UPDATE TO authenticated
+  USING (is_admin()) WITH CHECK (is_admin());
+
+CREATE POLICY "podcasts_delete_admin" ON podcasts
+  FOR DELETE TO authenticated
+  USING (is_admin());
 
 -- =============================================================================
 -- END OF RLS POLICIES

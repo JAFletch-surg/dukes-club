@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Mic, Plus, Edit, Trash2, Save, Loader, X, ExternalLink } from 'lucide-react'
+import { Mic, Plus, Edit, Trash2, Save, Loader, X } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 
 const STATUSES = ['draft', 'published', 'archived']
@@ -21,6 +21,13 @@ const S = {
   btn: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#0F1F3D', color: '#F5F8FC', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' } as React.CSSProperties,
 }
 
+function getSpotifyEmbedUrl(url: string): string | null {
+  if (!url) return null
+  // Match spotify.com/episode/{id} or spotify.com/embed/episode/{id}
+  const match = url.match(/spotify\.com\/(?:embed\/)?episode\/([a-zA-Z0-9]+)/)
+  return match ? `https://open.spotify.com/embed/episode/${match[1]}?utm_source=generator` : null
+}
+
 export default function PodcastsAdmin() {
   const { data: podcasts, loading, create, update, remove } = useSupabaseTable<any>('podcasts', 'created_at', false)
   const [editing, setEditing] = useState<string | null>(null)
@@ -33,7 +40,7 @@ export default function PodcastsAdmin() {
   const emptyForm = {
     title: '', description: '', episode_number: 1,
     guest_name: '', guest_title: '',
-    audio_url: '', external_url: '',
+    spotify_url: '',
     duration_seconds: 0, tags: [] as string[],
     status: 'draft', published_at: '',
   }
@@ -45,7 +52,7 @@ export default function PodcastsAdmin() {
       title: p.title || '', description: p.description || '',
       episode_number: p.episode_number || 1,
       guest_name: p.guest_name || '', guest_title: p.guest_title || '',
-      audio_url: p.audio_url || '', external_url: p.external_url || '',
+      spotify_url: p.spotify_url || '',
       duration_seconds: p.duration_seconds || 0,
       tags: Array.isArray(p.tags) ? p.tags : [],
       status: p.status || 'draft',
@@ -196,9 +203,23 @@ export default function PodcastsAdmin() {
 
               <div><label style={S.label}>Description</label><textarea style={S.textarea} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Episode description..." /></div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div><label style={S.label}>Audio URL</label><input style={S.input} value={form.audio_url} onChange={(e) => setForm({ ...form, audio_url: e.target.value })} placeholder="https://..." /><p style={S.hint}>Direct link to MP3 or hosted player</p></div>
-                <div><label style={S.label}>External Link</label><input style={S.input} value={form.external_url} onChange={(e) => setForm({ ...form, external_url: e.target.value })} placeholder="Spotify, Apple Podcasts, etc." /></div>
+              <div>
+                <label style={S.label}>Spotify Episode URL</label>
+                <input style={S.input} value={form.spotify_url} onChange={(e) => setForm({ ...form, spotify_url: e.target.value })} placeholder="https://open.spotify.com/episode/..." />
+                <p style={S.hint}>Paste the Spotify episode link or embed URL</p>
+                {getSpotifyEmbedUrl(form.spotify_url) && (
+                  <div style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden' }}>
+                    <iframe
+                      src={getSpotifyEmbedUrl(form.spotify_url)!}
+                      width="100%"
+                      height="152"
+                      frameBorder="0"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      style={{ borderRadius: 12 }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
