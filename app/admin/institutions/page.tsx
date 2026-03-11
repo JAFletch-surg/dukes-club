@@ -101,12 +101,12 @@ export default function InstitutionsAdmin() {
     <div style={{ fontFamily: 'Montserrat, sans-serif' }}>
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 200, padding: '12px 20px', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,.15)', background: toast.type === 'ok' ? '#16a34a' : C.destructive }}>{toast.msg}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-7">
         <div>
           <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 28, fontWeight: 700, color: C.navy }}>Institutions</h1>
           <p style={{ fontSize: 14, color: C.secondary, marginTop: 4 }}>Reusable across fellowships, events, and faculty profiles · {institutions.length} institutions</p>
         </div>
-        <button onClick={openNew} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}><Plus size={16} strokeWidth={2.5} /> Add Institution</button>
+        <button onClick={openNew} className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, padding: '10px 20px', background: C.navy, color: C.navyFg, border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}><Plus size={16} strokeWidth={2.5} /> Add Institution</button>
       </div>
 
       <input style={{ ...S.input, maxWidth: 400, marginBottom: 24 }} placeholder="Search institutions..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -120,7 +120,9 @@ export default function InstitutionsAdmin() {
           <p style={{ fontSize: 13, color: C.secondary, marginTop: 4 }}>Add your first institution to start linking them to fellowships and events</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead><tr style={{ borderBottom: `2px solid ${C.bg}` }}>
               {['Institution', 'City', 'Country', 'Type', 'Actions'].map(h => (
@@ -155,7 +157,35 @@ export default function InstitutionsAdmin() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map((inst: any) => (
+            <div key={inst.id} style={{ background: '#fff', borderRadius: 12, border: `1px solid ${C.border}`, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: inst.logo_url ? 'transparent' : 'rgba(15,31,61,.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                  {inst.logo_url ? <img src={inst.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Building2 size={18} color={C.navy} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: C.fg, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</div>
+                  <div style={{ fontSize: 12, color: C.secondary, marginTop: 1 }}>{[inst.city, inst.country].filter(Boolean).join(', ') || '—'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={() => openEdit(inst)} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: C.secondary }}><Edit size={16} /></button>
+                  <button onClick={() => handleDelete(inst.id)} disabled={deleting === inst.id} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: C.muted }}>{deleting === inst.id ? <Loader className="animate-spin" size={16} /> : <Trash2 size={16} />}</button>
+                </div>
+              </div>
+              <span style={S.badge(C.primaryBg, C.primary)}>{inst.type}</span>
+            </div>
+          ))}
+        </div>
+        </>
       )}
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center" style={{ background: C.navy, color: C.navyFg, border: 'none', cursor: 'pointer' }}>
+        <Plus size={24} />
+      </button>
 
       {/* ── Modal ── */}
       {editing !== null && (
@@ -167,10 +197,10 @@ export default function InstitutionsAdmin() {
               <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, padding: 4 }}><X size={20} /></button>
             </div>
 
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div className="p-4 sm:px-7 sm:py-6" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
               {/* Logo + Cover image side by side */}
-              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
                 <ImageUploadBox value={form.logo_url} onChange={(url) => setForm({ ...form, logo_url: url })} folder="institutions/logos" label="Logo" height={100} />
                 <ImageUploadBox value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} folder="institutions/images" label="Cover Image" height={100} />
               </div>
@@ -178,7 +208,7 @@ export default function InstitutionsAdmin() {
               <div><label style={S.label}>Institution Name *</label><input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. St Mark's Hospital" /></div>
               <div><label style={S.label}>Full Address</label><input style={S.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Street, City, Postcode" /></div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div><label style={S.label}>City</label><input style={S.input} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
                 <div><label style={S.label}>Country</label><input style={S.input} value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} /></div>
                 <div><label style={S.label}>Type</label><select style={S.select} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
@@ -186,7 +216,7 @@ export default function InstitutionsAdmin() {
 
               <div><label style={S.label}>Website URL</label><input style={S.input} value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} placeholder="https://..." /></div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div><label style={S.label}>Latitude</label><input style={S.input} type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="e.g. 51.5074" /></div>
                 <div><label style={S.label}>Longitude</label><input style={S.input} type="number" step="any" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="e.g. -0.1278" /></div>
               </div>

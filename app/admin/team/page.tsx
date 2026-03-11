@@ -78,14 +78,16 @@ export default function TeamAdmin() {
   return (
     <div>
       {toast && <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg text-white text-sm font-medium shadow-lg ${toast.type === 'ok' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.msg}</div>}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div><h1 className="text-2xl font-serif font-bold text-slate-800">Executive Team</h1><p className="text-sm text-gray-500 mt-1">{team.length} members</p></div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Member</button>
+        <button onClick={openNew} className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700"><Plus size={16} /> Add Member</button>
       </div>
 
       {loading ? <div className="flex justify-center py-16"><Loader className="animate-spin text-gray-400" size={28} /></div>
       : team.length === 0 ? <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-gray-400"><UserCheck size={36} className="mx-auto mb-3 opacity-40" /><p>No team members yet</p></div>
-      : <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      : <>
+          {/* Desktop table */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-100">
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>
@@ -115,8 +117,40 @@ export default function TeamAdmin() {
               </tr>
             ))}</tbody>
           </table>
-        </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {team.map((m: any) => (
+              <div key={m.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  {m.photo_url
+                    ? <img src={m.photo_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    : <div className="w-10 h-10 bg-slate-700 text-white rounded-full flex items-center justify-center text-xs font-bold">{initials(m.full_name || '?')}</div>
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-slate-800 truncate">{m.full_name}</p>
+                    <p className="text-xs text-gray-500 truncate">{m.region || '—'}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Edit size={15} /></button>
+                    <button onClick={() => handleDelete(m.id)} disabled={deleting === m.id} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600">{deleting === m.id ? <Loader className="animate-spin" size={15} /> : <Trash2 size={15} />}</button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">{m.role}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{m.is_active ? 'Active' : 'Inactive'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       }
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700">
+        <Plus size={24} />
+      </button>
 
       {editing !== null && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
@@ -125,7 +159,7 @@ export default function TeamAdmin() {
               <h2 className="text-lg font-serif font-bold">{editing === 'new' ? 'Add Team Member' : 'Edit Team Member'}</h2>
               <button onClick={() => setEditing(null)} className="p-1 rounded hover:bg-gray-100"><X size={18} /></button>
             </div>
-            <div className="px-6 py-5 space-y-4">
+            <div className="p-4 sm:px-6 sm:py-5 space-y-4">
               <PhotoUpload value={form.photo_url} onChange={(url) => setForm({ ...form, photo_url: url })} />
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">Full Name *</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -182,10 +182,10 @@ export default function ApplicantsPage() {
             {f === 'all' ? 'All' : STATUS_CONFIG[f]?.label} ({counts[f] || 0})
           </button>
         ))}
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+        <div className="w-full sm:w-auto sm:ml-auto" style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
           <input value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder="Search applicants..."
-            style={{ padding: '8px 12px 8px 30px', border: '1.5px solid #D1D1D6', borderRadius: 8, fontSize: 13, width: 220, outline: 'none', fontFamily: 'Montserrat, sans-serif' }} />
+            style={{ padding: '8px 12px 8px 30px', border: '1.5px solid #D1D1D6', borderRadius: 8, fontSize: 13, width: '100%', outline: 'none', fontFamily: 'Montserrat, sans-serif' }} />
         </div>
       </div>
 
@@ -233,10 +233,10 @@ export default function ApplicantsPage() {
                       <span style={{ fontSize: 14, fontWeight: 700, color: '#181820' }}>{b.applicant_name}</span>
                       <span style={S.badge(sc.bg, sc.fg)}>{sc.label}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#888', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <span>{b.applicant_email}</span>
-                      {b.applicant_training_level && <span>· {b.applicant_training_level}</span>}
-                      {b.applicant_hospital && <span>· {b.applicant_hospital}</span>}
+                      {b.applicant_training_level && <span> · {b.applicant_training_level}</span>}
+                      {b.applicant_hospital && <span className="hidden sm:inline"> · {b.applicant_hospital}</span>}
                     </div>
                   </div>
                   <span style={{ fontSize: 11, color: '#999', whiteSpace: 'nowrap' }}>
@@ -248,7 +248,7 @@ export default function ApplicantsPage() {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div style={{ borderTop: '1px solid #F1F1F3', padding: '16px 18px', background: '#FAFAFA' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                       <div>
                         <p style={{ fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1 }}>Training Level</p>
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#333', marginTop: 2 }}>{b.applicant_training_level || '—'}</p>

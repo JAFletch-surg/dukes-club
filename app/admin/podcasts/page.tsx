@@ -83,12 +83,12 @@ export default function PodcastsAdmin() {
     <div style={{ fontFamily: 'Montserrat, -apple-system, sans-serif' }}>
       {toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 200, padding: '12px 20px', borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,.15)', background: toast.type === 'ok' ? '#16a34a' : '#DB2424' }}>{toast.msg}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-7">
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: '#0F1F3D' }}>Podcasts</h1>
           <p style={{ fontSize: 14, color: '#504F58', marginTop: 4 }}>{podcasts.length} episodes</p>
         </div>
-        <button onClick={openNew} style={S.btn}><Plus size={16} strokeWidth={2.5} /> Add Episode</button>
+        <button onClick={openNew} className="hidden sm:flex" style={{ ...S.btn }}><Plus size={16} strokeWidth={2.5} /> Add Episode</button>
       </div>
 
       <input style={{ ...S.input, maxWidth: 400, marginBottom: 24 }} placeholder="Search podcasts..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -101,7 +101,9 @@ export default function PodcastsAdmin() {
           <p style={{ fontSize: 16, fontWeight: 600, color: '#181820' }}>No podcasts found</p>
         </div>
       ) : (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block" style={{ background: '#fff', borderRadius: 16, border: '1px solid #D1D1D6', overflow: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #F1F1F3' }}>
@@ -139,7 +141,39 @@ export default function PodcastsAdmin() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map((p: any) => (
+            <div key={p.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #D1D1D6', padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: '#C49A6C', flexShrink: 0 }}>#{p.episode_number}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#181820', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                  <div style={{ fontSize: 12, color: '#504F58', marginTop: 2 }}>{p.guest_name || 'No guest'} · {fmtDur(p.duration_seconds)}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={() => openEdit(p)} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#504F58' }}><Edit size={16} /></button>
+                  <button onClick={() => handleDelete(p.id)} disabled={deleting === p.id} style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6' }}>
+                    {deleting === p.id ? <Loader className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={S.badge(p.status === 'published' ? '#f0fdf4' : '#fefce8', p.status === 'published' ? '#16a34a' : '#a16207')}>{p.status}</span>
+                {(p.tags || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
+                {(p.tags || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.tags.length - 2}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
       )}
+
+      {/* Mobile FAB */}
+      <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center" style={{ ...S.btn, padding: 0, borderRadius: '50%' }}>
+        <Plus size={24} />
+      </button>
 
       {/* Modal */}
       {editing !== null && (
@@ -149,25 +183,25 @@ export default function PodcastsAdmin() {
               <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0F1F3D' }}>{editing === 'new' ? 'Add Episode' : 'Edit Episode'}</h2>
               <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6', padding: 4 }}><X size={20} /></button>
             </div>
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 14 }}>
+            <div className="p-4 sm:px-7 sm:py-6" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-[80px_1fr] gap-3.5">
                 <div><label style={S.label}>Episode #</label><input style={S.input} type="number" value={form.episode_number} onChange={(e) => setForm({ ...form, episode_number: Number(e.target.value) })} /></div>
                 <div><label style={S.label}>Title *</label><input style={S.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Episode title" /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div><label style={S.label}>Guest Name</label><input style={S.input} value={form.guest_name} onChange={(e) => setForm({ ...form, guest_name: e.target.value })} /></div>
                 <div><label style={S.label}>Guest Title</label><input style={S.input} value={form.guest_title} onChange={(e) => setForm({ ...form, guest_title: e.target.value })} placeholder="e.g. Consultant, Royal London" /></div>
               </div>
 
               <div><label style={S.label}>Description</label><textarea style={S.textarea} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Episode description..." /></div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div><label style={S.label}>Audio URL</label><input style={S.input} value={form.audio_url} onChange={(e) => setForm({ ...form, audio_url: e.target.value })} placeholder="https://..." /><p style={S.hint}>Direct link to MP3 or hosted player</p></div>
                 <div><label style={S.label}>External Link</label><input style={S.input} value={form.external_url} onChange={(e) => setForm({ ...form, external_url: e.target.value })} placeholder="Spotify, Apple Podcasts, etc." /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div><label style={S.label}>Duration (seconds)</label><input style={S.input} type="number" value={form.duration_seconds} onChange={(e) => setForm({ ...form, duration_seconds: Number(e.target.value) })} /></div>
                 <div><label style={S.label}>Status</label><select style={S.select} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{STATUSES.map(s => <option key={s}>{s}</option>)}</select></div>
                 <div><label style={S.label}>Published Date</label><input style={S.input} type="date" value={form.published_at} onChange={(e) => setForm({ ...form, published_at: e.target.value })} /></div>

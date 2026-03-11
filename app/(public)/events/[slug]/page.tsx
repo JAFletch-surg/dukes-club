@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  CalendarDays, MapPin, PoundSterling, Users, User, Clock,
+  CalendarDays, MapPin, PoundSterling, Users, User, Clock, Lock,
   ArrowLeft, ExternalLink, Globe, Loader2, Check, X as XIcon,
 } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
 
 const formatDate = (dateStr: string) => {
@@ -185,7 +186,14 @@ const EventDetailPage = () => {
   const endTime = event?.ends_at ? formatTime(event.ends_at) : null;
   const price = event ? formatPrice(event.price_pence) : '';
   const memberPrice = event?.member_price_pence != null ? formatPrice(event.member_price_pence) : null;
-  const timetable = event?.timetable_data as { time: string; title: string }[] | null;
+  // Support both legacy flat format and new multi-day format
+  const rawTimetable = event?.timetable_data as any[] | null;
+  const isMultiDay = rawTimetable && rawTimetable.length > 0 && rawTimetable[0] && 'entries' in rawTimetable[0];
+  const timetableDays = isMultiDay
+    ? (rawTimetable as { day: string; label?: string; entries: { time: string; title: string }[] }[])
+    : rawTimetable && rawTimetable.length > 0
+      ? [{ day: '', label: '', entries: rawTimetable as { time: string; title: string }[] }]
+      : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -260,14 +268,33 @@ const EventDetailPage = () => {
               </AnimatedSection>
 
               {/* Timetable */}
-              {timetable && timetable.length > 0 && (
+              {timetableDays && timetableDays.length > 0 && (
                 <AnimatedSection className="mt-12" delay={100}>
                   <h2 className="text-2xl font-sans font-bold text-navy-foreground mb-6">Timetable</h2>
-                  <div className="space-y-0">
-                    {timetable.map((item, i) => (
-                      <div key={i} className={cn("flex items-start gap-4 py-4 border-b border-navy-foreground/10", i === 0 && "border-t")}>
-                        <span className="text-gold font-semibold text-sm w-16 shrink-0 pt-0.5">{item.time}</span>
-                        <span className="text-navy-foreground/80 text-sm">{item.title}</span>
+                  <div className="space-y-8">
+                    {timetableDays.map((dayGroup, di) => (
+                      <div key={di}>
+                        {/* Show day heading if multi-day or has label */}
+                        {(timetableDays.length > 1 || dayGroup.label) && (
+                          <div className="mb-3">
+                            <h3 className="text-lg font-semibold text-navy-foreground">
+                              {dayGroup.label || `Day ${di + 1}`}
+                            </h3>
+                            {dayGroup.day && (
+                              <p className="text-sm text-navy-foreground/60">
+                                {new Date(dayGroup.day + 'T00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <div className="space-y-0">
+                          {dayGroup.entries.map((item, i) => (
+                            <div key={i} className={cn("flex items-start gap-4 py-4 border-b border-navy-foreground/10", i === 0 && "border-t")}>
+                              <span className="text-gold font-semibold text-sm w-16 shrink-0 pt-0.5">{item.time}</span>
+                              <span className="text-navy-foreground/80 text-sm">{item.title}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -341,6 +368,20 @@ const EventDetailPage = () => {
                               </Button>
                             </Link>
                             <p className="text-xs text-center text-navy-foreground/50 mt-2">Members only — <Link href="/register" className="text-gold underline">join now</Link></p>
+                          </div>
+                        ) : !canBookEvent(profile, event.event_type) ? (
+                          <div className="text-center space-y-3 py-2">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 text-amber-400 text-sm font-semibold">
+                              <Lock size={14} /> Full Members Only
+                            </div>
+                            <p className="text-xs text-navy-foreground/60 leading-relaxed">
+                              In-person courses are available to verified ACPGBI members. Submit your membership number to upgrade.
+                            </p>
+                            <Link href="/members/profile">
+                              <Button variant="gold" size="sm" className="w-full">
+                                Add Membership Number
+                              </Button>
+                            </Link>
                           </div>
                         ) : !showApplyForm ? (
                           <Button variant="gold" size="lg" className="w-full" onClick={() => setShowApplyForm(true)}>

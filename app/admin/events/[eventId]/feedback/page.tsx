@@ -344,7 +344,7 @@ export default function EventFeedbackAdmin() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Attendees', value: bookings.length, color: '#2563EB' },
           { label: 'Responses', value: responses.length, color: '#059669' },
@@ -359,7 +359,7 @@ export default function EventFeedbackAdmin() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid #E4E4E8', marginBottom: 24 }}>
+      <div className="overflow-x-auto" style={{ display: 'flex', gap: 0, borderBottom: '2px solid #E4E4E8', marginBottom: 24 }}>
         {[
           { key: 'builder' as const, label: 'Form Builder', icon: MessageSquare },
           { key: 'responses' as const, label: `Responses (${responses.length})`, icon: BarChart3 },
@@ -389,7 +389,7 @@ export default function EventFeedbackAdmin() {
           <div style={S.section}>
             <p style={S.sectionTitle}>Form Settings</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label style={S.label}>Form Title</label>
                 <input style={S.input} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
@@ -400,7 +400,7 @@ export default function EventFeedbackAdmin() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label style={S.label}>Opens At <span style={{ fontWeight: 400, color: '#999' }}>(optional)</span></label>
                 <input type="datetime-local" style={S.input} value={form.opens_at} onChange={e => setForm({ ...form, opens_at: e.target.value })} />
@@ -449,7 +449,7 @@ export default function EventFeedbackAdmin() {
             </button>
 
             {form.certificate_enabled && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label style={S.label}>Certificate Title</label>
                   <input style={S.input} value={form.certificate_title} onChange={e => setForm({ ...form, certificate_title: e.target.value })} />
@@ -569,7 +569,7 @@ export default function EventFeedbackAdmin() {
           </div>
 
           {/* Save + Send Reminders */}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', marginTop: 20 }}>
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-between mt-5">
             <button onClick={handleSendReminders} disabled={sendingReminders || bookings.length === 0} style={{ ...S.btnOutline, opacity: bookings.length === 0 ? 0.4 : 1 }}>
               {sendingReminders ? <Loader className="animate-spin" size={14} /> : <Send size={14} />}
               Send Feedback Requests ({bookings.filter(b => !b.feedback_completed_at).length} pending)

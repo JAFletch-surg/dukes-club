@@ -109,7 +109,7 @@ function CommentItem({
   }
 
   return (
-    <div className={`${depth > 0 ? "ml-10" : ""}`}>
+    <div className={`${depth > 0 ? "ml-6 sm:ml-10" : ""}`}>
       <div className={`py-4 ${depth === 0 ? "border-b border-border" : ""} ${comment.is_pinned ? "bg-gold/5 -mx-4 px-4 rounded-lg border border-gold/20" : ""}`}>
         {comment.is_pinned && (
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gold mb-2">
@@ -138,7 +138,7 @@ function CommentItem({
             </p>
 
             {/* Actions */}
-            <div className="flex items-center gap-3 mt-2">
+            <div className="flex items-center gap-2 sm:gap-3 mt-2 flex-wrap">
               <button
                 onClick={() => onLike(comment.id)}
                 className={`flex items-center gap-1 text-xs transition-colors ${
@@ -218,7 +218,7 @@ function CommentItem({
           {depth === 0 && comment.replies.length > 2 && (
             <button
               onClick={() => setShowReplies(!showReplies)}
-              className="flex items-center gap-1.5 ml-11 text-xs font-medium text-primary hover:underline py-1"
+              className="flex items-center gap-1.5 ml-7 sm:ml-11 text-xs font-medium text-primary hover:underline py-1"
             >
               <CornerDownRight size={12} />
               {showReplies ? "Hide" : "Show"} {comment.replies.length} {comment.replies.length === 1 ? "reply" : "replies"}
@@ -714,74 +714,110 @@ const VideoArchive = () => {
       )}
 
       {/* Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filtered.map(video => (
-          <Card
-            key={video.id}
-            className="border overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 group hover:-translate-y-0.5"
-            onClick={() => { setActiveVideo(video); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-          >
-            <div className="relative aspect-video bg-navy">
-              {video.thumbnail_url ? (
-                <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Video size={32} className="text-navy-foreground/30" />
-                </div>
-              )}
-              {/* Play hover overlay */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
-                <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 shadow-xl">
-                  <Play size={22} className="text-navy ml-0.5" fill="currentColor" />
-                </div>
-              </div>
-              {video.category && (
-                <Badge className="absolute top-2.5 left-2.5 text-[10px] shadow-sm" variant="secondary">
-                  {video.category}
-                </Badge>
-              )}
-              <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm">
-                {fmtDuration(video.duration_seconds)}
-              </span>
-            </div>
-            <CardContent className="p-4">
-              {video.tags && video.tags.length > 0 && (
-                <div className="flex gap-1 flex-wrap mb-2">
-                  {video.tags.slice(0, 3).map(tag => (
-                    <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
-                      {tag}
-                    </span>
-                  ))}
-                  {video.tags.length > 3 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
-                      +{video.tags.length - 3}
-                    </span>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-5">
+        {filtered.map(video => {
+          const dateStr = video.published_at
+            ? new Date(video.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+            : video.vimeo_created_at
+            ? new Date(video.vimeo_created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+            : "";
+
+          return (
+            <div
+              key={video.id}
+              className="cursor-pointer group"
+              onClick={() => { setActiveVideo(video); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            >
+              {/* Mobile: horizontal card */}
+              <div className="sm:hidden flex rounded-lg border overflow-hidden bg-card hover:shadow-md transition-shadow">
+                <div className="w-28 shrink-0 relative bg-navy">
+                  {video.thumbnail_url ? (
+                    <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Video size={18} className="text-navy-foreground/30" />
+                    </div>
                   )}
-                </div>
-              )}
-              <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
-                {video.title}
-              </h3>
-              {video.speaker && (
-                <p className="text-xs text-muted-foreground mt-1.5">{video.speaker}</p>
-              )}
-              <div className="flex items-center justify-between mt-2.5 text-xs text-muted-foreground">
-                <span>
-                  {video.published_at
-                    ? new Date(video.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                    : video.vimeo_created_at
-                    ? new Date(video.vimeo_created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                    : ""}
-                </span>
-                {video.vimeo_plays > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Eye size={12} /> {video.vimeo_plays.toLocaleString()}
+                  <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-mono px-1 py-0.5 rounded">
+                    {fmtDuration(video.duration_seconds)}
                   </span>
-                )}
+                </div>
+                <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center gap-0.5">
+                  {video.category && (
+                    <span className="text-[10px] font-medium text-muted-foreground">{video.category}</span>
+                  )}
+                  <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{video.title}</h3>
+                  {video.speaker && (
+                    <p className="text-[11px] text-muted-foreground truncate">{video.speaker}</p>
+                  )}
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>{dateStr}</span>
+                    {video.vimeo_plays > 0 && (
+                      <span className="flex items-center gap-0.5"><Eye size={10} /> {video.vimeo_plays.toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+
+              {/* Desktop: vertical card */}
+              <Card className="hidden sm:block border overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+                <div className="relative aspect-video bg-navy">
+                  {video.thumbnail_url ? (
+                    <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Video size={32} className="text-navy-foreground/30" />
+                    </div>
+                  )}
+                  {/* Play hover overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+                    <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 shadow-xl">
+                      <Play size={22} className="text-navy ml-0.5" fill="currentColor" />
+                    </div>
+                  </div>
+                  {video.category && (
+                    <Badge className="absolute top-2.5 left-2.5 text-[10px] shadow-sm" variant="secondary">
+                      {video.category}
+                    </Badge>
+                  )}
+                  <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm">
+                    {fmtDuration(video.duration_seconds)}
+                  </span>
+                </div>
+                <CardContent className="p-4">
+                  {video.tags && video.tags.length > 0 && (
+                    <div className="flex gap-1 flex-wrap mb-2">
+                      {video.tags.slice(0, 3).map(tag => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                          {tag}
+                        </span>
+                      ))}
+                      {video.tags.length > 3 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                          +{video.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+                    {video.title}
+                  </h3>
+                  {video.speaker && (
+                    <p className="text-xs text-muted-foreground mt-1.5">{video.speaker}</p>
+                  )}
+                  <div className="flex items-center justify-between mt-2.5 text-xs text-muted-foreground">
+                    <span>{dateStr}</span>
+                    {video.vimeo_plays > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Eye size={12} /> {video.vimeo_plays.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })}
       </div>
 
       {/* Empty state */}

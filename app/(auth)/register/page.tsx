@@ -1,14 +1,12 @@
 'use client'
 import Link from "next/link"
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { sendEmail } from "@/lib/emails/send-email"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, ArrowRight, CheckCircle, Clock } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, CheckCircle, Clock, ShieldCheck } from "lucide-react"
 import AuthLayout from "@/components/auth/AuthLayout"
 
 const APPROVED_DOMAINS = ["nhs.net", "nhs.uk", "doctors.org.uk"]
@@ -75,40 +73,36 @@ const RegisterPage = () => {
     }
 
     setIsLoading(true)
-    const supabase = createClient()
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          full_name: formData.fullName,
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
           region: formData.region,
-          training_stage: formData.trainingStage,
-          acpgbi_number: formData.acpgbiNumber || null,
-          directory_visible: directoryVisible,
-        },
-        emailRedirectTo: `${window.location.origin}/login?verified=true`,
-      },
-    })
+          trainingStage: formData.trainingStage,
+          acpgbiNumber: formData.acpgbiNumber || null,
+          directoryVisible,
+        }),
+      })
 
-    setIsLoading(false)
+      const result = await res.json()
 
-    if (signUpError) {
-      if (signUpError.message.includes('already registered')) {
-        setError("An account with this email already exists. Try signing in instead.")
-      } else {
-        setError(signUpError.message)
+      if (!res.ok) {
+        setError(result.error || 'Registration failed. Please try again.')
+        setIsLoading(false)
+        return
       }
+    } catch {
+      setError('Network error. Please check your connection and try again.')
+      setIsLoading(false)
       return
     }
 
-    // Send welcome email (fire and forget — don't block registration)
-    sendEmail({
-      type: 'welcome',
-      to: formData.email,
-      data: { name: formData.fullName },
-    }).catch((err) => console.error('Welcome email failed:', err))
+    setIsLoading(false)
 
     const approved = isApprovedDomain(formData.email)
     setApprovalType(approved ? "auto" : "pending")
@@ -271,15 +265,33 @@ const RegisterPage = () => {
           </div>
 
           <div className="space-y-2">
+            <div className="rounded-lg bg-navy/5 border border-navy/10 px-4 py-3 flex items-start gap-3">
+              <ShieldCheck size={18} className="text-navy shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs text-foreground font-medium">ACPGBI members get full access</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  In-person courses, unlimited question bank, and more. Don&apos;t have a number yet? You can add it later from your profile.
+                </p>
+              </div>
+            </div>
             <Label htmlFor="acpgbi-number">ACPGBI membership number</Label>
             <Input
               id="acpgbi-number"
-              placeholder="Optional — for full Member access"
+              placeholder="Optional — enter for full Member access"
               value={formData.acpgbiNumber}
               onChange={(e) => updateField("acpgbiNumber", e.target.value)}
               className="h-11"
             />
-            <p className="text-xs text-muted-foreground">If you&apos;re a paying Dukes&apos; Club member via ACPGBI, enter your membership number for full access</p>
+            {formData.acpgbiNumber ? (
+              <p className="text-xs text-gold flex items-center gap-1">
+                <Clock size={12} />
+                Your membership number will be verified by an admin. Full Member access will be granted once confirmed.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                If you&apos;re a paying ACPGBI member, enter your membership number for full access
+              </p>
+            )}
           </div>
 
           <label className="flex items-start gap-3 cursor-pointer">

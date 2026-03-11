@@ -185,7 +185,7 @@ export default function MembersAdmin() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-serif font-bold text-slate-800">Members</h1>
           <p className="text-sm text-gray-500 mt-1">{members.length} registered members</p>
@@ -212,10 +212,10 @@ export default function MembersAdmin() {
             {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
           </button>
         ))}
-        <div className="ml-auto relative">
+        <div className="sm:ml-auto relative w-full sm:w-auto">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
-            className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-56"
+            className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-full sm:w-56"
             placeholder="Search members..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -249,7 +249,9 @@ export default function MembersAdmin() {
           <Users size={36} className="mx-auto mb-3 opacity-40" /><p>No members found</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <>
+        {/* Desktop table */}
+        <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -296,7 +298,6 @@ export default function MembersAdmin() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {/* Quick approve/reject for pending */}
                       {m.approval_status === 'pending' && (
                         <>
                           <button
@@ -318,8 +319,6 @@ export default function MembersAdmin() {
                           </button>
                         </>
                       )}
-
-                      {/* Re-approve rejected members */}
                       {m.approval_status === 'rejected' && (
                         <button
                           onClick={() => handleApprove(m)}
@@ -329,8 +328,6 @@ export default function MembersAdmin() {
                           <UserCheck size={12} /> Approve
                         </button>
                       )}
-
-                      {/* Edit button for all members */}
                       <button
                         onClick={() => openEdit(m)}
                         className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
@@ -345,6 +342,47 @@ export default function MembersAdmin() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {filtered.map((m: any) => (
+            <div key={m.id} className={`bg-white rounded-xl border border-gray-200 p-4 ${m.approval_status === 'pending' ? 'border-amber-200 bg-amber-50/30' : ''}`}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-purple-700 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {initials(m.full_name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-slate-800 truncate">{m.full_name || '—'}</p>
+                  <p className="text-xs text-gray-500 truncate">{m.email || '—'}</p>
+                </div>
+                <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 flex-shrink-0"><Edit size={15} /></button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[m.role] || ROLE_COLORS.pending}`}>{m.role}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${APPROVAL_COLORS[m.approval_status] || 'bg-gray-100 text-gray-500'}`}>{m.approval_status || 'unknown'}</span>
+                {m.region && <span className="text-xs text-gray-500">{m.region}</span>}
+              </div>
+              {m.approval_status === 'pending' && (
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                  <button onClick={() => handleApprove(m)} disabled={updating === m.id} className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white rounded-md text-xs font-semibold hover:bg-green-600 disabled:opacity-50">
+                    {updating === m.id ? <Loader className="animate-spin" size={12} /> : <UserCheck size={12} />} Approve
+                  </button>
+                  <button onClick={() => handleReject(m)} disabled={updating === m.id} className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600 text-white rounded-md text-xs font-semibold hover:bg-red-700 disabled:opacity-50">
+                    <UserX size={12} /> Reject
+                  </button>
+                </div>
+              )}
+              {m.approval_status === 'rejected' && (
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                  <button onClick={() => handleApprove(m)} disabled={updating === m.id} className="flex items-center gap-1 px-3 py-1.5 bg-green-700 text-white rounded-md text-xs font-semibold hover:bg-green-600 disabled:opacity-50">
+                    <UserCheck size={12} /> Approve
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        </>
       )}
 
       {/* Edit Modal */}

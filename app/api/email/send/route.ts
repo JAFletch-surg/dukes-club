@@ -8,6 +8,7 @@ import {
   bookingConfirmationEmail,
   bookingStatusEmail,
   passwordResetEmail,
+  adminNewRegistrationEmail,
 } from '@/lib/emails/templates'
 
 function getSupabase() {
@@ -19,7 +20,7 @@ function getSupabase() {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
-type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset'
+type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration'
 
 export async function POST(request: NextRequest) {
   try {
@@ -110,6 +111,16 @@ export async function POST(request: NextRequest) {
         email = passwordResetEmail({
           name: data.name || 'Member',
           resetUrl: data.resetUrl,
+        })
+        break
+
+      case 'admin_new_registration':
+        email = adminNewRegistrationEmail({
+          userName: data.userName || 'New User',
+          userEmail: data.userEmail || to,
+          region: data.region || 'Not specified',
+          trainingStage: data.trainingStage || 'Not specified',
+          siteUrl: SITE_URL,
         })
         break
 

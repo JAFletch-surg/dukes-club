@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Camera, Shield, Trash2, Bell, AlertTriangle, Check, Loader2 } from "lucide-react";
+import { Camera, Shield, Trash2, Bell, AlertTriangle, Check, Loader2, ShieldCheck, Clock } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
 import { createClient } from "@/lib/supabase/client";
 
@@ -36,6 +36,8 @@ const MemberProfile = () => {
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savingAcpgbi, setSavingAcpgbi] = useState(false);
+  const [savedAcpgbi, setSavedAcpgbi] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Form state
@@ -107,6 +109,26 @@ const MemberProfile = () => {
     if (!error) {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    }
+  };
+
+  const handleSaveAcpgbi = async () => {
+    if (!user) return;
+    setSavingAcpgbi(true);
+    setSavedAcpgbi(false);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        acpgbi_number: acpgbiNumber || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
+
+    setSavingAcpgbi(false);
+    if (!error) {
+      setSavedAcpgbi(true);
+      setTimeout(() => setSavedAcpgbi(false), 3000);
     }
   };
 
@@ -254,19 +276,6 @@ const MemberProfile = () => {
                 </div>
               </div>
 
-              <Separator className="my-4" />
-
-              {/* ACPGBI */}
-              <div className="space-y-2">
-                <Label>ACPGBI Membership Number</Label>
-                <div className="flex items-center gap-3">
-                  <Input value={acpgbiNumber} onChange={(e) => setAcpgbiNumber(e.target.value)} className="max-w-xs" />
-                  {acpgbiNumber && (
-                    <Badge className="bg-emerald-600 text-emerald-50 text-[10px]">ACPGBI Member</Badge>
-                  )}
-                </div>
-              </div>
-
               <Button variant="default" size="sm" className="mt-4" onClick={handleSaveProfile} disabled={saving}>
                 {saving ? (
                   <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
@@ -276,6 +285,77 @@ const MemberProfile = () => {
                   'Save Changes'
                 )}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* ACPGBI Membership Card */}
+          <Card className={`border ${!acpgbiNumber ? 'border-gold/30 bg-gold/5' : profile.role === 'trainee' ? 'border-amber-200' : 'border-emerald-200'}`}>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck size={18} className={!acpgbiNumber ? 'text-gold' : profile.role === 'trainee' ? 'text-amber-500' : 'text-emerald-600'} />
+                <h2 className="text-lg font-semibold text-foreground">ACPGBI Membership</h2>
+                {acpgbiNumber && profile.role !== 'trainee' && profile.role !== 'pending' && (
+                  <Badge className="bg-emerald-600 text-emerald-50 text-[10px]">Verified</Badge>
+                )}
+                {acpgbiNumber && profile.role === 'trainee' && (
+                  <Badge className="bg-amber-100 text-amber-800 text-[10px]">
+                    <Clock size={10} className="mr-1" /> Pending Verification
+                  </Badge>
+                )}
+              </div>
+
+              {!acpgbiNumber ? (
+                <p className="text-sm text-muted-foreground mb-4">
+                  Submit your ACPGBI membership number to upgrade to Full Member status.
+                  This gives you access to book in-person courses, unlimited question bank access, and more.
+                </p>
+              ) : profile.role === 'trainee' ? (
+                <p className="text-sm text-muted-foreground mb-4">
+                  Your ACPGBI number has been submitted and is pending verification.
+                  You&apos;ll receive full Member access once an admin has confirmed your membership.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-4">
+                  Your ACPGBI membership has been verified. You have full Member access.
+                </p>
+              )}
+
+              <div className="flex items-center gap-3">
+                <Input
+                  value={acpgbiNumber}
+                  onChange={(e) => setAcpgbiNumber(e.target.value)}
+                  placeholder="Enter your ACPGBI membership number"
+                  className="max-w-xs"
+                />
+                <Button
+                  variant={!acpgbiNumber ? 'gold' : 'default'}
+                  size="sm"
+                  onClick={handleSaveAcpgbi}
+                  disabled={savingAcpgbi}
+                >
+                  {savingAcpgbi ? (
+                    <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
+                  ) : savedAcpgbi ? (
+                    <><Check size={14} className="mr-2" /> Submitted</>
+                  ) : (
+                    'Submit for Verification'
+                  )}
+                </Button>
+              </div>
+
+              {!acpgbiNumber && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Don&apos;t have an ACPGBI membership?{' '}
+                  <a
+                    href="https://www.acpgbi.org.uk/membership/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold hover:text-gold/80 underline"
+                  >
+                    Learn how to join
+                  </a>
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

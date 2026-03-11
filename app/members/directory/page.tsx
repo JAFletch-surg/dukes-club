@@ -178,120 +178,167 @@ const MemberDirectory = () => {
       )}
 
       {/* Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
         {filtered.map((member) => {
           const ds = member.directory_settings;
           const isMe = user?.id === member.id;
 
           return (
-            <Card key={member.id} className={`border hover:shadow-md transition-shadow ${isMe ? 'ring-2 ring-gold/30' : ''}`}>
-              <CardContent className="p-5 text-center">
-                <Avatar className="h-14 w-14 mx-auto mb-3">
-                  {member.avatar_url ? (
-                    <img src={member.avatar_url} alt="" className="h-full w-full object-cover rounded-full" />
-                  ) : (
-                    <AvatarFallback className="bg-navy text-navy-foreground text-sm font-semibold">
-                      {getInitials(member.full_name)}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-
-                <h3 className="text-sm font-semibold text-foreground">{member.full_name}</h3>
-
-                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                  {/* Training stage & region */}
-                  <p>
-                    {ds?.show_training_stage !== false && member.training_stage && (
-                      <span>{member.training_stage}</span>
+            <div key={member.id}>
+              {/* Mobile: compact horizontal card */}
+              <Card className={`sm:hidden border hover:shadow-md transition-shadow ${isMe ? 'ring-2 ring-gold/30' : ''}`}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <Avatar className="h-10 w-10 shrink-0">
+                    {member.avatar_url ? (
+                      <img src={member.avatar_url} alt="" className="h-full w-full object-cover rounded-full" />
+                    ) : (
+                      <AvatarFallback className="bg-navy text-navy-foreground text-xs font-semibold">
+                        {getInitials(member.full_name)}
+                      </AvatarFallback>
                     )}
-                    {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && member.region && (
-                      <span> · </span>
-                    )}
-                    {ds?.show_region !== false && member.region && (
-                      <span>{member.region}</span>
-                    )}
-                  </p>
-
-                  {/* Hospital */}
-                  {ds?.show_hospital !== false && member.hospital && (
-                    <p className="truncate">{member.hospital}</p>
-                  )}
-                </div>
-
-                {/* Subspecialties */}
-                {ds?.show_subspecialty_interests !== false && member.subspecialty_interests && member.subspecialty_interests.length > 0 && (
-                  <div className="flex gap-1 flex-wrap justify-center mt-2.5">
-                    {member.subspecialty_interests.slice(0, 3).map((s) => (
-                      <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
-                        {s}
-                      </span>
-                    ))}
-                    {member.subspecialty_interests.length > 3 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
-                        +{member.subspecialty_interests.length - 3}
-                      </span>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-semibold text-foreground truncate">{member.full_name}</h3>
+                      {isMe && <span className="text-[9px] text-gold font-medium shrink-0">You</span>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {ds?.show_training_stage !== false && member.training_stage && member.training_stage}
+                      {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && member.region && ' · '}
+                      {ds?.show_region !== false && member.region && member.region}
+                    </p>
+                    {ds?.show_hospital !== false && member.hospital && (
+                      <p className="text-[11px] text-muted-foreground/70 truncate">{member.hospital}</p>
                     )}
                   </div>
-                )}
+                  {!isMe && user && (ds?.allow_messages !== false) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 h-8 w-8 p-0"
+                      onClick={() => handleMessage(member.id)}
+                      disabled={startingDM === member.id}
+                    >
+                      {startingDM === member.id ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : (
+                        <MessageSquare size={14} />
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
 
-                {/* Contact / social links */}
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  {ds?.show_email && member.email && (
-                    <a
-                      href={`mailto:${member.email}`}
-                      className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                      title={member.email}
-                    >
-                      <Mail size={14} />
-                    </a>
-                  )}
-                  {ds?.show_social_links && member.social_twitter && (
-                    <a
-                      href={member.social_twitter.startsWith('http') ? member.social_twitter : `https://twitter.com/${member.social_twitter.replace('@', '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                      title="Twitter / X"
-                    >
-                      <Twitter size={14} />
-                    </a>
-                  )}
-                  {ds?.show_social_links && member.social_linkedin && (
-                    <a
-                      href={member.social_linkedin.startsWith('http') ? member.social_linkedin : `https://linkedin.com/in/${member.social_linkedin}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                      title="LinkedIn"
-                    >
-                      <Linkedin size={14} />
-                    </a>
-                  )}
-                </div>
-
-                {/* Message button */}
-                {!isMe && user && (ds?.allow_messages !== false) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 w-full text-xs"
-                    onClick={() => handleMessage(member.id)}
-                    disabled={startingDM === member.id}
-                  >
-                    {startingDM === member.id ? (
-                      <Loader2 className="animate-spin mr-1.5" size={12} />
+              {/* Desktop: vertical centered card */}
+              <Card className={`hidden sm:block border hover:shadow-md transition-shadow ${isMe ? 'ring-2 ring-gold/30' : ''}`}>
+                <CardContent className="p-5 text-center">
+                  <Avatar className="h-14 w-14 mx-auto mb-3">
+                    {member.avatar_url ? (
+                      <img src={member.avatar_url} alt="" className="h-full w-full object-cover rounded-full" />
                     ) : (
-                      <MessageSquare size={12} className="mr-1.5" />
+                      <AvatarFallback className="bg-navy text-navy-foreground text-sm font-semibold">
+                        {getInitials(member.full_name)}
+                      </AvatarFallback>
                     )}
-                    Message
-                  </Button>
-                )}
+                  </Avatar>
 
-                {isMe && (
-                  <p className="text-[10px] text-gold font-medium mt-2">This is you</p>
-                )}
-              </CardContent>
-            </Card>
+                  <h3 className="text-sm font-semibold text-foreground">{member.full_name}</h3>
+
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    {/* Training stage & region */}
+                    <p>
+                      {ds?.show_training_stage !== false && member.training_stage && (
+                        <span>{member.training_stage}</span>
+                      )}
+                      {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && member.region && (
+                        <span> · </span>
+                      )}
+                      {ds?.show_region !== false && member.region && (
+                        <span>{member.region}</span>
+                      )}
+                    </p>
+
+                    {/* Hospital */}
+                    {ds?.show_hospital !== false && member.hospital && (
+                      <p className="truncate">{member.hospital}</p>
+                    )}
+                  </div>
+
+                  {/* Subspecialties */}
+                  {ds?.show_subspecialty_interests !== false && member.subspecialty_interests && member.subspecialty_interests.length > 0 && (
+                    <div className="flex gap-1 flex-wrap justify-center mt-2.5">
+                      {member.subspecialty_interests.slice(0, 3).map((s) => (
+                        <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                          {s}
+                        </span>
+                      ))}
+                      {member.subspecialty_interests.length > 3 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                          +{member.subspecialty_interests.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Contact / social links */}
+                  <div className="flex items-center justify-center gap-2 mt-3">
+                    {ds?.show_email && member.email && (
+                      <a
+                        href={`mailto:${member.email}`}
+                        className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                        title={member.email}
+                      >
+                        <Mail size={14} />
+                      </a>
+                    )}
+                    {ds?.show_social_links && member.social_twitter && (
+                      <a
+                        href={member.social_twitter.startsWith('http') ? member.social_twitter : `https://twitter.com/${member.social_twitter.replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                        title="Twitter / X"
+                      >
+                        <Twitter size={14} />
+                      </a>
+                    )}
+                    {ds?.show_social_links && member.social_linkedin && (
+                      <a
+                        href={member.social_linkedin.startsWith('http') ? member.social_linkedin : `https://linkedin.com/in/${member.social_linkedin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                        title="LinkedIn"
+                      >
+                        <Linkedin size={14} />
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Message button */}
+                  {!isMe && user && (ds?.allow_messages !== false) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full text-xs"
+                      onClick={() => handleMessage(member.id)}
+                      disabled={startingDM === member.id}
+                    >
+                      {startingDM === member.id ? (
+                        <Loader2 className="animate-spin mr-1.5" size={12} />
+                      ) : (
+                        <MessageSquare size={12} className="mr-1.5" />
+                      )}
+                      Message
+                    </Button>
+                  )}
+
+                  {isMe && (
+                    <p className="text-[10px] text-gold font-medium mt-2">This is you</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           );
         })}
       </div>

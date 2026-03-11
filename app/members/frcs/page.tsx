@@ -3,8 +3,9 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { FileText, BookOpen, GraduationCap, ExternalLink, Trophy, Target, Flame, TrendingUp, ArrowRight, Loader2, Users } from "lucide-react";
+import { FileText, BookOpen, GraduationCap, ExternalLink, Trophy, Target, Flame, TrendingUp, ArrowRight, Loader2, Users, Lock, Clock } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
+import { isQuestionBankTrialExpired, getTrialDaysRemaining } from "@/lib/membership-gates";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -215,7 +216,9 @@ function ScoreHistogram({ distribution, userScore }: { distribution: ScoreBucket
 
 // ─── Main Component ────────────────────────────────
 const FRCSResources = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const trialExpired = isQuestionBankTrialExpired(profile);
+  const daysRemaining = getTrialDaysRemaining(profile);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [topicPerformance, setTopicPerformance] = useState<TopicPerformance[]>([]);
   const [questionCount, setQuestionCount] = useState(0);
@@ -347,27 +350,53 @@ const FRCSResources = () => {
         <ScoreHistogram distribution={scoreDistribution} userScore={overallPct} />
       )}
 
+      {/* Trial banner */}
+      {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 30 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+          <Clock size={16} className="text-amber-600 shrink-0" />
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? 's' : ''}</span> remaining on your question bank trial.{' '}
+            <a href="/members/profile" className="text-amber-900 underline font-medium">Add your ACPGBI number</a> for unlimited access.
+          </p>
+        </div>
+      )}
+
       {/* Resource Cards */}
       <div className="grid sm:grid-cols-2 gap-4">
         {resources.map((resource) => {
-          const Wrapper = resource.available ? Link : "div";
-          const wrapperProps = resource.available ? { href: resource.link! } : {};
+          const isQBankLocked = resource.title === 'Question Bank' && trialExpired;
+          const isAvailable = resource.available && !isQBankLocked;
+          const Wrapper = isAvailable ? Link : "div";
+          const wrapperProps = isAvailable ? { href: resource.link! } : {};
           const badgeText = resource.badgeType === 'count' ? `${questionCount}+ Qs` : resource.badge;
           return (
             <Wrapper key={resource.title} {...(wrapperProps as any)}>
-              <Card className={`border h-full transition-shadow ${resource.available ? "hover:shadow-md cursor-pointer" : "opacity-70"}`}>
+              <Card className={`border h-full transition-shadow ${isAvailable ? "hover:shadow-md cursor-pointer" : "opacity-70"}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-navy/10 flex items-center justify-center">
-                      <resource.icon size={20} className="text-navy" />
+                      {isQBankLocked ? (
+                        <Lock size={20} className="text-muted-foreground" />
+                      ) : (
+                        <resource.icon size={20} className="text-navy" />
+                      )}
                     </div>
-                    <Badge variant={resource.available ? "default" : "secondary"} className="text-[10px]">
-                      {badgeText}
-                    </Badge>
+                    {isQBankLocked ? (
+                      <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800">Trial Ended</Badge>
+                    ) : (
+                      <Badge variant={isAvailable ? "default" : "secondary"} className="text-[10px]">
+                        {badgeText}
+                      </Badge>
+                    )}
                   </div>
                   <h3 className="text-base font-semibold text-foreground">{resource.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{resource.description}</p>
-                  {!resource.available && (
+                  {isQBankLocked && (
+                    <p className="text-xs text-amber-700 mt-3">
+                      <a href="/members/profile" className="underline font-medium">Add your ACPGBI number</a> to regain access
+                    </p>
+                  )}
+                  {!resource.available && !isQBankLocked && (
                     <p className="text-xs text-muted-foreground/60 mt-3 italic">Coming soon</p>
                   )}
                 </CardContent>

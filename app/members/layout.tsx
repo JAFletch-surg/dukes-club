@@ -58,7 +58,7 @@ const bottomNavItems = [
   { title: "Videos", path: "/members/videos", icon: Video },
   { title: "Questions", path: "/members/questions", icon: FileText },
   { title: "Events", path: "/events", icon: Calendar },
-  { title: "Profile", path: "/members/profile", icon: Settings },
+  { title: "Messages", path: "/members/messages", icon: MessageSquare },
 ];
 
 const MembersLayout = ({ children }: { children: React.ReactNode }) => {
@@ -309,13 +309,20 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-0 ${
+                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors min-w-0 relative ${
                     active
                       ? "text-gold"
                       : "text-muted-foreground"
                   }`}
                 >
-                  <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+                  <div className="relative">
+                    <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+                    {item.path === '/members/messages' && unreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-2.5 bg-red-500 text-white text-[8px] font-bold px-1 py-px rounded-full min-w-[16px] text-center leading-tight">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-[10px] font-medium truncate ${active ? "text-gold" : ""}`}>
                     {item.title}
                   </span>

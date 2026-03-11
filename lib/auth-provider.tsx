@@ -16,6 +16,7 @@ export interface Profile {
   training_stage: string | null
   avatar_url: string | null
   acpgbi_number: string | null
+  created_at: string | null
 }
 
 interface AuthContextType {

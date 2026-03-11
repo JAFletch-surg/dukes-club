@@ -36,9 +36,12 @@ function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-function parseCSV(text: string): { time: string; title: string }[] {
+interface TimetableEntry { time: string; title: string }
+interface TimetableDay { day: string; label: string; entries: TimetableEntry[] }
+
+function parseCSV(text: string): TimetableEntry[] {
   const lines = text.trim().split('\n')
-  const rows: { time: string; title: string }[] = []
+  const rows: TimetableEntry[] = []
   for (const line of lines) {
     const sep = line.includes('\t') ? '\t' : ','
     const parts = line.split(sep).map(s => s.trim().replace(/^["']|["']$/g, ''))
@@ -50,6 +53,24 @@ function parseCSV(text: string): { time: string; title: string }[] {
     }
   }
   return rows
+}
+
+/** Convert legacy flat timetable to multi-day format */
+function normaliseTimetable(raw: any, startsAt?: string): TimetableDay[] {
+  if (!Array.isArray(raw) || raw.length === 0) return []
+  // Already multi-day format
+  if (raw[0] && typeof raw[0] === 'object' && 'day' in raw[0] && 'entries' in raw[0]) {
+    return raw as TimetableDay[]
+  }
+  // Legacy flat format — wrap in single day
+  const day = startsAt ? startsAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
+  return [{ day, label: '', entries: raw as TimetableEntry[] }]
+}
+
+/** Flatten multi-day timetable for DB storage (returns null if empty) */
+function serialiseTimetable(days: TimetableDay[]): TimetableDay[] | null {
+  const nonEmpty = days.filter(d => d.entries.length > 0)
+  return nonEmpty.length > 0 ? nonEmpty : null
 }
 
 /* ── Searchable Faculty Picker ──────────────────── */
@@ -169,9 +190,9 @@ function FacultySearch({ faculty, assigned, onAdd }: {
 }
 
 const S = {
-  input: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
-  select: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
-  textarea: { width: '100%', padding: '10px 14px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 14, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif', minHeight: 100, resize: 'vertical' as const } as React.CSSProperties,
+  input: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
+  select: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
+  textarea: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif', minHeight: 100, resize: 'vertical' as const } as React.CSSProperties,
   label: { display: 'block', fontSize: 13, fontWeight: 700, color: '#181820', marginBottom: 6 } as React.CSSProperties,
   hint: { fontSize: 11, color: '#888', marginTop: 4 } as React.CSSProperties,
   badge: (bg: string, fg: string) => ({ display: 'inline-flex', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: bg, color: fg }) as React.CSSProperties,
@@ -223,7 +244,8 @@ export default function EventsAdmin() {
     stream_type: 'zoom', zoom_url: '', zoom_meeting_id: '', zoom_passcode: '',
     vimeo_live_id: '', vimeo_live_embed_url: '',
     subspecialties: [] as string[],
-    timetable_data: [] as { time: string; title: string }[],
+    timetable_data: [] as TimetableDay[],
+    activeTimetableDay: 0,
     // Application fields
     applications_enabled: false,
     eligibility_criteria: '',
@@ -256,7 +278,8 @@ export default function EventsAdmin() {
       zoom_passcode: e.zoom_passcode || '',
       vimeo_live_id: e.vimeo_live_id || '', vimeo_live_embed_url: e.vimeo_live_embed_url || '',
       subspecialties: Array.isArray(e.subspecialties) ? e.subspecialties : [],
-      timetable_data: Array.isArray(e.timetable_data) ? e.timetable_data : [],
+      timetable_data: normaliseTimetable(e.timetable_data, e.starts_at),
+      activeTimetableDay: 0,
       // Application fields
       applications_enabled: e.applications_enabled || false,
       eligibility_criteria: e.eligibility_criteria || '',
@@ -293,7 +316,7 @@ export default function EventsAdmin() {
         access_level: form.access_level,
         featured_image_url: form.featured_image_url || null,
         subspecialties: form.subspecialties,
-        timetable_data: form.timetable_data.length > 0 ? form.timetable_data : null,
+        timetable_data: serialiseTimetable(form.timetable_data),
         published_at: form.status === 'published' ? new Date().toISOString() : null,
         // Application fields
         applications_enabled: form.applications_enabled,
@@ -526,6 +549,14 @@ export default function EventsAdmin() {
                   )}>{e.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {e.applications_enabled && (
+                    <Link href={`/admin/events/${e.id}/applicants`} className="p-2 rounded-lg bg-blue-50 text-blue-700">
+                      <Users size={14} />
+                    </Link>
+                  )}
+                  <Link href={`/admin/events/${e.id}/feedback`} className="p-2 rounded-lg bg-amber-50 text-amber-800">
+                    <MessageSquare size={14} />
+                  </Link>
                   <button onClick={() => openEdit(e)} className="p-2 rounded-lg bg-[#F3F4F6] text-[#504F58]">
                     <Edit size={14} />
                   </button>
@@ -543,11 +574,11 @@ export default function EventsAdmin() {
       {editing !== null && (
         <div onClick={() => setEditing(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto' }} className="p-3 md:p-6">
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, maxWidth: 760, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 28px', borderBottom: '1px solid #E4E4E8' }}>
+            <div className="flex justify-between items-center px-4 py-4 sm:px-7 sm:py-5 border-b border-[#E4E4E8]">
               <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0F1F3D' }}>{editing === 'new' ? 'Create Event' : 'Edit Event'}</h2>
               <button onClick={() => setEditing(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#D1D1D6', padding: 4 }}><X size={20} /></button>
             </div>
-            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+            <div className="px-4 py-5 sm:px-7 sm:py-6" style={{ display: 'flex', flexDirection: 'column', gap: 18, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
 
               <div><label style={S.label}>Title *</label><input style={S.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: slugify(e.target.value) })} placeholder="Event title" /></div>
               <div><label style={S.label}>Slug</label><input style={{ ...S.input, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
@@ -578,19 +609,19 @@ export default function EventsAdmin() {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                 <div><label style={S.label}>Start Date/Time *</label><input style={S.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} /></div>
                 <div><label style={S.label}>End Date/Time</label><input style={S.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} /></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                 <div><label style={S.label}>Location</label><input style={S.input} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Venue name" /></div>
                 <div><label style={S.label}>Address</label><input style={S.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" /></div>
               </div>
 
               <div><label style={S.label}>Description</label><textarea style={S.textarea} value={form.description_plain} onChange={(e) => setForm({ ...form, description_plain: e.target.value })} placeholder="Event description..." /></div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
                 <div>
                   <label style={S.label}>Event Type</label>
                   <select style={S.select} value={form.event_type} onChange={(e) => setForm({ ...form, event_type: e.target.value })}>
@@ -669,7 +700,7 @@ export default function EventsAdmin() {
                   </div>
                   {(form.stream_type === 'zoom' || form.stream_type === 'hybrid') && (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                         <div><label style={S.label}>Zoom URL</label><input style={S.input} value={form.zoom_url} onChange={(e) => setForm({ ...form, zoom_url: e.target.value })} placeholder="https://zoom.us/j/..." /></div>
                         <div><label style={S.label}>Meeting ID</label><input style={S.input} value={form.zoom_meeting_id} onChange={(e) => setForm({ ...form, zoom_meeting_id: e.target.value })} /></div>
                       </div>
@@ -677,7 +708,7 @@ export default function EventsAdmin() {
                     </>
                   )}
                   {(form.stream_type === 'vimeo_live' || form.stream_type === 'hybrid') && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                       <div><label style={S.label}>Vimeo Live Event ID</label><input style={S.input} value={form.vimeo_live_id} onChange={(e) => setForm({ ...form, vimeo_live_id: e.target.value })} /></div>
                       <div><label style={S.label}>Vimeo Embed URL</label><input style={S.input} value={form.vimeo_live_embed_url} onChange={(e) => setForm({ ...form, vimeo_live_embed_url: e.target.value })} placeholder="https://vimeo.com/event/..." /></div>
                     </div>
@@ -685,10 +716,10 @@ export default function EventsAdmin() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-3.5">
                 <div><label style={S.label}>Price (pence)</label><input style={S.input} type="number" value={form.price_pence} onChange={(e) => setForm({ ...form, price_pence: Number(e.target.value) })} /><p style={S.hint}>0 = Free</p></div>
                 <div><label style={S.label}>Member Price (pence)</label><input style={S.input} type="number" value={form.member_price_pence} onChange={(e) => setForm({ ...form, member_price_pence: e.target.value })} /><p style={S.hint}>Leave blank for same as above</p></div>
-                <div><label style={S.label}>Booking URL</label><input style={S.input} value={form.booking_url} onChange={(e) => setForm({ ...form, booking_url: e.target.value })} placeholder="https://..." /></div>
+                <div className="col-span-2 sm:col-span-1"><label style={S.label}>Booking URL</label><input style={S.input} value={form.booking_url} onChange={(e) => setForm({ ...form, booking_url: e.target.value })} placeholder="https://..." /></div>
               </div>
 
               {/* APPLICATION SETTINGS — shown for workshops & courses */}
@@ -703,7 +734,7 @@ export default function EventsAdmin() {
 
                   {form.applications_enabled && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                         <div>
                           <label style={S.label}>Places Available</label>
                           <input style={S.input} type="number" value={form.places_available} onChange={(e) => setForm({ ...form, places_available: e.target.value })} placeholder="e.g. 20" />
@@ -779,57 +810,149 @@ export default function EventsAdmin() {
 
               <div style={S.section}>
                 <p style={S.sectionTitle}>TIMETABLE / SCHEDULE</p>
-                <label style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '24px 16px', border: '2px dashed #7C3AED', borderRadius: 12,
-                  cursor: 'pointer', background: '#FAFAFF', transition: 'all 0.15s',
-                }}>
-                  <Upload size={24} color="#7C3AED" style={{ marginBottom: 8 }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#7C3AED' }}>Upload CSV Timetable</span>
-                  <span style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Click to select a .csv or .tsv file</span>
-                  <span style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Format: <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>09:00, Registration &amp; Coffee</code></span>
-                  <input type="file" accept=".csv,.tsv,.txt" style={{ display: 'none' }} onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    const reader = new FileReader()
-                    reader.onload = (ev) => {
-                      const text = ev.target?.result as string
-                      const rows = parseCSV(text)
-                      if (rows.length > 0) {
-                        setForm(prev => ({ ...prev, timetable_data: rows }))
-                        showToast(`Imported ${rows.length} timetable entries`)
-                      } else {
-                        showToast('No valid rows found. Format: time, title', 'error')
-                      }
-                    }
-                    reader.readAsText(file)
-                    e.target.value = ''
-                  }} />
-                </label>
+
+                {/* Day tabs */}
                 {form.timetable_data.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {form.timetable_data.map((entry, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input style={{ ...S.input, maxWidth: 90, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={entry.time}
-                          onChange={(e) => { const u = [...form.timetable_data]; u[i] = { ...u[i], time: e.target.value }; setForm({ ...form, timetable_data: u }) }} placeholder="09:00" />
-                        <input style={{ ...S.input, flex: 1 }} value={entry.title}
-                          onChange={(e) => { const u = [...form.timetable_data]; u[i] = { ...u[i], title: e.target.value }; setForm({ ...form, timetable_data: u }) }} placeholder="Session title" />
-                        <button type="button" onClick={() => setForm({ ...form, timetable_data: form.timetable_data.filter((_, j) => j !== i) })}
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0 }}><X size={14} /></button>
-                      </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {form.timetable_data.map((day, di) => (
+                      <button key={di} type="button"
+                        onClick={() => setForm(prev => ({ ...prev, activeTimetableDay: di }))}
+                        style={{
+                          padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          border: form.activeTimetableDay === di ? '2px solid #7C3AED' : '1.5px solid #D1D1D6',
+                          background: form.activeTimetableDay === di ? '#F3EEFF' : '#fff',
+                          color: form.activeTimetableDay === di ? '#7C3AED' : '#504F58',
+                        }}>
+                        {day.label || `Day ${di + 1}`}
+                        {day.day && <span style={{ fontWeight: 400, marginLeft: 4, opacity: 0.6 }}>({day.day})</span>}
+                      </button>
                     ))}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <button type="button" onClick={() => setForm({ ...form, timetable_data: [...form.timetable_data, { time: '', title: '' }] })}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #D1D1D6', borderRadius: 8, background: 'none', fontSize: 12, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>
-                    <Plus size={13} /> Add row
+
+                {/* Add Day button */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button type="button" onClick={() => {
+                    const startDate = form.starts_at ? new Date(form.starts_at) : new Date()
+                    const dayOffset = form.timetable_data.length
+                    const newDate = new Date(startDate)
+                    newDate.setDate(newDate.getDate() + dayOffset)
+                    const dayStr = newDate.toISOString().slice(0, 10)
+                    setForm(prev => ({
+                      ...prev,
+                      timetable_data: [...prev.timetable_data, { day: dayStr, label: `Day ${prev.timetable_data.length + 1}`, entries: [] }],
+                      activeTimetableDay: prev.timetable_data.length,
+                    }))
+                  }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #7C3AED', borderRadius: 8, background: '#FAFAFF', fontSize: 12, fontWeight: 600, color: '#7C3AED', cursor: 'pointer' }}>
+                    <Plus size={13} /> Add Day
                   </button>
                   {form.timetable_data.length > 0 && (
-                    <button type="button" onClick={() => setForm({ ...form, timetable_data: [] })}
-                      style={{ fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Clear all</button>
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, timetable_data: [], activeTimetableDay: 0 }))}
+                      style={{ fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Clear all days</button>
                   )}
                 </div>
+
+                {/* Active day editor */}
+                {form.timetable_data.length > 0 && form.timetable_data[form.activeTimetableDay] && (() => {
+                  const dayIdx = form.activeTimetableDay
+                  const activeDay = form.timetable_data[dayIdx]
+                  const updateDay = (updates: Partial<TimetableDay>) => {
+                    setForm(prev => {
+                      const days = [...prev.timetable_data]
+                      days[dayIdx] = { ...days[dayIdx], ...updates }
+                      return { ...prev, timetable_data: days }
+                    })
+                  }
+                  const updateEntry = (ei: number, field: 'time' | 'title', value: string) => {
+                    setForm(prev => {
+                      const days = [...prev.timetable_data]
+                      const entries = [...days[dayIdx].entries]
+                      entries[ei] = { ...entries[ei], [field]: value }
+                      days[dayIdx] = { ...days[dayIdx], entries }
+                      return { ...prev, timetable_data: days }
+                    })
+                  }
+                  const removeEntry = (ei: number) => {
+                    setForm(prev => {
+                      const days = [...prev.timetable_data]
+                      days[dayIdx] = { ...days[dayIdx], entries: days[dayIdx].entries.filter((_, j) => j !== ei) }
+                      return { ...prev, timetable_data: days }
+                    })
+                  }
+                  const removeDay = () => {
+                    setForm(prev => {
+                      const days = prev.timetable_data.filter((_, j) => j !== dayIdx)
+                      return { ...prev, timetable_data: days, activeTimetableDay: Math.max(0, dayIdx - 1) }
+                    })
+                  }
+
+                  return (
+                    <div style={{ border: '1px solid #E5E5EA', borderRadius: 10, padding: 16, background: '#FAFAFA', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {/* Day header: date + label */}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input type="date" style={{ ...S.input, maxWidth: 160 }} value={activeDay.day}
+                          onChange={(e) => updateDay({ day: e.target.value })} />
+                        <input style={{ ...S.input, flex: 1, minWidth: 120 }} value={activeDay.label}
+                          onChange={(e) => updateDay({ label: e.target.value })} placeholder="Day label, e.g. Day 1 — Lectures" />
+                        <button type="button" onClick={removeDay}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0, fontSize: 11, fontWeight: 600 }}>
+                          <Trash2 size={14} /> Remove day
+                        </button>
+                      </div>
+
+                      {/* CSV upload for this day */}
+                      <label style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        padding: '16px 12px', border: '2px dashed #7C3AED', borderRadius: 10,
+                        cursor: 'pointer', background: '#FAFAFF', transition: 'all 0.15s',
+                      }}>
+                        <Upload size={18} color="#7C3AED" style={{ marginBottom: 4 }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED' }}>Upload CSV for {activeDay.label || `Day ${dayIdx + 1}`}</span>
+                        <span style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Format: <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>09:00, Registration &amp; Coffee</code></span>
+                        <input type="file" accept=".csv,.tsv,.txt" style={{ display: 'none' }} onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = (ev) => {
+                            const text = ev.target?.result as string
+                            const rows = parseCSV(text)
+                            if (rows.length > 0) {
+                              updateDay({ entries: [...activeDay.entries, ...rows] })
+                              showToast(`Imported ${rows.length} entries into ${activeDay.label || `Day ${dayIdx + 1}`}`)
+                            } else {
+                              showToast('No valid rows found. Format: time, title', 'error')
+                            }
+                          }
+                          reader.readAsText(file)
+                          e.target.value = ''
+                        }} />
+                      </label>
+
+                      {/* Entries */}
+                      {activeDay.entries.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {activeDay.entries.map((entry, ei) => (
+                            <div key={ei} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <input style={{ ...S.input, maxWidth: 90, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={entry.time}
+                                onChange={(e) => updateEntry(ei, 'time', e.target.value)} placeholder="09:00" />
+                              <input style={{ ...S.input, flex: 1 }} value={entry.title}
+                                onChange={(e) => updateEntry(ei, 'title', e.target.value)} placeholder="Session title" />
+                              <button type="button" onClick={() => removeEntry(ei)}
+                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0 }}><X size={14} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add row */}
+                      <button type="button" onClick={() => updateDay({ entries: [...activeDay.entries, { time: '', title: '' }] })}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', border: '1.5px dashed #D1D1D6', borderRadius: 8, background: 'none', fontSize: 12, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>
+                        <Plus size={13} /> Add row
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>
@@ -856,7 +979,7 @@ export default function EventsAdmin() {
               </label>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '18px 28px', borderTop: '1px solid #E4E4E8', background: '#FAFAFA', borderRadius: '0 0 20px 20px' }}>
+            <div className="flex justify-end gap-3 px-4 py-4 sm:px-7 sm:py-4.5 border-t border-[#E4E4E8] bg-[#FAFAFA] rounded-b-[20px]">
               <button onClick={() => setEditing(null)} style={{ padding: '10px 20px', border: 'none', background: 'none', fontSize: 14, fontWeight: 600, color: '#504F58', cursor: 'pointer' }}>Cancel</button>
               <button onClick={handleSave} disabled={saving} style={{ ...S.btn, opacity: saving ? 0.5 : 1 }}>
                 {saving ? <Loader className="animate-spin" size={15} /> : <Save size={15} />}
