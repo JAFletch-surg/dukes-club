@@ -549,6 +549,14 @@ export default function EventsAdmin() {
                   )}>{e.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {e.applications_enabled && (
+                    <Link href={`/admin/events/${e.id}/applicants`} className="p-2 rounded-lg bg-blue-50 text-blue-700">
+                      <Users size={14} />
+                    </Link>
+                  )}
+                  <Link href={`/admin/events/${e.id}/feedback`} className="p-2 rounded-lg bg-amber-50 text-amber-800">
+                    <MessageSquare size={14} />
+                  </Link>
                   <button onClick={() => openEdit(e)} className="p-2 rounded-lg bg-[#F3F4F6] text-[#504F58]">
                     <Edit size={14} />
                   </button>
