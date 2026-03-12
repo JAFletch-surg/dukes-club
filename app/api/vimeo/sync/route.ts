@@ -200,12 +200,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Archive videos no longer in the Vimeo folder (e.g. old account IDs)
+    const folderVimeoIds = new Set(
+      vimeoVideos.map(v => extractVimeoId(v.uri)).filter(Boolean)
+    )
+    const staleIds = (existingVideos || [])
+      .map((v: { vimeo_id: string }) => v.vimeo_id)
+      .filter(id => !folderVimeoIds.has(id))
+
+    let archived = 0
+    if (staleIds.length > 0) {
+      const { error: archiveErr, count } = await supabase
+        .from('videos')
+        .update({ status: 'archived', synced_at: new Date().toISOString() })
+        .in('vimeo_id', staleIds)
+        .eq('status', 'published')
+
+      if (archiveErr) {
+        console.error('[Vimeo Sync] Failed to archive stale videos:', archiveErr.message)
+      } else {
+        archived = count ?? staleIds.length
+      }
+    }
+
     return NextResponse.json({
       success: true,
       total_on_vimeo: vimeoVideos.length,
       created,
       updated,
       skipped,
+      archived,
     })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal error'

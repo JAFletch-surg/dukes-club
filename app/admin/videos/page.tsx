@@ -71,7 +71,7 @@ export default function AdminVideosPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
   const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number; total_on_vimeo: number } | null>(null)
+  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number; archived: number; total_on_vimeo: number } | null>(null)
 
   /* ── Form state ──────────────────────────────────── */
   const [form, setForm] = useState({
@@ -280,8 +280,8 @@ export default function AdminVideosPage() {
           background: '#DCFCE7', color: '#166534', fontSize: 13, fontWeight: 600,
         }}>
           <span>
-            Sync complete: {syncResult.created} created, {syncResult.updated} updated, {syncResult.skipped} skipped
-            ({syncResult.total_on_vimeo} total on Vimeo)
+            Sync complete: {syncResult.created} created, {syncResult.updated} updated, {syncResult.skipped} skipped{syncResult.archived > 0 ? `, ${syncResult.archived} archived` : ''}
+            ({syncResult.total_on_vimeo} total in folder)
           </span>
           <button onClick={() => setSyncResult(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#166534', padding: 4 }}>
             <X size={16} />
