@@ -107,7 +107,6 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
     <div
       ref={containerRef}
       className="relative w-full rounded-xl overflow-hidden bg-black shadow-lg"
-      style={{ paddingBottom: '56.25%' }}
     />
   )
 }
