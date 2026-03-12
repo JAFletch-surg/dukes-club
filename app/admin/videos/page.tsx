@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload } from 'lucide-react'
+import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 
@@ -70,6 +70,8 @@ export default function AdminVideosPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number; total_on_vimeo: number } | null>(null)
 
   /* ── Form state ──────────────────────────────────── */
   const [form, setForm] = useState({
@@ -158,6 +160,33 @@ export default function AdminVideosPage() {
     try { await remove(v.id) } catch (err: any) { alert('Delete failed: ' + err.message) }
   }
 
+  /* ── Sync all videos from Vimeo ─────────────────── */
+  const handleSync = async () => {
+    if (syncing) return
+    if (!confirm('Sync all videos from your Vimeo account? This will create new records and update existing ones.')) return
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+      const res = await fetch('/api/vimeo/sync', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Sync failed')
+      }
+      const result = await res.json()
+      setSyncResult(result)
+      refetch()
+    } catch (err: any) {
+      alert('Sync failed: ' + err.message)
+    }
+    setSyncing(false)
+  }
+
   /* ── Fetch thumbnail from Vimeo API ──────────────── */
   const fetchVimeoData = async () => {
     if (!form.vimeo_id) return
@@ -210,24 +239,55 @@ export default function AdminVideosPage() {
             {videos.length} video{videos.length !== 1 ? 's' : ''} in library
           </p>
         </div>
-        <button
-          onClick={openNew}
-          className="hidden sm:flex"
-          style={{
-            alignItems: 'center', gap: 8,
-            padding: '10px 20px', background: C.navy, color: C.navyFg,
-            border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <Plus size={18} /> Add Video
-        </button>
+        <div className="hidden sm:flex" style={{ gap: 10 }}>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 20px', background: syncing ? '#ccc' : C.primary, color: '#fff',
+              border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
+              cursor: syncing ? 'wait' : 'pointer',
+            }}
+          >
+            {syncing ? <Loader size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {syncing ? 'Syncing...' : 'Sync from Vimeo'}
+          </button>
+          <button
+            onClick={openNew}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 20px', background: C.navy, color: C.navyFg,
+              border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={18} /> Add Video
+          </button>
+        </div>
       </div>
 
       {/* Mobile FAB */}
       <button onClick={openNew} className="sm:hidden fixed bottom-[4.5rem] right-4 z-30 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform" style={{ background: C.navy, color: C.navyFg }}>
         <Plus size={24} strokeWidth={2.5} />
       </button>
+
+      {/* Sync result banner */}
+      {syncResult && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 20px', marginBottom: 16, borderRadius: 10,
+          background: '#DCFCE7', color: '#166534', fontSize: 13, fontWeight: 600,
+        }}>
+          <span>
+            Sync complete: {syncResult.created} created, {syncResult.updated} updated, {syncResult.skipped} skipped
+            ({syncResult.total_on_vimeo} total on Vimeo)
+          </span>
+          <button onClick={() => setSyncResult(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#166534', padding: 4 }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
