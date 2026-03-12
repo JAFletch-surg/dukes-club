@@ -322,6 +322,13 @@ CREATE POLICY "event_feedback_responses_insert_own"
   TO authenticated
   WITH CHECK (user_id = auth.uid());
 
+-- FK so PostgREST can resolve profiles:user_id(...) joins
+ALTER TABLE event_feedback_responses
+  DROP CONSTRAINT IF EXISTS event_feedback_responses_user_id_fkey;
+ALTER TABLE event_feedback_responses
+  ADD CONSTRAINT event_feedback_responses_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES profiles(id);
+
 -- ═══════════════════════════════════════════════════════════════════
 -- TABLE: event_certificates
 -- ═══════════════════════════════════════════════════════════════════
