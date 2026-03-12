@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// ── Supabase (service role for admin-level DB access) ───────────
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,80 +10,105 @@ function getSupabase() {
   )
 }
 
+// ── Env ─────────────────────────────────────────────────────────
+
 const VIMEO_TOKEN = process.env.VIMEO_ACCESS_TOKEN
+const VIMEO_FOLDER_ID = process.env.VIMEO_FOLDER_ID
 const VIMEO_API = 'https://api.vimeo.com'
 
-interface VimeoVideo {
+const VIMEO_HEADERS = {
+  Authorization: `bearer ${VIMEO_TOKEN}`,
+  Accept: 'application/vnd.vimeo.*+json;version=3.4',
+}
+
+const FIELDS = 'uri,name,description,duration,created_time,pictures.sizes,tags,privacy'
+
+// ── Types ───────────────────────────────────────────────────────
+
+interface VimeoVideoData {
   uri: string
   name: string
   description: string | null
   duration: number
   created_time: string
-  modified_time: string
   pictures: {
-    sizes: { width: number; height: number; link: string }[]
+    sizes: Array<{ width: number; height: number; link: string }>
   }
-  tags: { name: string }[]
-  stats: { plays: number }
-  privacy: { view: string }
-  status: string
-  embed: { html: string }
-  link: string
+  tags: Array<{ name: string }>
+  privacy: { embed: string; view: string }
 }
 
-function slugify(t: string) {
+interface VimeoApiResponse {
+  data: VimeoVideoData[]
+  total: number
+  paging: { next: string | null }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+function slugify(t: string): string {
   return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
 function extractVimeoId(uri: string): string {
-  // uri is like "/videos/123456789"
   return uri.split('/').pop() || ''
 }
 
-function getBestThumbnail(pictures: VimeoVideo['pictures']): string | null {
+function getBestThumbnail(
+  pictures: VimeoVideoData['pictures']
+): string | null {
   if (!pictures?.sizes?.length) return null
-  // Pick the largest size that's not ridiculously huge
   const sorted = [...pictures.sizes].sort((a, b) => b.width - a.width)
-  // Prefer something around 640-1280px wide
   const preferred = sorted.find(s => s.width >= 640 && s.width <= 1280)
   return (preferred || sorted[0])?.link || null
 }
 
-async function fetchAllVimeoVideos(): Promise<VimeoVideo[]> {
-  const allVideos: VimeoVideo[] = []
+// ── Fetch all videos from the Vimeo folder (paginated) ─────────
+
+async function fetchAllFolderVideos(): Promise<VimeoVideoData[]> {
+  const allVideos: VimeoVideoData[] = []
   let page = 1
   const perPage = 100
 
   while (true) {
-    const res = await fetch(
-      `${VIMEO_API}/me/videos?page=${page}&per_page=${perPage}&fields=uri,name,description,duration,created_time,modified_time,pictures.sizes,tags.name,stats.plays,privacy.view,status,embed.html,link`,
-      {
-        headers: {
-          Authorization: `Bearer ${VIMEO_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    const url = `${VIMEO_API}/me/projects/${VIMEO_FOLDER_ID}/videos?page=${page}&per_page=${perPage}&fields=${FIELDS}`
+
+    const res = await fetch(url, { headers: VIMEO_HEADERS })
 
     if (!res.ok) {
       const err = await res.text()
       throw new Error(`Vimeo API error ${res.status}: ${err}`)
     }
 
-    const data = await res.json()
-    allVideos.push(...(data.data || []))
+    const body: VimeoApiResponse = await res.json()
+    allVideos.push(...body.data)
 
-    // Check if there are more pages
-    if (!data.paging?.next) break
+    if (!body.paging.next) break
     page++
   }
 
   return allVideos
 }
 
+// ── POST — full sync ────────────────────────────────────────────
+
 export async function POST(request: NextRequest) {
   try {
+    if (!VIMEO_TOKEN) {
+      return NextResponse.json(
+        { error: 'VIMEO_ACCESS_TOKEN not configured' },
+        { status: 500 }
+      )
+    }
+    if (!VIMEO_FOLDER_ID) {
+      return NextResponse.json(
+        { error: 'VIMEO_FOLDER_ID not configured' },
+        { status: 500 }
+      )
+    }
+
     const supabase = getSupabase()
+
     // Auth check — only admins can trigger sync
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
@@ -105,19 +132,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 })
     }
 
-    if (!VIMEO_TOKEN) {
-      return NextResponse.json({ error: 'VIMEO_ACCESS_TOKEN not configured' }, { status: 500 })
-    }
+    // Fetch all videos from the Vimeo folder
+    const vimeoVideos = await fetchAllFolderVideos()
 
-    // Fetch all videos from Vimeo
-    const vimeoVideos = await fetchAllVimeoVideos()
-
-    // Get existing videos from Supabase to check what's already synced
+    // Get existing vimeo_ids from Supabase
     const { data: existingVideos } = await supabase
       .from('videos')
       .select('vimeo_id')
 
-    const existingIds = new Set((existingVideos || []).map((v: any) => v.vimeo_id))
+    const existingIds = new Set(
+      (existingVideos || []).map((v: { vimeo_id: string }) => v.vimeo_id)
+    )
 
     let created = 0
     let updated = 0
@@ -127,37 +152,16 @@ export async function POST(request: NextRequest) {
       const vimeoId = extractVimeoId(video.uri)
       if (!vimeoId) { skipped++; continue }
 
-      // Skip videos that aren't available/playable
-      if (video.status !== 'available') { skipped++; continue }
-
       const thumbnail = getBestThumbnail(video.pictures)
-      const tags = (video.tags || []).map((t: any) => t.name)
-
-      const row = {
-        vimeo_id: vimeoId,
-        title: video.name || 'Untitled',
-        slug: slugify(video.name || `video-${vimeoId}`),
-        description: video.description || null,
-        duration_seconds: video.duration || 0,
-        thumbnail_url: thumbnail,
-        tags: tags.length > 0 ? tags : null,
-        vimeo_plays: video.stats?.plays || 0,
-        vimeo_created_at: video.created_time || null,
-        vimeo_privacy: video.privacy?.view || null,
-        is_members_only: true,
-        status: 'published',
-        published_at: new Date().toISOString(),
-        synced_at: new Date().toISOString(),
-      }
+      const tags = (video.tags || []).map(t => t.name)
 
       if (existingIds.has(vimeoId)) {
-        // Update existing — don't overwrite manual edits to title/description/status
+        // Update existing — preserve manual edits to title/description/status
         const { error } = await supabase
           .from('videos')
           .update({
             thumbnail_url: thumbnail,
             duration_seconds: video.duration || 0,
-            vimeo_plays: video.stats?.plays || 0,
             tags: tags.length > 0 ? tags : null,
             vimeo_privacy: video.privacy?.view || null,
             synced_at: new Date().toISOString(),
@@ -170,8 +174,23 @@ export async function POST(request: NextRequest) {
           updated++
         }
       } else {
-        // Insert new
-        const { error } = await supabase.from('videos').insert(row)
+        // Insert new video
+        const { error } = await supabase.from('videos').insert({
+          vimeo_id: vimeoId,
+          title: video.name || 'Untitled',
+          slug: slugify(video.name || `video-${vimeoId}`),
+          description: video.description?.trim() || null,
+          duration_seconds: video.duration || 0,
+          thumbnail_url: thumbnail,
+          tags: tags.length > 0 ? tags : null,
+          vimeo_created_at: video.created_time || null,
+          vimeo_privacy: video.privacy?.view || null,
+          is_members_only: true,
+          status: 'published',
+          published_at: new Date().toISOString(),
+          synced_at: new Date().toISOString(),
+        })
+
         if (error) {
           console.error(`[Vimeo Sync] Failed to insert ${vimeoId}:`, error.message)
           skipped++
@@ -188,48 +207,46 @@ export async function POST(request: NextRequest) {
       updated,
       skipped,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal error'
     console.error('[Vimeo Sync] Error:', error)
-    return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 })
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
 
-// GET endpoint to check sync status / preview what would be synced
-export async function GET(request: NextRequest) {
+// ── GET — preview / connection check ────────────────────────────
+
+export async function GET() {
   try {
     if (!VIMEO_TOKEN) {
       return NextResponse.json({ error: 'VIMEO_ACCESS_TOKEN not configured' }, { status: 500 })
     }
+    if (!VIMEO_FOLDER_ID) {
+      return NextResponse.json({ error: 'VIMEO_FOLDER_ID not configured' }, { status: 500 })
+    }
 
-    // Just fetch first page to show a preview
-    const res = await fetch(
-      `${VIMEO_API}/me/videos?page=1&per_page=5&fields=uri,name,duration,pictures.sizes,status`,
-      {
-        headers: {
-          Authorization: `Bearer ${VIMEO_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    const url = `${VIMEO_API}/me/projects/${VIMEO_FOLDER_ID}/videos?page=1&per_page=5&fields=uri,name,duration,pictures.sizes`
+
+    const res = await fetch(url, { headers: VIMEO_HEADERS })
 
     if (!res.ok) {
       const err = await res.text()
       return NextResponse.json({ error: `Vimeo API error: ${err}` }, { status: res.status })
     }
 
-    const data = await res.json()
+    const body: VimeoApiResponse = await res.json()
 
     return NextResponse.json({
       connected: true,
-      total_videos: data.total || 0,
-      preview: (data.data || []).map((v: any) => ({
+      total_videos: body.total || 0,
+      preview: body.data.map(v => ({
         vimeo_id: extractVimeoId(v.uri),
         title: v.name,
         duration: v.duration,
-        status: v.status,
       })),
     })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Internal error'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

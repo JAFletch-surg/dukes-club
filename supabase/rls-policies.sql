@@ -492,6 +492,49 @@ CREATE POLICY "video_comment_likes_delete_own"
   TO authenticated
   USING (user_id = auth.uid());
 
+-- ═══════════════════════════════════════════════════════════════════
+-- TABLE: video_watch_progress
+-- ═══════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS video_watch_progress (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  watched_seconds INTEGER NOT NULL DEFAULT 0,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  last_watched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, video_id)
+);
+
+ALTER TABLE video_watch_progress ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "video_watch_progress_select_own" ON video_watch_progress;
+DROP POLICY IF EXISTS "video_watch_progress_select_admin" ON video_watch_progress;
+DROP POLICY IF EXISTS "video_watch_progress_insert_own" ON video_watch_progress;
+DROP POLICY IF EXISTS "video_watch_progress_update_own" ON video_watch_progress;
+
+CREATE POLICY "video_watch_progress_select_own"
+  ON video_watch_progress FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "video_watch_progress_select_admin"
+  ON video_watch_progress FOR SELECT
+  TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "video_watch_progress_insert_own"
+  ON video_watch_progress FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "video_watch_progress_update_own"
+  ON video_watch_progress FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 4: QUESTIONS / QUIZ TABLES
 -- ─────────────────────────────────────────────────────────────────────────────

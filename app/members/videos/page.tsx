@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import VimeoPlayer from "@/components/members/VimeoPlayer";
 
 const defaultCategories = ["All", "Operative", "Complications", "Webinar", "Education", "Lecture"];
 const sortOptions = ["Newest", "Most Viewed", "Duration"] as const;
@@ -428,6 +429,7 @@ const VideoArchive = () => {
   const [sort, setSort] = useState<typeof sortOptions[number]>("Newest");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeVideo, setActiveVideo] = useState<VideoRecord | null>(null);
+  const [watchProgress, setWatchProgress] = useState<Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }>>({});
 
   useEffect(() => {
     async function loadVideos() {
@@ -444,6 +446,18 @@ const VideoArchive = () => {
       setLoading(false);
     }
     loadVideos();
+
+    // Fetch watch progress for all videos
+    fetch('/api/videos/progress')
+      .then(r => r.json())
+      .then((rows: Array<{ video_id: string; watched_seconds: number; duration_seconds: number; completed: boolean }>) => {
+        if (Array.isArray(rows)) {
+          const map: Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }> = {};
+          for (const r of rows) map[r.video_id] = r;
+          setWatchProgress(map);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const toggleTag = (tag: string) => {
@@ -503,14 +517,7 @@ const VideoArchive = () => {
 
         {/* Player */}
         {activeVideo.vimeo_id ? (
-          <div className="relative w-full rounded-xl overflow-hidden bg-black shadow-lg" style={{ paddingBottom: "56.25%" }}>
-            <iframe
-              src={`https://player.vimeo.com/video/${activeVideo.vimeo_id}?autoplay=1&title=0&byline=0&portrait=0`}
-              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
+          <VimeoPlayer vimeoId={activeVideo.vimeo_id} videoId={activeVideo.id} />
         ) : (
           <div className="w-full aspect-video bg-navy rounded-xl flex items-center justify-center">
             <p className="text-navy-foreground/60 text-sm">No video source available</p>
@@ -741,6 +748,14 @@ const VideoArchive = () => {
                   <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-mono px-1 py-0.5 rounded">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id] && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
+                      <div
+                        className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
+                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center gap-0.5">
                   {video.category && (
@@ -783,6 +798,14 @@ const VideoArchive = () => {
                   <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id] && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                      <div
+                        className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
+                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <CardContent className="p-4">
                   {video.tags && video.tags.length > 0 && (
