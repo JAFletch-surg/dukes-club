@@ -164,6 +164,13 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
             <div className="flex items-center gap-2 text-[13px] font-semibold text-red-600">
               <Shield size={14} /> Admin Mode
             </div>
+            <Link
+              href="/members"
+              className="lg:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy/10 text-navy text-[11px] font-semibold"
+            >
+              <Layout size={12} />
+              Members
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[13px] font-semibold text-[#181820] hidden sm:inline">
