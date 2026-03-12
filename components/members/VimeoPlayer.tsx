@@ -6,11 +6,12 @@ import Player from '@vimeo/player'
 interface VimeoPlayerProps {
   vimeoId: string
   videoId: string // Supabase UUID — used for progress tracking
+  embedHash?: string | null // Privacy hash for unlisted/private videos
 }
 
 const PROGRESS_INTERVAL_S = 10 // save progress every 10 seconds
 
-export default function VimeoPlayer({ vimeoId, videoId }: VimeoPlayerProps) {
+export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<Player | null>(null)
   const lastSavedRef = useRef(0)
@@ -43,15 +44,23 @@ export default function VimeoPlayer({ vimeoId, videoId }: VimeoPlayerProps) {
   useEffect(() => {
     if (!containerRef.current || !vimeoId) return
 
-    const player = new Player(containerRef.current, {
-      id: parseInt(vimeoId, 10),
+    const playerOpts: Record<string, unknown> = {
       width: containerRef.current.offsetWidth,
       autoplay: true,
       title: false,
       byline: false,
       portrait: false,
       responsive: true,
-    })
+    }
+
+    if (embedHash) {
+      // For unlisted/private videos, use the full URL with hash
+      playerOpts.url = `https://player.vimeo.com/video/${vimeoId}?h=${embedHash}`
+    } else {
+      playerOpts.id = parseInt(vimeoId, 10)
+    }
+
+    const player = new Player(containerRef.current, playerOpts)
 
     playerRef.current = player
 
@@ -92,7 +101,7 @@ export default function VimeoPlayer({ vimeoId, videoId }: VimeoPlayerProps) {
       player.destroy()
       playerRef.current = null
     }
-  }, [vimeoId, videoId, saveProgress])
+  }, [vimeoId, videoId, embedHash, saveProgress])
 
   return (
     <div

@@ -23,6 +23,7 @@ interface VideoRecord {
   slug: string;
   description: string | null;
   vimeo_id: string | null;
+  vimeo_embed_hash: string | null;
   duration_seconds: number;
   thumbnail_url: string | null;
   tags: string[] | null;
@@ -517,7 +518,7 @@ const VideoArchive = () => {
 
         {/* Player */}
         {activeVideo.vimeo_id ? (
-          <VimeoPlayer vimeoId={activeVideo.vimeo_id} videoId={activeVideo.id} />
+          <VimeoPlayer vimeoId={activeVideo.vimeo_id} videoId={activeVideo.id} embedHash={activeVideo.vimeo_embed_hash} />
         ) : (
           <div className="w-full aspect-video bg-navy rounded-xl flex items-center justify-center">
             <p className="text-navy-foreground/60 text-sm">No video source available</p>

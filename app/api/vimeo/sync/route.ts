@@ -21,7 +21,7 @@ const VIMEO_HEADERS = {
   Accept: 'application/vnd.vimeo.*+json;version=3.4',
 }
 
-const FIELDS = 'uri,name,description,duration,created_time,pictures.sizes,tags,privacy'
+const FIELDS = 'uri,name,description,duration,created_time,pictures.sizes,tags,privacy,embed.html'
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -36,6 +36,7 @@ interface VimeoVideoData {
   }
   tags: Array<{ name: string }>
   privacy: { embed: string; view: string }
+  embed?: { html?: string }
 }
 
 interface VimeoApiResponse {
@@ -51,7 +52,21 @@ function slugify(t: string): string {
 }
 
 function extractVimeoId(uri: string): string {
-  return uri.split('/').pop() || ''
+  // URI can be /videos/123456 or /videos/123456:hash
+  const last = uri.split('/').pop() || ''
+  return last.split(':')[0]
+}
+
+function extractEmbedHash(video: VimeoVideoData): string | null {
+  // Try URI first — unlisted videos use /videos/123456:hash format
+  const uriPart = video.uri.split('/').pop() || ''
+  if (uriPart.includes(':')) {
+    return uriPart.split(':')[1] || null
+  }
+  // Fallback: extract ?h=... from embed HTML
+  const html = video.embed?.html || ''
+  const match = html.match(/[?&]h=([a-f0-9]+)/)
+  return match?.[1] || null
 }
 
 function getBestThumbnail(
@@ -154,6 +169,7 @@ export async function POST(request: NextRequest) {
 
       const thumbnail = getBestThumbnail(video.pictures)
       const tags = (video.tags || []).map(t => t.name)
+      const embedHash = extractEmbedHash(video)
 
       if (existingIds.has(vimeoId)) {
         // Update existing — preserve manual edits to title/description/status
@@ -164,6 +180,7 @@ export async function POST(request: NextRequest) {
             duration_seconds: video.duration || 0,
             tags: tags.length > 0 ? tags : null,
             vimeo_privacy: video.privacy?.view || null,
+            vimeo_embed_hash: embedHash,
             synced_at: new Date().toISOString(),
           })
           .eq('vimeo_id', vimeoId)
@@ -185,6 +202,7 @@ export async function POST(request: NextRequest) {
           tags: tags.length > 0 ? tags : null,
           vimeo_created_at: video.created_time || null,
           vimeo_privacy: video.privacy?.view || null,
+          vimeo_embed_hash: embedHash,
           is_members_only: true,
           status: 'published',
           published_at: new Date().toISOString(),
