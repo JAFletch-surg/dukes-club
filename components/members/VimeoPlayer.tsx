@@ -45,7 +45,6 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
     if (!containerRef.current || !vimeoId) return
 
     const playerOpts: Record<string, unknown> = {
-      width: containerRef.current.offsetWidth,
       autoplay: true,
       title: false,
       byline: false,
@@ -106,7 +105,7 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   return (
     <div
       ref={containerRef}
-      className="relative w-full rounded-xl overflow-hidden bg-black shadow-lg"
+      className="w-full rounded-xl overflow-hidden shadow-lg"
     />
   )
 }
