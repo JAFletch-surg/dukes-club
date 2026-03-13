@@ -44,6 +44,14 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   useEffect(() => {
     if (!containerRef.current || !vimeoId) return
 
+    // Clean up any leftover DOM from a previous player instance
+    // (React StrictMode double-mounts; destroy() is async so wrapper divs may linger)
+    if (playerRef.current) {
+      playerRef.current.destroy().catch(() => {})
+      playerRef.current = null
+    }
+    containerRef.current.innerHTML = ''
+
     const playerOpts: Record<string, unknown> = {
       autoplay: true,
       title: false,
@@ -97,8 +105,10 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       player.getCurrentTime().then(s => {
         saveProgress(s, false)
       }).catch(() => {})
-      player.destroy()
+      player.destroy().catch(() => {})
       playerRef.current = null
+      // Remove all SDK-injected wrapper divs to prevent stacking on re-mount
+      if (containerRef.current) containerRef.current.innerHTML = ''
     }
   }, [vimeoId, videoId, embedHash, saveProgress])
 
