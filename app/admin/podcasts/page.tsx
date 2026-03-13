@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { Mic, Plus, Edit, Trash2, Save, Loader, X, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Mic, Plus, Edit, Trash2, Save, Loader, X, Search } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
+import { createClient } from '@/lib/supabase/client'
 
 const STATUSES = ['draft', 'published', 'archived']
 const TAGS = [
@@ -21,8 +22,129 @@ const S = {
   btn: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#0F1F3D', color: '#F5F8FC', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' } as React.CSSProperties,
 }
 
+function getSpotifyEmbedUrl(url: string): string | null {
+  if (!url) return null
+  // Match spotify.com/episode/{id} or spotify.com/embed/episode/{id}
+  const match = url.match(/spotify\.com\/(?:embed\/)?episode\/([a-zA-Z0-9]+)/)
+  return match ? `https://open.spotify.com/embed/episode/${match[1]}?utm_source=generator` : null
+}
+
+/* ── Faculty search (mirrors events page pattern) ── */
+function GuestFacultySearch({ faculty, onSelect }: {
+  faculty: any[]
+  onSelect: (f: any) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const matches = faculty.filter(f => {
+    if (!query) return true
+    const q = query.toLowerCase()
+    return (
+      f.full_name?.toLowerCase().includes(q) ||
+      f.hospital?.toLowerCase().includes(q) ||
+      f.position_title?.toLowerCase().includes(q)
+    )
+  })
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        border: '1.5px solid #D1D1D6', borderRadius: 10, padding: '0 12px',
+        background: '#fff',
+        ...(open ? { borderColor: '#7C3AED', boxShadow: '0 0 0 3px rgba(124,58,237,0.1)' } : {}),
+      }}>
+        <Search size={15} color="#999" style={{ flexShrink: 0 }} />
+        <input
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search faculty by name, hospital, or role..."
+          style={{
+            width: '100%', padding: '10px 0', border: 'none', fontSize: 14,
+            color: '#000', background: 'transparent', outline: 'none',
+            fontFamily: 'Montserrat, sans-serif',
+          }}
+        />
+        {query && (
+          <button type="button" onClick={() => { setQuery(''); setOpen(false) }}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#999', padding: 2, flexShrink: 0 }}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          marginTop: 4, background: '#fff', border: '1.5px solid #D1D1D6',
+          borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+          maxHeight: 240, overflowY: 'auto',
+        }}>
+          {matches.length === 0 ? (
+            <div style={{ padding: '16px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
+              No matching faculty found
+            </div>
+          ) : (
+            matches.slice(0, 20).map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => { onSelect(f); setQuery(''); setOpen(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '10px 14px', border: 'none', background: 'none',
+                  cursor: 'pointer', textAlign: 'left', fontSize: 13,
+                  borderBottom: '1px solid #F1F1F3', transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#F8F5FF')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+              >
+                {f.photo_url ? (
+                  <img src={f.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%', background: '#059669',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {f.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '?'}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, color: '#181820', lineHeight: 1.3 }}>{f.full_name}</div>
+                  <div style={{ fontSize: 11, color: '#888', lineHeight: 1.3, marginTop: 1 }}>
+                    {[f.position_title, f.hospital].filter(Boolean).join(' · ') || 'Faculty'}
+                  </div>
+                </div>
+                <Plus size={14} color="#7C3AED" style={{ flexShrink: 0 }} />
+              </button>
+            ))
+          )}
+          {matches.length > 20 && (
+            <div style={{ padding: '8px 14px', textAlign: 'center', color: '#999', fontSize: 11 }}>
+              Type to narrow down {matches.length} results...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PodcastsAdmin() {
   const { data: podcasts, loading, create, update, remove } = useSupabaseTable<any>('podcasts', 'created_at', false)
+  const [faculty, setFaculty] = useState<any[]>([])
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -30,11 +152,17 @@ export default function PodcastsAdmin() {
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
+  // Load faculty list
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('faculty').select('id, full_name, position_title, hospital, photo_url').order('full_name').then(({ data }: any) => setFaculty(data || []))
+  }, [])
+
   const emptyForm = {
     title: '', description: '', episode_number: 1,
     guest_name: '', guest_title: '',
-    audio_url: '', external_url: '',
-    duration_seconds: 0, tags: [] as string[],
+    spotify_url: '',
+    duration_seconds: 0, subspecialties: [] as string[],
     status: 'draft', published_at: '',
   }
   const [form, setForm] = useState(emptyForm)
@@ -45,9 +173,9 @@ export default function PodcastsAdmin() {
       title: p.title || '', description: p.description || '',
       episode_number: p.episode_number || 1,
       guest_name: p.guest_name || '', guest_title: p.guest_title || '',
-      audio_url: p.audio_url || '', external_url: p.external_url || '',
+      spotify_url: p.spotify_url || '',
       duration_seconds: p.duration_seconds || 0,
-      tags: Array.isArray(p.tags) ? p.tags : [],
+      subspecialties: Array.isArray(p.subspecialties) ? p.subspecialties : [],
       status: p.status || 'draft',
       published_at: p.published_at?.slice(0, 10) || '',
     })
@@ -58,8 +186,10 @@ export default function PodcastsAdmin() {
     if (!form.title) { showToast('Title is required', 'error'); return }
     setSaving(true)
     try {
+      const slug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
       const payload: any = {
         ...form,
+        slug,
         published_at: form.status === 'published' ? (form.published_at || new Date().toISOString()) : null,
       }
       if (editing === 'new') { await create(payload); showToast('Podcast created') }
@@ -121,8 +251,8 @@ export default function PodcastsAdmin() {
                   <td style={{ padding: '14px 16px', color: '#504F58' }}>{fmtDur(p.duration_seconds)}</td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {(p.tags || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
-                      {(p.tags || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.tags.length - 2}</span>}
+                      {(p.subspecialties || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
+                      {(p.subspecialties || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.subspecialties.length - 2}</span>}
                     </div>
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -161,8 +291,8 @@ export default function PodcastsAdmin() {
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={S.badge(p.status === 'published' ? '#f0fdf4' : '#fefce8', p.status === 'published' ? '#16a34a' : '#a16207')}>{p.status}</span>
-                {(p.tags || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
-                {(p.tags || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.tags.length - 2}</span>}
+                {(p.subspecialties || []).slice(0, 2).map((t: string) => <span key={t} style={S.badge('#FCF5FF', '#9333EA')}>{t}</span>)}
+                {(p.subspecialties || []).length > 2 && <span style={{ fontSize: 11, color: '#888' }}>+{p.subspecialties.length - 2}</span>}
               </div>
             </div>
           ))}
@@ -189,6 +319,14 @@ export default function PodcastsAdmin() {
                 <div><label style={S.label}>Title *</label><input style={S.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Episode title" /></div>
               </div>
 
+              <div>
+                <label style={S.label}>Guest (select from faculty)</label>
+                <GuestFacultySearch faculty={faculty} onSelect={(f) => setForm({
+                  ...form,
+                  guest_name: f.full_name || '',
+                  guest_title: [f.position_title, f.hospital].filter(Boolean).join(', '),
+                })} />
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div><label style={S.label}>Guest Name</label><input style={S.input} value={form.guest_name} onChange={(e) => setForm({ ...form, guest_name: e.target.value })} /></div>
                 <div><label style={S.label}>Guest Title</label><input style={S.input} value={form.guest_title} onChange={(e) => setForm({ ...form, guest_title: e.target.value })} placeholder="e.g. Consultant, Royal London" /></div>
@@ -196,9 +334,23 @@ export default function PodcastsAdmin() {
 
               <div><label style={S.label}>Description</label><textarea style={S.textarea} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Episode description..." /></div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div><label style={S.label}>Audio URL</label><input style={S.input} value={form.audio_url} onChange={(e) => setForm({ ...form, audio_url: e.target.value })} placeholder="https://..." /><p style={S.hint}>Direct link to MP3 or hosted player</p></div>
-                <div><label style={S.label}>External Link</label><input style={S.input} value={form.external_url} onChange={(e) => setForm({ ...form, external_url: e.target.value })} placeholder="Spotify, Apple Podcasts, etc." /></div>
+              <div>
+                <label style={S.label}>Spotify Episode URL</label>
+                <input style={S.input} value={form.spotify_url} onChange={(e) => setForm({ ...form, spotify_url: e.target.value })} placeholder="https://open.spotify.com/episode/..." />
+                <p style={S.hint}>Paste the Spotify episode link or embed URL</p>
+                {getSpotifyEmbedUrl(form.spotify_url) && (
+                  <div style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden' }}>
+                    <iframe
+                      src={getSpotifyEmbedUrl(form.spotify_url)!}
+                      width="100%"
+                      height="152"
+                      frameBorder="0"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      style={{ borderRadius: 12 }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -211,11 +363,11 @@ export default function PodcastsAdmin() {
                 <label style={S.label}>Tags</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {TAGS.map(t => {
-                    const selected = form.tags.includes(t)
+                    const selected = form.subspecialties.includes(t)
                     return (
                       <button key={t} type="button" onClick={() => {
-                        const tags = selected ? form.tags.filter(x => x !== t) : [...form.tags, t]
-                        setForm({ ...form, tags })
+                        const subspecialties = selected ? form.subspecialties.filter(x => x !== t) : [...form.subspecialties, t]
+                        setForm({ ...form, subspecialties })
                       }}
                         style={{ padding: '4px 12px', borderRadius: 20, border: selected ? '1.5px solid #7C3AED' : '1.5px solid #D1D1D6', background: selected ? '#F5F3FF' : '#fff', color: selected ? '#7C3AED' : '#504F58', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
                         {t}

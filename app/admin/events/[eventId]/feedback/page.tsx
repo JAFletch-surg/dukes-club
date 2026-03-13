@@ -148,13 +148,28 @@ export default function EventFeedbackAdmin() {
         })
       }
 
-      // Load responses with user profiles
-      const { data: resps } = await supabase
+      // Load responses (separate query for profiles to avoid FK join dependency)
+      const { data: resps, error: respsErr } = await supabase
         .from('event_feedback_responses')
-        .select('*, profiles:user_id(full_name, email)')
+        .select('*')
         .eq('event_id', eventId)
         .order('submitted_at', { ascending: false })
-      if (resps) setResponses(resps)
+      if (respsErr) console.error('[Feedback] Failed to load responses:', respsErr.message)
+
+      if (resps && resps.length > 0) {
+        const userIds = [...new Set(resps.map((r: any) => r.user_id))]
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds)
+        const profileMap = new Map((profs || []).map((p: any) => [p.id, p]))
+        setResponses(resps.map((r: any) => ({
+          ...r,
+          profiles: profileMap.get(r.user_id) || null,
+        })))
+      } else if (resps) {
+        setResponses(resps)
+      }
 
       // Load certificates
       const { data: certs } = await supabase

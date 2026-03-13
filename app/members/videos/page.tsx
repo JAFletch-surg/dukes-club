@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import {
   Play, Search, Eye, Video, X, Clock, ArrowLeft, Loader2,
   MessageSquare, ThumbsUp, Pin, Trash2, Reply, Send, CornerDownRight,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, User,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import VimeoPlayer from "@/components/members/VimeoPlayer";
 
 const defaultCategories = ["All", "Operative", "Complications", "Webinar", "Education", "Lecture"];
 const sortOptions = ["Newest", "Most Viewed", "Duration"] as const;
@@ -22,6 +23,7 @@ interface VideoRecord {
   slug: string;
   description: string | null;
   vimeo_id: string | null;
+  vimeo_embed_hash: string | null;
   duration_seconds: number;
   thumbnail_url: string | null;
   tags: string[] | null;
@@ -29,6 +31,9 @@ interface VideoRecord {
   vimeo_created_at: string | null;
   speaker: string | null;
   category: string | null;
+  video_faculty: Array<{
+    faculty: { id: string; full_name: string; photo_url: string | null; position_title: string | null; hospital: string | null }
+  }> | null;
   is_members_only: boolean;
   status: string;
   published_at: string | null;
@@ -428,6 +433,7 @@ const VideoArchive = () => {
   const [sort, setSort] = useState<typeof sortOptions[number]>("Newest");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeVideo, setActiveVideo] = useState<VideoRecord | null>(null);
+  const [watchProgress, setWatchProgress] = useState<Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }>>({});
 
   useEffect(() => {
     async function loadVideos() {
@@ -435,7 +441,7 @@ const VideoArchive = () => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("videos")
-        .select("*")
+        .select("*, video_faculty(faculty(id, full_name, photo_url, position_title, hospital))")
         .eq("status", "published")
         .order("published_at", { ascending: false });
 
@@ -444,6 +450,18 @@ const VideoArchive = () => {
       setLoading(false);
     }
     loadVideos();
+
+    // Fetch watch progress for all videos
+    fetch('/api/videos/progress')
+      .then(r => r.json())
+      .then((rows: Array<{ video_id: string; watched_seconds: number; duration_seconds: number; completed: boolean }>) => {
+        if (Array.isArray(rows)) {
+          const map: Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }> = {};
+          for (const r of rows) map[r.video_id] = r;
+          setWatchProgress(map);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const toggleTag = (tag: string) => {
@@ -454,7 +472,7 @@ const VideoArchive = () => {
     let result = videos.filter(v => {
       const matchesSearch =
         v.title.toLowerCase().includes(search.toLowerCase()) ||
-        (v.speaker || "").toLowerCase().includes(search.toLowerCase()) ||
+        (v.video_faculty || []).some(vf => vf.faculty.full_name.toLowerCase().includes(search.toLowerCase())) ||
         (v.description || "").toLowerCase().includes(search.toLowerCase()) ||
         (v.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase()));
       const matchesCategory = category === "All" || v.category === category;
@@ -503,14 +521,7 @@ const VideoArchive = () => {
 
         {/* Player */}
         {activeVideo.vimeo_id ? (
-          <div className="relative w-full rounded-xl overflow-hidden bg-black shadow-lg" style={{ paddingBottom: "56.25%" }}>
-            <iframe
-              src={`https://player.vimeo.com/video/${activeVideo.vimeo_id}?autoplay=1&title=0&byline=0&portrait=0`}
-              style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
+          <VimeoPlayer vimeoId={activeVideo.vimeo_id} videoId={activeVideo.id} embedHash={activeVideo.vimeo_embed_hash} />
         ) : (
           <div className="w-full aspect-video bg-navy rounded-xl flex items-center justify-center">
             <p className="text-navy-foreground/60 text-sm">No video source available</p>
@@ -525,9 +536,6 @@ const VideoArchive = () => {
             <div>
               <h1 className="text-xl font-bold text-foreground leading-snug">{activeVideo.title}</h1>
               <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-                {activeVideo.speaker && (
-                  <span className="text-sm text-foreground font-medium">{activeVideo.speaker}</span>
-                )}
                 {activeVideo.category && (
                   <Badge variant="secondary" className="text-[10px]">{activeVideo.category}</Badge>
                 )}
@@ -546,6 +554,29 @@ const VideoArchive = () => {
                 )}
               </div>
             </div>
+
+            {/* Faculty / Speakers */}
+            {activeVideo.video_faculty && activeVideo.video_faculty.length > 0 && (
+              <div className="space-y-3">
+                {activeVideo.video_faculty.map(({ faculty: member }) => (
+                  <div key={member.id} className="flex items-center gap-3">
+                    {member.photo_url ? (
+                      <img src={member.photo_url} alt={member.full_name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <User className="text-muted-foreground" size={18} />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{member.full_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {member.position_title}{member.hospital && ` · ${member.hospital}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Description */}
             {activeVideo.description && (
@@ -604,8 +635,10 @@ const VideoArchive = () => {
                       <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
                         {v.title}
                       </p>
-                      {v.speaker && (
-                        <p className="text-[11px] text-muted-foreground mt-1 truncate">{v.speaker}</p>
+                      {(v.video_faculty?.length ?? 0) > 0 && (
+                        <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                          {v.video_faculty!.map(vf => vf.faculty.full_name).join(", ")}
+                        </p>
                       )}
                       {v.vimeo_plays > 0 && (
                         <p className="text-[10px] text-muted-foreground mt-0.5">{v.vimeo_plays.toLocaleString()} views</p>
@@ -741,14 +774,22 @@ const VideoArchive = () => {
                   <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-mono px-1 py-0.5 rounded">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id] && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
+                      <div
+                        className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
+                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center gap-0.5">
                   {video.category && (
                     <span className="text-[10px] font-medium text-muted-foreground">{video.category}</span>
                   )}
                   <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{video.title}</h3>
-                  {video.speaker && (
-                    <p className="text-[11px] text-muted-foreground truncate">{video.speaker}</p>
+                  {(video.video_faculty?.length ?? 0) > 0 && (
+                    <p className="text-[11px] text-muted-foreground truncate">{video.video_faculty!.map(vf => vf.faculty.full_name).join(", ")}</p>
                   )}
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span>{dateStr}</span>
@@ -783,6 +824,14 @@ const VideoArchive = () => {
                   <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id] && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                      <div
+                        className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
+                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <CardContent className="p-4">
                   {video.tags && video.tags.length > 0 && (
@@ -802,8 +851,8 @@ const VideoArchive = () => {
                   <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
                     {video.title}
                   </h3>
-                  {video.speaker && (
-                    <p className="text-xs text-muted-foreground mt-1.5">{video.speaker}</p>
+                  {(video.video_faculty?.length ?? 0) > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1.5">{video.video_faculty!.map(vf => vf.faculty.full_name).join(", ")}</p>
                   )}
                   <div className="flex items-center justify-between mt-2.5 text-xs text-muted-foreground">
                     <span>{dateStr}</span>

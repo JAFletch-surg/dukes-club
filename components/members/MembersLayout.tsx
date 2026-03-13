@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Home, Video, Play, Mic, BookOpen, FileText, Globe, Users,
-  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink, Award,
+  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, Shield, ExternalLink, Award, Layout,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/use-auth";
@@ -54,7 +54,7 @@ const navSections = [
 const MembersLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { profile, signOut, isAdmin } = useAuth();
+  const { profile, signOut, isAdmin, isEditor } = useAuth();
   const initials = profile?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?';
 
   const isActive = (path: string, end?: boolean) => {
@@ -168,6 +168,19 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
             >
               <Menu size={22} />
             </button>
+            {(isAdmin || isEditor) && (
+              <div className="lg:hidden flex items-center bg-gray-100 rounded-full p-0.5">
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-gray-500 text-[11px] font-semibold hover:text-gray-700"
+                >
+                  <Shield size={11} /> Admin
+                </Link>
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy text-white text-[11px] font-semibold">
+                  <Layout size={11} /> Members
+                </span>
+              </div>
+            )}
             <div className="relative hidden sm:block">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input

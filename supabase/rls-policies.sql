@@ -34,6 +34,73 @@ RETURNS boolean AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+-- Check if current user is a participant of a given conversation.
+-- SECURITY DEFINER so it bypasses RLS on conversation_participants,
+-- preventing infinite recursion when used inside RLS policies.
+CREATE OR REPLACE FUNCTION is_conversation_participant(conv_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM conversation_participants
+    WHERE conversation_id = conv_id
+      AND user_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- Find or create a DM conversation between two users.
+-- SECURITY DEFINER so it bypasses RLS (enforces its own auth checks).
+CREATE OR REPLACE FUNCTION find_or_create_dm(user_a uuid, user_b uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _conv_id uuid;
+BEGIN
+  -- Caller must be one of the two participants
+  IF auth.uid() IS NULL OR (auth.uid() <> user_a AND auth.uid() <> user_b) THEN
+    RAISE EXCEPTION 'Not authorised';
+  END IF;
+
+  -- Cannot DM yourself
+  IF user_a = user_b THEN
+    RAISE EXCEPTION 'Cannot create a DM with yourself';
+  END IF;
+
+  -- Both users must be approved members
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = user_a AND approval_status = 'approved') THEN
+    RAISE EXCEPTION 'User A is not an approved member';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = user_b AND approval_status = 'approved') THEN
+    RAISE EXCEPTION 'User B is not an approved member';
+  END IF;
+
+  -- Serialize concurrent creation for the same pair
+  PERFORM pg_advisory_xact_lock(
+    hashtext(LEAST(user_a::text, user_b::text) || GREATEST(user_a::text, user_b::text))
+  );
+
+  -- Find existing DM
+  SELECT cp1.conversation_id INTO _conv_id
+  FROM conversation_participants cp1
+  JOIN conversation_participants cp2 ON cp2.conversation_id = cp1.conversation_id
+  JOIN conversations c ON c.id = cp1.conversation_id
+  WHERE cp1.user_id = user_a AND cp2.user_id = user_b AND c.type = 'dm'
+  LIMIT 1;
+
+  IF _conv_id IS NOT NULL THEN
+    RETURN _conv_id;
+  END IF;
+
+  -- Create new DM
+  INSERT INTO conversations (type, created_by) VALUES ('dm', auth.uid()) RETURNING id INTO _conv_id;
+  INSERT INTO conversation_participants (conversation_id, user_id, role)
+  VALUES (_conv_id, user_a, 'owner'), (_conv_id, user_b, 'owner');
+
+  RETURN _conv_id;
+END;
+$$;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 1: CORE USER TABLES
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -255,6 +322,13 @@ CREATE POLICY "event_feedback_responses_insert_own"
   TO authenticated
   WITH CHECK (user_id = auth.uid());
 
+-- FK so PostgREST can resolve profiles:user_id(...) joins
+ALTER TABLE event_feedback_responses
+  DROP CONSTRAINT IF EXISTS event_feedback_responses_user_id_fkey;
+ALTER TABLE event_feedback_responses
+  ADD CONSTRAINT event_feedback_responses_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES profiles(id);
+
 -- ═══════════════════════════════════════════════════════════════════
 -- TABLE: event_certificates
 -- ═══════════════════════════════════════════════════════════════════
@@ -271,6 +345,31 @@ CREATE POLICY "event_certificates_select_own"
 
 CREATE POLICY "event_certificates_select_admin"
   ON event_certificates FOR SELECT
+  TO authenticated
+  USING (is_admin());
+
+-- ═══════════════════════════════════════════════════════════════════
+-- TABLE: video_faculty
+-- ═══════════════════════════════════════════════════════════════════
+
+ALTER TABLE video_faculty ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "video_faculty_select_public" ON video_faculty;
+DROP POLICY IF EXISTS "video_faculty_insert_admin" ON video_faculty;
+DROP POLICY IF EXISTS "video_faculty_delete_admin" ON video_faculty;
+
+CREATE POLICY "video_faculty_select_public"
+  ON video_faculty FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "video_faculty_insert_admin"
+  ON video_faculty FOR INSERT
+  TO authenticated
+  WITH CHECK (is_admin());
+
+CREATE POLICY "video_faculty_delete_admin"
+  ON video_faculty FOR DELETE
   TO authenticated
   USING (is_admin());
 
@@ -415,6 +514,49 @@ CREATE POLICY "video_comment_likes_insert_own"
 
 CREATE POLICY "video_comment_likes_delete_own"
   ON video_comment_likes FOR DELETE
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- ═══════════════════════════════════════════════════════════════════
+-- TABLE: video_watch_progress
+-- ═══════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS video_watch_progress (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  watched_seconds INTEGER NOT NULL DEFAULT 0,
+  duration_seconds INTEGER NOT NULL DEFAULT 0,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  last_watched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, video_id)
+);
+
+ALTER TABLE video_watch_progress ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "video_watch_progress_select_own" ON video_watch_progress;
+DROP POLICY IF EXISTS "video_watch_progress_select_admin" ON video_watch_progress;
+DROP POLICY IF EXISTS "video_watch_progress_insert_own" ON video_watch_progress;
+DROP POLICY IF EXISTS "video_watch_progress_update_own" ON video_watch_progress;
+
+CREATE POLICY "video_watch_progress_select_own"
+  ON video_watch_progress FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "video_watch_progress_select_admin"
+  ON video_watch_progress FOR SELECT
+  TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "video_watch_progress_insert_own"
+  ON video_watch_progress FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "video_watch_progress_update_own"
+  ON video_watch_progress FOR UPDATE
   TO authenticated
   USING (user_id = auth.uid());
 
@@ -593,19 +735,26 @@ CREATE POLICY "question_flags_update_admin"
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "conversations_select_participant" ON conversations;
+DROP POLICY IF EXISTS "conversations_select_channel" ON conversations;
 DROP POLICY IF EXISTS "conversations_insert_member" ON conversations;
 DROP POLICY IF EXISTS "conversations_update_participant" ON conversations;
 
+-- DMs: only visible to participants
 CREATE POLICY "conversations_select_participant"
   ON conversations FOR SELECT
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = conversations.id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(id)
+  );
+
+-- Channels: browsable by any approved member
+CREATE POLICY "conversations_select_channel"
+  ON conversations FOR SELECT
+  TO authenticated
+  USING (
+    is_approved_member()
+    AND type = 'channel'
   );
 
 CREATE POLICY "conversations_insert_member"
@@ -618,19 +767,11 @@ CREATE POLICY "conversations_update_participant"
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = conversations.id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(id)
   )
   WITH CHECK (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = conversations.id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(id)
   );
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -640,18 +781,18 @@ CREATE POLICY "conversations_update_participant"
 ALTER TABLE conversation_participants ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "conversation_participants_select_member" ON conversation_participants;
+DROP POLICY IF EXISTS "conversation_participants_select_own" ON conversation_participants;
+DROP POLICY IF EXISTS "conversation_participants_select_co_members" ON conversation_participants;
 DROP POLICY IF EXISTS "conversation_participants_insert_member" ON conversation_participants;
 
+-- Allow users to see all participants in conversations they belong to.
+-- Uses SECURITY DEFINER helper to avoid infinite recursion.
 CREATE POLICY "conversation_participants_select_member"
   ON conversation_participants FOR SELECT
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants AS cp
-      WHERE cp.conversation_id = conversation_participants.conversation_id
-        AND cp.user_id = auth.uid()
-    )
+    AND is_conversation_participant(conversation_id)
   );
 
 CREATE POLICY "conversation_participants_insert_member"
@@ -674,11 +815,7 @@ CREATE POLICY "messages_select_participant"
   TO authenticated
   USING (
     is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = messages.conversation_id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(conversation_id)
   );
 
 CREATE POLICY "messages_insert_participant"
@@ -687,11 +824,7 @@ CREATE POLICY "messages_insert_participant"
   WITH CHECK (
     sender_id = auth.uid()
     AND is_approved_member()
-    AND EXISTS (
-      SELECT 1 FROM conversation_participants
-      WHERE conversation_participants.conversation_id = messages.conversation_id
-        AND conversation_participants.user_id = auth.uid()
-    )
+    AND is_conversation_participant(conversation_id)
   );
 
 CREATE POLICY "messages_update_own"
@@ -1003,7 +1136,7 @@ CREATE POLICY "calendar_dates_delete_admin"
   USING (is_admin());
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- FUTURE TABLES: media, podcasts
+-- FUTURE TABLES: media
 -- ─────────────────────────────────────────────────────────────────────────────
 -- These tables do not exist yet. When you create them, run the policies below.
 --
@@ -1014,15 +1147,38 @@ CREATE POLICY "calendar_dates_delete_admin"
 -- CREATE POLICY "media_insert_admin"  ON media FOR INSERT TO authenticated WITH CHECK (is_admin());
 -- CREATE POLICY "media_update_admin"  ON media FOR UPDATE TO authenticated USING (is_admin()) WITH CHECK (is_admin());
 -- CREATE POLICY "media_delete_admin"  ON media FOR DELETE TO authenticated USING (is_admin());
---
--- ── podcasts (published → approved members, admin CRUD) ──
---
--- ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "podcasts_select_published" ON podcasts FOR SELECT TO authenticated USING (status = 'published' AND is_approved_member());
--- CREATE POLICY "podcasts_select_admin"     ON podcasts FOR SELECT TO authenticated USING (is_admin());
--- CREATE POLICY "podcasts_insert_admin"     ON podcasts FOR INSERT TO authenticated WITH CHECK (is_admin());
--- CREATE POLICY "podcasts_update_admin"     ON podcasts FOR UPDATE TO authenticated USING (is_admin()) WITH CHECK (is_admin());
--- CREATE POLICY "podcasts_delete_admin"     ON podcasts FOR DELETE TO authenticated USING (is_admin());
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PODCASTS TABLE (published → approved members, admin CRUD)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "podcasts_select_published" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_select_admin" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_insert_admin" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_update_admin" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_delete_admin" ON podcasts;
+
+CREATE POLICY "podcasts_select_published" ON podcasts
+  FOR SELECT TO authenticated
+  USING (status = 'published' AND is_approved_member());
+
+CREATE POLICY "podcasts_select_admin" ON podcasts
+  FOR SELECT TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "podcasts_insert_admin" ON podcasts
+  FOR INSERT TO authenticated
+  WITH CHECK (is_admin());
+
+CREATE POLICY "podcasts_update_admin" ON podcasts
+  FOR UPDATE TO authenticated
+  USING (is_admin()) WITH CHECK (is_admin());
+
+CREATE POLICY "podcasts_delete_admin" ON podcasts
+  FOR DELETE TO authenticated
+  USING (is_admin());
 
 -- =============================================================================
 -- END OF RLS POLICIES
