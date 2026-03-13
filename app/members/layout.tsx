@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Home, Video, Play, Mic, BookOpen, FileText, Globe, Users,
   Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink, Award, MessageSquare, Calendar,
+  Shield, Layout,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/use-auth";
@@ -254,9 +255,23 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
               >
                 <Menu size={22} />
               </button>
-              <Link href="/members" className="flex items-center gap-2">
-                <img src="/images/logo-white.png" alt="Dukes' Club" className="h-7 object-contain" />
-              </Link>
+              {isAdmin ? (
+                <div className="flex items-center bg-navy-foreground/10 rounded-full p-0.5">
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold text-gold-foreground text-[11px] font-semibold">
+                    <Layout size={11} /> Members
+                  </span>
+                  <Link
+                    href="/admin"
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-navy-foreground/50 text-[11px] font-semibold hover:text-navy-foreground/80"
+                  >
+                    <Shield size={11} /> Admin
+                  </Link>
+                </div>
+              ) : (
+                <Link href="/members" className="flex items-center gap-2">
+                  <img src="/images/logo-white.png" alt="Dukes' Club" className="h-7 object-contain" />
+                </Link>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Link href="/members/profile">
