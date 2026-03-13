@@ -777,7 +777,7 @@ const VideoArchive = () => {
           return (
             <div
               key={video.id}
-              className="cursor-pointer group min-w-0 overflow-hidden"
+              className="cursor-pointer group min-w-0 overflow-hidden h-full"
               onClick={() => { setActiveVideo(video); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             >
               {/* Mobile: horizontal card */}
@@ -820,7 +820,7 @@ const VideoArchive = () => {
               </div>
 
               {/* Desktop: vertical card */}
-              <Card className="hidden sm:block border overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+              <Card className="hidden sm:flex sm:flex-col border overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 h-full">
                 <div className="relative aspect-video bg-navy">
                   {video.thumbnail_url ? (
                     <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
@@ -852,7 +852,7 @@ const VideoArchive = () => {
                     </div>
                   )}
                 </div>
-                <CardContent className="p-4">
+                <CardContent className="p-4 flex-1 flex flex-col">
                   {video.tags && video.tags.length > 0 && (
                     <div className="flex gap-1 flex-wrap mb-2">
                       {video.tags.slice(0, 3).map(tag => (
@@ -873,7 +873,7 @@ const VideoArchive = () => {
                   {(video.video_faculty?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground mt-1.5">{video.video_faculty!.map(vf => vf.faculty.full_name).join(", ")}</p>
                   )}
-                  <div className="flex items-center justify-between mt-2.5 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between mt-auto pt-2.5 text-xs text-muted-foreground">
                     <span>{dateStr}</span>
                     {video.vimeo_plays > 0 && (
                       <span className="flex items-center gap-1">
