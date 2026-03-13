@@ -173,9 +173,17 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                 <Layout size={11} /> Members
               </Link>
             </div>
-            {/* Admin Mode label — desktop only */}
-            <div className="hidden lg:flex items-center gap-2 text-[13px] font-semibold text-navy">
-              <Shield size={14} /> Admin Mode
+            {/* Area toggle — desktop */}
+            <div className="hidden lg:flex items-center bg-navy/10 rounded-full p-0.5">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-navy text-navy-foreground text-[11px] font-semibold">
+                <Shield size={11} /> Admin
+              </span>
+              <Link
+                href="/members"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-navy/50 text-[11px] font-semibold hover:text-navy/80"
+              >
+                <Layout size={11} /> Members
+              </Link>
             </div>
           </div>
           <div className="flex items-center gap-3">

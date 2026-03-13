@@ -65,7 +65,7 @@ const bottomNavItems = [
 const MembersLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { profile, user, signOut, isAdmin } = useAuth();
+  const { profile, user, signOut, isAdmin, isEditor } = useAuth();
   const initials = profile?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?';
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -142,7 +142,7 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Nav sections */}
       <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-5">
-        {navSections.filter(s => s.label !== 'ADMIN' || isAdmin).map((section) => (
+        {navSections.filter(s => s.label !== 'ADMIN' || isEditor).map((section) => (
           <div key={section.label}>
             <p className="text-navy-foreground/30 text-[10px] font-bold tracking-[0.18em] uppercase px-3 mb-1.5">
               {section.label}
@@ -255,7 +255,7 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
               >
                 <Menu size={22} />
               </button>
-              {isAdmin ? (
+              {isEditor ? (
                 <div className="flex items-center bg-navy-foreground/10 rounded-full p-0.5">
                   <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold text-gold-foreground text-[11px] font-semibold">
                     <Layout size={11} /> Members
@@ -290,6 +290,19 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
         {/* Desktop Header */}
         <header className="hidden lg:flex h-14 bg-card border-b border-border items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-3">
+            {isEditor && (
+              <div className="flex items-center bg-navy/10 rounded-full p-0.5 mr-2">
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold text-gold-foreground text-[11px] font-semibold">
+                  <Layout size={11} /> Members
+                </span>
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-navy/50 text-[11px] font-semibold hover:text-navy/80"
+                >
+                  <Shield size={11} /> Admin
+                </Link>
+              </div>
+            )}
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
