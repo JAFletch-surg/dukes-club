@@ -168,7 +168,7 @@ const MembersDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-6xl overflow-hidden">
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
@@ -345,7 +345,7 @@ const MembersDashboard = () => {
                       <Calendar size={16} className="text-gold" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">{event.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <span>{formatDate(event.starts_at)}</span>
                         <span>·</span>
