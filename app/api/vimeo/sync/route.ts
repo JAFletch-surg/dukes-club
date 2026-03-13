@@ -172,13 +172,12 @@ export async function POST(request: NextRequest) {
       const embedHash = extractEmbedHash(video)
 
       if (existingIds.has(vimeoId)) {
-        // Update existing — preserve manual edits to title/description/status
+        // Update existing — only sync Vimeo-owned fields, preserve manual edits
         const { error } = await supabase
           .from('videos')
           .update({
             thumbnail_url: thumbnail,
             duration_seconds: video.duration || 0,
-            tags: tags.length > 0 ? tags : null,
             vimeo_privacy: video.privacy?.view || null,
             vimeo_embed_hash: embedHash,
             synced_at: new Date().toISOString(),

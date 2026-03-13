@@ -348,6 +348,31 @@ CREATE POLICY "event_certificates_select_admin"
   TO authenticated
   USING (is_admin());
 
+-- ═══════════════════════════════════════════════════════════════════
+-- TABLE: video_faculty
+-- ═══════════════════════════════════════════════════════════════════
+
+ALTER TABLE video_faculty ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "video_faculty_select_public" ON video_faculty;
+DROP POLICY IF EXISTS "video_faculty_insert_admin" ON video_faculty;
+DROP POLICY IF EXISTS "video_faculty_delete_admin" ON video_faculty;
+
+CREATE POLICY "video_faculty_select_public"
+  ON video_faculty FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "video_faculty_insert_admin"
+  ON video_faculty FOR INSERT
+  TO authenticated
+  WITH CHECK (is_admin());
+
+CREATE POLICY "video_faculty_delete_admin"
+  ON video_faculty FOR DELETE
+  TO authenticated
+  USING (is_admin());
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 3: CONTENT TABLES
 -- ─────────────────────────────────────────────────────────────────────────────

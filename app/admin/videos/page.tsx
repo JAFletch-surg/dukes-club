@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw } from 'lucide-react'
+import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw, User } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 
@@ -58,6 +58,14 @@ interface VideoRecord {
   created_at: string
 }
 
+interface FacultyMember {
+  id: string
+  full_name: string
+  photo_url: string | null
+  position_title: string | null
+  hospital: string | null
+}
+
 /* ═════════════════════════════════════════════════════
    MAIN ADMIN VIDEOS PAGE
    ═════════════════════════════════════════════════════ */
@@ -73,6 +81,26 @@ export default function AdminVideosPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number; archived: number; total_on_vimeo: number } | null>(null)
 
+  /* ── Faculty state ──────────────────────────────── */
+  const [facultyList, setFacultyList] = useState<FacultyMember[]>([])
+  const [selectedFacultyIds, setSelectedFacultyIds] = useState<string[]>([])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('faculty')
+      .select('id, full_name, photo_url, position_title, hospital')
+      .eq('is_active', true)
+      .order('full_name')
+      .then(({ data }) => { if (data) setFacultyList(data) })
+  }, [])
+
+  const toggleFaculty = (id: string) => {
+    setSelectedFacultyIds(prev =>
+      prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]
+    )
+  }
+
   /* ── Form state ──────────────────────────────────── */
   const [form, setForm] = useState({
     title: '',
@@ -80,7 +108,6 @@ export default function AdminVideosPage() {
     description: '',
     duration_seconds: 0,
     thumbnail_url: '',
-    speaker: '',
     category: '',
     tags: [] as string[],
     status: 'draft',
@@ -91,14 +118,15 @@ export default function AdminVideosPage() {
   const openNew = () => {
     setIsNew(true)
     setEditing({} as VideoRecord)
+    setSelectedFacultyIds([])
     setForm({
       title: '', vimeo_id: '', description: '', duration_seconds: 0,
-      thumbnail_url: '', speaker: '', category: '', tags: [],
+      thumbnail_url: '', category: '', tags: [],
       status: 'draft', is_members_only: true, published_at: '',
     })
   }
 
-  const openEdit = (v: VideoRecord) => {
+  const openEdit = async (v: VideoRecord) => {
     setIsNew(false)
     setEditing(v)
     setForm({
@@ -107,13 +135,19 @@ export default function AdminVideosPage() {
       description: v.description || '',
       duration_seconds: v.duration_seconds || 0,
       thumbnail_url: v.thumbnail_url || '',
-      speaker: v.speaker || '',
       category: v.category || '',
       tags: Array.isArray(v.tags) ? v.tags : [],
       status: v.status || 'draft',
       is_members_only: v.is_members_only ?? true,
       published_at: v.published_at ? v.published_at.slice(0, 10) : '',
     })
+    // Load linked faculty for this video
+    const supabase = createClient()
+    const { data: vf } = await supabase
+      .from('video_faculty')
+      .select('faculty_id')
+      .eq('video_id', v.id)
+    setSelectedFacultyIds((vf || []).map((r: { faculty_id: string }) => r.faculty_id))
   }
 
   const closeModal = () => { setEditing(null); setIsNew(false) }
@@ -136,18 +170,32 @@ export default function AdminVideosPage() {
         description: form.description.trim() || null,
         duration_seconds: form.duration_seconds || 0,
         thumbnail_url: form.thumbnail_url.trim() || null,
-        speaker: form.speaker.trim() || null,
         category: form.category || null,
         tags: form.tags,
         status: form.status,
         is_members_only: form.is_members_only,
         published_at: form.published_at || null,
       }
+      let videoId: string | undefined
       if (isNew) {
-        await create(payload)
+        const created = await create(payload)
+        videoId = (created as any)?.id
       } else if (editing?.id) {
         await update(editing.id, payload)
+        videoId = editing.id
       }
+
+      // Sync video_faculty junction
+      if (videoId) {
+        const supabase = createClient()
+        await supabase.from('video_faculty').delete().eq('video_id', videoId)
+        if (selectedFacultyIds.length > 0) {
+          await supabase.from('video_faculty').insert(
+            selectedFacultyIds.map(fid => ({ video_id: videoId, faculty_id: fid }))
+          )
+        }
+      }
+
       closeModal()
     } catch (err: any) {
       alert('Save failed: ' + err.message)
@@ -209,7 +257,7 @@ export default function AdminVideosPage() {
   /* ── Filter videos ───────────────────────────────── */
   const filtered = videos.filter(v => {
     const q = search.toLowerCase()
-    const matchSearch = !q || v.title.toLowerCase().includes(q) || (v.speaker || '').toLowerCase().includes(q) || (v.vimeo_id || '').includes(q)
+    const matchSearch = !q || v.title.toLowerCase().includes(q) || (v.vimeo_id || '').includes(q)
     const matchStatus = filterStatus === 'all' || v.status === filterStatus
     const matchCategory = filterCategory === 'all' || v.category === filterCategory
     return matchSearch && matchStatus && matchCategory
@@ -294,7 +342,7 @@ export default function AdminVideosPage() {
         <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: 400 }}>
           <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
           <input
-            placeholder="Search by title, speaker, or Vimeo ID..."
+            placeholder="Search by title or Vimeo ID..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ ...S.input, paddingLeft: 36 }}
@@ -354,7 +402,6 @@ export default function AdminVideosPage() {
                           {v.title}
                         </p>
                         <p style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                          {v.speaker && <span>{v.speaker} · </span>}
                           <span>{fmtDuration(v.duration_seconds)}</span>
                           {v.vimeo_id && <span> · Vimeo {v.vimeo_id}</span>}
                         </p>
@@ -531,15 +578,45 @@ export default function AdminVideosPage() {
                 <p style={S.hint}>Enter Vimeo ID and click Fetch to auto-fill thumbnail, duration &amp; title</p>
               </div>
 
-              {/* Speaker */}
+              {/* Faculty / Speakers */}
               <div>
-                <label style={S.label}>Speaker / Presenter</label>
-                <input
-                  value={form.speaker}
-                  onChange={e => setForm(f => ({ ...f, speaker: e.target.value }))}
-                  placeholder="e.g. Mr J. Smith"
-                  style={S.input}
-                />
+                <label style={S.label}>Speakers / Faculty</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {facultyList.map(f => {
+                    const sel = selectedFacultyIds.includes(f.id)
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => toggleFaculty(f.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '4px 12px 4px 4px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          border: sel ? '1.5px solid #0F1F3D' : '1.5px solid #D1D1D6',
+                          background: sel ? '#0F1F3D' : '#fff',
+                          color: sel ? '#fff' : '#504F58',
+                          cursor: 'pointer', fontFamily: 'Montserrat, sans-serif',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {f.photo_url ? (
+                          <img src={f.photo_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ width: 24, height: 24, borderRadius: '50%', background: sel ? 'rgba(255,255,255,0.2)' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <User size={12} color={sel ? '#fff' : '#999'} />
+                          </span>
+                        )}
+                        {f.full_name}
+                      </button>
+                    )
+                  })}
+                </div>
+                {selectedFacultyIds.length > 0 && (
+                  <p style={S.hint}>{selectedFacultyIds.length} speaker{selectedFacultyIds.length !== 1 ? 's' : ''} selected</p>
+                )}
+                {facultyList.length === 0 && (
+                  <p style={S.hint}>No faculty found. Add faculty in the Faculty admin page first.</p>
+                )}
               </div>
 
               {/* Description */}
