@@ -777,7 +777,7 @@ const VideoArchive = () => {
           return (
             <div
               key={video.id}
-              className="cursor-pointer group"
+              className="cursor-pointer group min-w-0 overflow-hidden"
               onClick={() => { setActiveVideo(video); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             >
               {/* Mobile: horizontal card */}
