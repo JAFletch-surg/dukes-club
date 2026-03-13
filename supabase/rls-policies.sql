@@ -1154,6 +1154,12 @@ CREATE POLICY "calendar_dates_delete_admin"
 
 ALTER TABLE podcasts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "podcasts_select_published" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_select_admin" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_insert_admin" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_update_admin" ON podcasts;
+DROP POLICY IF EXISTS "podcasts_delete_admin" ON podcasts;
+
 CREATE POLICY "podcasts_select_published" ON podcasts
   FOR SELECT TO authenticated
   USING (status = 'published' AND is_approved_member());
