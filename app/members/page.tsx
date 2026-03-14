@@ -100,22 +100,19 @@ const MembersDashboard = () => {
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
 
-          // Fetch video watch progress for stats and badges
-          const { data: watchProgress, error: watchErr } = await supabase
-            .from('video_watch_progress')
-            .select('completed, watched_seconds, duration_seconds')
-            .eq('user_id', user.id);
-
-          if (watchErr) console.error('[Dashboard] Watch progress error:', watchErr.message);
-          if (watchProgress) {
-            const completedCount = watchProgress.filter(r => r.completed).length;
-            const totalSeconds = watchProgress.reduce((sum, r) => {
-              // Use full duration for completed videos, position for in-progress
-              return sum + (r.completed ? (r.duration_seconds || 0) : (r.watched_seconds || 0));
-            }, 0);
-            const minutesWatched = Math.floor(totalSeconds / 60);
-            setVideoStats({ completedCount, minutesWatched });
-          }
+          // Fetch video watch progress via API (same approach as video library page)
+          fetch('/api/videos/progress')
+            .then(r => r.json())
+            .then((rows: Array<{ video_id: string; watched_seconds: number; duration_seconds: number; completed: boolean }>) => {
+              if (Array.isArray(rows)) {
+                const completedCount = rows.filter(r => r.completed).length;
+                const totalSeconds = rows.reduce((sum, r) => {
+                  return sum + (r.completed ? (r.duration_seconds || 0) : (r.watched_seconds || 0));
+                }, 0);
+                setVideoStats({ completedCount, minutesWatched: Math.floor(totalSeconds / 60) });
+              }
+            })
+            .catch(() => console.error('[Dashboard] Watch progress fetch failed'));
 
           // Fetch unread message count across all conversations
           const { data: myConvs } = await supabase
