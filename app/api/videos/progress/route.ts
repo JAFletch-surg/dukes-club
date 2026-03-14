@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     const body: {
       video_id: string
       watched_seconds: number
+      last_position: number
       duration_seconds: number
       completed: boolean
     } = await request.json()
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           video_id: body.video_id,
           watched_seconds: Math.floor(body.watched_seconds || 0),
+          last_position: Math.floor(body.last_position || 0),
           duration_seconds: Math.floor(body.duration_seconds || 0),
           completed: body.completed || false,
           last_watched_at: new Date().toISOString(),

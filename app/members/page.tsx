@@ -100,19 +100,18 @@ const MembersDashboard = () => {
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
 
-          // Fetch video watch progress with reliable durations from videos table (Vimeo sync)
+          // Fetch video watch progress (watched_seconds = actual time watched via Vimeo getPlayed())
           const { data: watchProgress, error: watchErr } = await supabase
             .from('video_watch_progress')
-            .select('completed, watched_seconds, videos(duration_seconds)')
+            .select('completed, watched_seconds')
             .eq('user_id', user.id);
 
           if (watchErr) console.error('[Dashboard] Watch progress error:', watchErr.message);
           if (watchProgress && watchProgress.length > 0) {
             const completedCount = watchProgress.filter((r: any) => r.completed).length;
-            const totalSeconds = watchProgress.reduce((sum: number, r: any) => {
-              const videoDuration = r.videos?.duration_seconds || 0;
-              return sum + (r.completed ? videoDuration : (r.watched_seconds || 0));
-            }, 0);
+            const totalSeconds = watchProgress.reduce(
+              (sum: number, r: any) => sum + (r.watched_seconds || 0), 0
+            );
             setVideoStats({ completedCount, minutesWatched: Math.floor(totalSeconds / 60) });
           } else if (watchProgress) {
             setVideoStats({ completedCount: 0, minutesWatched: 0 });
@@ -253,7 +252,7 @@ const MembersDashboard = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Videos watched", value: videoStats?.completedCount ?? "–", icon: Video, color: "text-navy", subtitle: videoStats ? `${videoStats.minutesWatched} min watched` : undefined, badge: currentBadge },
+          { label: "Videos watched", value: videoStats?.completedCount ?? "–", icon: Video, color: "text-navy", subtitle: videoStats ? (videoStats.minutesWatched >= 60 ? `${(videoStats.minutesWatched / 60).toFixed(1)} hrs watched` : `${videoStats.minutesWatched} min watched`) : undefined, badge: currentBadge },
           { label: "Questions attempted", value: questionStats?.total_attempted || 0, icon: HelpCircle, color: "text-emerald-600" },
           { label: "Events booked", value: myBookings.length, icon: Calendar, color: "text-gold" },
           { label: "Exam average", value: questionStats?.overall_percentage ? `${questionStats.overall_percentage}%` : "–", icon: BarChart3, color: "text-primary" },

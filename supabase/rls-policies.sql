@@ -527,6 +527,7 @@ CREATE TABLE IF NOT EXISTS video_watch_progress (
   video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
   watched_seconds INTEGER NOT NULL DEFAULT 0,
   duration_seconds INTEGER NOT NULL DEFAULT 0,
+  last_position INTEGER NOT NULL DEFAULT 0,
   completed BOOLEAN NOT NULL DEFAULT false,
   last_watched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

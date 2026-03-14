@@ -11,23 +11,40 @@ interface VimeoPlayerProps {
 
 const PROGRESS_INTERVAL_S = 10 // save progress every 10 seconds
 
+/** Sum the actually-played time ranges reported by the Vimeo SDK. */
+async function getWatchedSeconds(player: Player): Promise<number> {
+  try {
+    const ranges = await player.getPlayed()
+    // Each range is a {0: start, 1: end} pair (TimeRanges-like)
+    let total = 0
+    for (let i = 0; i < ranges.length; i++) {
+      total += ranges[i][1] - ranges[i][0]
+    }
+    return total
+  } catch {
+    return 0
+  }
+}
+
 export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<Player | null>(null)
   const lastSavedRef = useRef(0)
   const durationRef = useRef(0)
+  const baseWatchedRef = useRef(0) // accumulated watched_seconds from previous sessions
 
   // ── Save progress to API ──────────────────────────────────────
 
   const saveProgress = useCallback(
-    async (seconds: number, completed: boolean) => {
+    async (watchedSeconds: number, position: number, completed: boolean) => {
       try {
         await fetch('/api/videos/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             video_id: videoId,
-            watched_seconds: Math.floor(seconds),
+            watched_seconds: Math.floor(watchedSeconds),
+            last_position: Math.floor(position),
             duration_seconds: Math.floor(durationRef.current),
             completed,
           }),
@@ -76,12 +93,15 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       durationRef.current = d
     })
 
-    // Resume from saved position
+    // Resume from saved position & load accumulated watch time
     fetch(`/api/videos/progress?video_id=${videoId}`)
       .then(r => r.json())
       .then(progress => {
-        if (progress && !progress.completed && progress.watched_seconds > 0) {
-          player.setCurrentTime(progress.watched_seconds).catch(() => {})
+        if (progress) {
+          baseWatchedRef.current = progress.watched_seconds || 0
+          if (!progress.completed && progress.last_position > 0) {
+            player.setCurrentTime(progress.last_position).catch(() => {})
+          }
         }
       })
       .catch(() => {})
@@ -91,19 +111,26 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       durationRef.current = event.duration
       if (Math.abs(event.seconds - lastSavedRef.current) >= PROGRESS_INTERVAL_S) {
         lastSavedRef.current = event.seconds
-        saveProgress(event.seconds, false)
+        getWatchedSeconds(player).then(sessionWatched => {
+          saveProgress(baseWatchedRef.current + sessionWatched, event.seconds, false)
+        })
       }
     })
 
     // Mark completed on end
     player.on('ended', () => {
-      saveProgress(durationRef.current, true)
+      getWatchedSeconds(player).then(sessionWatched => {
+        saveProgress(baseWatchedRef.current + sessionWatched, durationRef.current, true)
+      })
     })
 
     return () => {
       // Save final position on unmount
-      player.getCurrentTime().then(s => {
-        saveProgress(s, false)
+      Promise.all([
+        player.getCurrentTime(),
+        getWatchedSeconds(player),
+      ]).then(([position, sessionWatched]) => {
+        saveProgress(baseWatchedRef.current + sessionWatched, position, false)
       }).catch(() => {})
       player.destroy().catch(() => {})
       playerRef.current = null

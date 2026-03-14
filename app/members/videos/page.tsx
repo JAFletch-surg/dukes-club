@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Play, Search, Eye, Video, X, Clock, ArrowLeft, Loader2,
   MessageSquare, ThumbsUp, Pin, Trash2, Reply, Send, CornerDownRight,
-  ChevronDown, ChevronUp, User, SlidersHorizontal,
+  ChevronDown, ChevronUp, User, SlidersHorizontal, Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -434,7 +434,7 @@ const VideoArchive = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeVideo, setActiveVideo] = useState<VideoRecord | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [watchProgress, setWatchProgress] = useState<Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }>>({});
+  const [watchProgress, setWatchProgress] = useState<Record<string, { watched_seconds: number; last_position: number; duration_seconds: number; completed: boolean }>>({});
 
   useEffect(() => {
     async function loadVideos() {
@@ -455,9 +455,9 @@ const VideoArchive = () => {
     // Fetch watch progress for all videos
     fetch('/api/videos/progress')
       .then(r => r.json())
-      .then((rows: Array<{ video_id: string; watched_seconds: number; duration_seconds: number; completed: boolean }>) => {
+      .then((rows: Array<{ video_id: string; watched_seconds: number; last_position: number; duration_seconds: number; completed: boolean }>) => {
         if (Array.isArray(rows)) {
-          const map: Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }> = {};
+          const map: Record<string, { watched_seconds: number; last_position: number; duration_seconds: number; completed: boolean }> = {};
           for (const r of rows) map[r.video_id] = r;
           setWatchProgress(map);
         }
@@ -793,11 +793,16 @@ const VideoArchive = () => {
                   <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-mono px-1 py-0.5 rounded">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id]?.completed && (
+                    <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow">
+                      <Check size={10} className="text-white" />
+                    </div>
+                  )}
                   {watchProgress[video.id] && (
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
                       <div
                         className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
-                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
+                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].last_position / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
                       />
                     </div>
                   )}
@@ -843,11 +848,16 @@ const VideoArchive = () => {
                   <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id]?.completed && (
+                    <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-0.5 shadow">
+                      <Check size={12} className="text-white" />
+                    </div>
+                  )}
                   {watchProgress[video.id] && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
                       <div
                         className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
-                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
+                        style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].last_position / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
                       />
                     </div>
                   )}
