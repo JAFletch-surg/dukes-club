@@ -103,15 +103,17 @@ const MembersDashboard = () => {
           // Fetch video watch progress for stats and badges
           const { data: watchProgress, error: watchErr } = await supabase
             .from('video_watch_progress')
-            .select('completed, watched_seconds')
+            .select('completed, watched_seconds, duration_seconds')
             .eq('user_id', user.id);
 
           if (watchErr) console.error('[Dashboard] Watch progress error:', watchErr.message);
           if (watchProgress) {
             const completedCount = watchProgress.filter(r => r.completed).length;
-            const minutesWatched = Math.floor(
-              watchProgress.reduce((sum, r) => sum + (r.watched_seconds || 0), 0) / 60
-            );
+            const totalSeconds = watchProgress.reduce((sum, r) => {
+              // Use full duration for completed videos, position for in-progress
+              return sum + (r.completed ? (r.duration_seconds || 0) : (r.watched_seconds || 0));
+            }, 0);
+            const minutesWatched = Math.floor(totalSeconds / 60);
             setVideoStats({ completedCount, minutesWatched });
           }
 
