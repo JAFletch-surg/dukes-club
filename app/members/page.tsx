@@ -100,18 +100,19 @@ const MembersDashboard = () => {
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
 
-          // Fetch video watch progress (watched_seconds = actual time watched via Vimeo getPlayed())
+          // Fetch video watch progress for stats and badges
           const { data: watchProgress, error: watchErr } = await supabase
             .from('video_watch_progress')
-            .select('completed, watched_seconds')
+            .select('completed, watched_seconds, duration_seconds')
             .eq('user_id', user.id);
 
           if (watchErr) console.error('[Dashboard] Watch progress error:', watchErr.message);
           if (watchProgress && watchProgress.length > 0) {
             const completedCount = watchProgress.filter((r: any) => r.completed).length;
-            const totalSeconds = watchProgress.reduce(
-              (sum: number, r: any) => sum + (r.watched_seconds || 0), 0
-            );
+            const totalSeconds = watchProgress.reduce((sum: number, r: any) => {
+              // completed → full video duration, in-progress → position reached
+              return sum + (r.completed ? (r.duration_seconds || 0) : (r.watched_seconds || 0));
+            }, 0);
             setVideoStats({ completedCount, minutesWatched: Math.floor(totalSeconds / 60) });
           } else if (watchProgress) {
             setVideoStats({ completedCount: 0, minutesWatched: 0 });

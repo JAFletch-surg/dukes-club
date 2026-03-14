@@ -16,36 +16,18 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   const playerRef = useRef<Player | null>(null)
   const lastSavedRef = useRef(0)
   const durationRef = useRef(0)
-  const baseWatchedRef = useRef(0)    // accumulated watched_seconds from previous sessions
-  const sessionWatchedRef = useRef(0) // watch time accumulated this session (wall-clock)
-  const playStartRef = useRef<number | null>(null) // timestamp when playback started
-
-  // ── Accumulate wall-clock watch time ────────────────────────────
-  // Called whenever playback pauses, ends, or we need current total.
-  // Uses Date.now() delta since last play event — simple and reliable.
-
-  const flushWatchTime = useCallback(() => {
-    if (playStartRef.current !== null) {
-      const elapsed = (Date.now() - playStartRef.current) / 1000
-      sessionWatchedRef.current += elapsed
-      playStartRef.current = Date.now() // reset for next interval
-    }
-  }, [])
 
   // ── Save progress to API ──────────────────────────────────────
 
   const saveProgress = useCallback(
-    async (position: number, completed: boolean) => {
-      flushWatchTime()
-      const totalWatched = baseWatchedRef.current + sessionWatchedRef.current
+    async (seconds: number, completed: boolean) => {
       try {
         await fetch('/api/videos/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             video_id: videoId,
-            watched_seconds: Math.floor(totalWatched),
-            last_position: Math.floor(position),
+            watched_seconds: Math.floor(seconds),
             duration_seconds: Math.floor(durationRef.current),
             completed,
           }),
@@ -54,7 +36,7 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
         // Silently fail — progress tracking is non-critical
       }
     },
-    [videoId, flushWatchTime]
+    [videoId]
   )
 
   // ── Initialise player & attach event listeners ────────────────
@@ -94,33 +76,17 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       durationRef.current = d
     })
 
-    // Resume from saved position & load accumulated watch time
+    // Resume from saved position
     fetch(`/api/videos/progress?video_id=${videoId}`)
       .then(r => r.json())
       .then(progress => {
-        if (progress) {
-          baseWatchedRef.current = progress.watched_seconds || 0
-          if (!progress.completed && progress.last_position > 0) {
-            player.setCurrentTime(progress.last_position).catch(() => {})
-          }
+        if (progress && !progress.completed && progress.watched_seconds > 0) {
+          player.setCurrentTime(progress.watched_seconds).catch(() => {})
         }
       })
       .catch(() => {})
 
-    // Start wall-clock timer when video plays
-    player.on('play', () => {
-      playStartRef.current = Date.now()
-    })
-
-    // Stop wall-clock timer when video pauses
-    player.on('pause', () => {
-      if (playStartRef.current !== null) {
-        sessionWatchedRef.current += (Date.now() - playStartRef.current) / 1000
-        playStartRef.current = null
-      }
-    })
-
-    // Track playback position — debounced save every PROGRESS_INTERVAL_S
+    // Track playback — debounced save every PROGRESS_INTERVAL_S
     player.on('timeupdate', (event: { seconds: number; duration: number }) => {
       durationRef.current = event.duration
       if (Math.abs(event.seconds - lastSavedRef.current) >= PROGRESS_INTERVAL_S) {

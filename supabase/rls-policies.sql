@@ -527,7 +527,6 @@ CREATE TABLE IF NOT EXISTS video_watch_progress (
   video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
   watched_seconds INTEGER NOT NULL DEFAULT 0,
   duration_seconds INTEGER NOT NULL DEFAULT 0,
-  last_position INTEGER NOT NULL DEFAULT 0,
   completed BOOLEAN NOT NULL DEFAULT false,
   last_watched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -559,7 +558,8 @@ CREATE POLICY "video_watch_progress_insert_own"
 CREATE POLICY "video_watch_progress_update_own"
   ON video_watch_progress FOR UPDATE
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 4: QUESTIONS / QUIZ TABLES
