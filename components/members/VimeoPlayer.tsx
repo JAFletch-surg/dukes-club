@@ -11,39 +11,40 @@ interface VimeoPlayerProps {
 
 const PROGRESS_INTERVAL_S = 10 // save progress every 10 seconds
 
-/** Sum the actually-played time ranges reported by the Vimeo SDK. */
-async function getWatchedSeconds(player: Player): Promise<number> {
-  try {
-    const ranges = await player.getPlayed()
-    // Each range is a {0: start, 1: end} pair (TimeRanges-like)
-    let total = 0
-    for (let i = 0; i < ranges.length; i++) {
-      total += ranges[i][1] - ranges[i][0]
-    }
-    return total
-  } catch {
-    return 0
-  }
-}
-
 export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<Player | null>(null)
   const lastSavedRef = useRef(0)
   const durationRef = useRef(0)
-  const baseWatchedRef = useRef(0) // accumulated watched_seconds from previous sessions
+  const baseWatchedRef = useRef(0)    // accumulated watched_seconds from previous sessions
+  const sessionWatchedRef = useRef(0) // watch time accumulated this session (wall-clock)
+  const playStartRef = useRef<number | null>(null) // timestamp when playback started
+
+  // ── Accumulate wall-clock watch time ────────────────────────────
+  // Called whenever playback pauses, ends, or we need current total.
+  // Uses Date.now() delta since last play event — simple and reliable.
+
+  const flushWatchTime = useCallback(() => {
+    if (playStartRef.current !== null) {
+      const elapsed = (Date.now() - playStartRef.current) / 1000
+      sessionWatchedRef.current += elapsed
+      playStartRef.current = Date.now() // reset for next interval
+    }
+  }, [])
 
   // ── Save progress to API ──────────────────────────────────────
 
   const saveProgress = useCallback(
-    async (watchedSeconds: number, position: number, completed: boolean) => {
+    async (position: number, completed: boolean) => {
+      flushWatchTime()
+      const totalWatched = baseWatchedRef.current + sessionWatchedRef.current
       try {
         await fetch('/api/videos/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             video_id: videoId,
-            watched_seconds: Math.floor(watchedSeconds),
+            watched_seconds: Math.floor(totalWatched),
             last_position: Math.floor(position),
             duration_seconds: Math.floor(durationRef.current),
             completed,
@@ -53,7 +54,7 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
         // Silently fail — progress tracking is non-critical
       }
     },
-    [videoId]
+    [videoId, flushWatchTime]
   )
 
   // ── Initialise player & attach event listeners ────────────────
@@ -106,31 +107,37 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       })
       .catch(() => {})
 
-    // Track playback — debounced save every PROGRESS_INTERVAL_S
+    // Start wall-clock timer when video plays
+    player.on('play', () => {
+      playStartRef.current = Date.now()
+    })
+
+    // Stop wall-clock timer when video pauses
+    player.on('pause', () => {
+      if (playStartRef.current !== null) {
+        sessionWatchedRef.current += (Date.now() - playStartRef.current) / 1000
+        playStartRef.current = null
+      }
+    })
+
+    // Track playback position — debounced save every PROGRESS_INTERVAL_S
     player.on('timeupdate', (event: { seconds: number; duration: number }) => {
       durationRef.current = event.duration
       if (Math.abs(event.seconds - lastSavedRef.current) >= PROGRESS_INTERVAL_S) {
         lastSavedRef.current = event.seconds
-        getWatchedSeconds(player).then(sessionWatched => {
-          saveProgress(baseWatchedRef.current + sessionWatched, event.seconds, false)
-        })
+        saveProgress(event.seconds, false)
       }
     })
 
     // Mark completed on end
     player.on('ended', () => {
-      getWatchedSeconds(player).then(sessionWatched => {
-        saveProgress(baseWatchedRef.current + sessionWatched, durationRef.current, true)
-      })
+      saveProgress(durationRef.current, true)
     })
 
     return () => {
       // Save final position on unmount
-      Promise.all([
-        player.getCurrentTime(),
-        getWatchedSeconds(player),
-      ]).then(([position, sessionWatched]) => {
-        saveProgress(baseWatchedRef.current + sessionWatched, position, false)
+      player.getCurrentTime().then(s => {
+        saveProgress(s, false)
       }).catch(() => {})
       player.destroy().catch(() => {})
       playerRef.current = null
