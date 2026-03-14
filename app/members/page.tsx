@@ -100,19 +100,23 @@ const MembersDashboard = () => {
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
 
-          // Fetch video watch progress via API (same approach as video library page)
-          fetch('/api/videos/progress')
-            .then(r => r.json())
-            .then((rows: Array<{ video_id: string; watched_seconds: number; duration_seconds: number; completed: boolean }>) => {
-              if (Array.isArray(rows)) {
-                const completedCount = rows.filter(r => r.completed).length;
-                const totalSeconds = rows.reduce((sum, r) => {
-                  return sum + (r.completed ? (r.duration_seconds || 0) : (r.watched_seconds || 0));
-                }, 0);
-                setVideoStats({ completedCount, minutesWatched: Math.floor(totalSeconds / 60) });
-              }
-            })
-            .catch(() => console.error('[Dashboard] Watch progress fetch failed'));
+          // Fetch video watch progress with reliable durations from videos table (Vimeo sync)
+          const { data: watchProgress, error: watchErr } = await supabase
+            .from('video_watch_progress')
+            .select('completed, watched_seconds, videos(duration_seconds)')
+            .eq('user_id', user.id);
+
+          if (watchErr) console.error('[Dashboard] Watch progress error:', watchErr.message);
+          if (watchProgress && watchProgress.length > 0) {
+            const completedCount = watchProgress.filter((r: any) => r.completed).length;
+            const totalSeconds = watchProgress.reduce((sum: number, r: any) => {
+              const videoDuration = r.videos?.duration_seconds || 0;
+              return sum + (r.completed ? videoDuration : (r.watched_seconds || 0));
+            }, 0);
+            setVideoStats({ completedCount, minutesWatched: Math.floor(totalSeconds / 60) });
+          } else if (watchProgress) {
+            setVideoStats({ completedCount: 0, minutesWatched: 0 });
+          }
 
           // Fetch unread message count across all conversations
           const { data: myConvs } = await supabase
