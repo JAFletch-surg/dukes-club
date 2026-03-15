@@ -9,7 +9,10 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Not authenticated — please log in again' },
+        { status: 401 }
+      )
     }
 
     const body: {
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           console.error('[Watch Progress] Update failed:', error.message)
-          return NextResponse.json({ error: error.message }, { status: 500 })
+          return NextResponse.json({ error: formatDbError(error.message) }, { status: 500 })
         }
         return NextResponse.json(data)
       }
@@ -78,14 +81,31 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Watch Progress] Upsert failed:', error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: formatDbError(error.message) }, { status: 500 })
     }
 
     return NextResponse.json(data)
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal error'
+    console.error('[Watch Progress] Unexpected error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
+}
+
+function formatDbError(message: string): string {
+  if (/relation.*does not exist/i.test(message)) {
+    return 'Database table "video_watch_progress" not found — run the migration SQL'
+  }
+  if (/permission denied|policy/i.test(message)) {
+    return 'Database permissions not configured — RLS policies may be missing'
+  }
+  if (/unique|duplicate|conflict/i.test(message)) {
+    return 'Database constraint error — the unique constraint may be misconfigured'
+  }
+  if (/violates foreign key/i.test(message)) {
+    return 'Video not found in database — try re-syncing from Vimeo'
+  }
+  return message
 }
 
 // ── GET — fetch watch progress for current user ─────────────────
@@ -96,7 +116,10 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Not authenticated — please log in again' },
+        { status: 401 }
+      )
     }
 
     const videoId = request.nextUrl.searchParams.get('video_id')
@@ -113,12 +136,14 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[Watch Progress] Query failed:', error.message)
+      return NextResponse.json({ error: formatDbError(error.message) }, { status: 500 })
     }
 
     return NextResponse.json(videoId ? (data?.[0] || null) : data)
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal error'
+    console.error('[Watch Progress] Unexpected error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

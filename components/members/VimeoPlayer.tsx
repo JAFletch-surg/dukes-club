@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import Player from '@vimeo/player'
+import { AlertTriangle, X } from 'lucide-react'
 
 interface VimeoPlayerProps {
   vimeoId: string
@@ -17,6 +18,9 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   const lastSavedRef = useRef(0)
   const durationRef = useRef(0)
   const completedRef = useRef(false) // track if video ended to avoid unmount regression
+  const hasErrorRef = useRef(false) // only show first error, don't spam
+
+  const [progressError, setProgressError] = useState<string | null>(null)
 
   // ── Save progress to API ──────────────────────────────────────
 
@@ -36,9 +40,17 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           console.error('[VimeoPlayer] Progress save failed:', res.status, body)
+          if (!hasErrorRef.current) {
+            hasErrorRef.current = true
+            setProgressError(body?.error || `Save failed (${res.status})`)
+          }
         }
       } catch (err) {
         console.error('[VimeoPlayer] Progress save error:', err)
+        if (!hasErrorRef.current) {
+          hasErrorRef.current = true
+          setProgressError('Network error — progress not being tracked')
+        }
       }
     },
     [videoId]
@@ -49,8 +61,10 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   useEffect(() => {
     if (!containerRef.current || !vimeoId) return
 
-    // Reset completed flag for this video instance
+    // Reset state for this video instance
     completedRef.current = false
+    hasErrorRef.current = false
+    setProgressError(null)
 
     // Clean up any leftover DOM from a previous player instance
     // (React StrictMode double-mounts; destroy() is async so wrapper divs may linger)
@@ -84,15 +98,30 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       durationRef.current = d
     })
 
-    // Resume from saved position
+    // Preflight check: verify progress API is accessible
     fetch(`/api/videos/progress?video_id=${videoId}`)
-      .then(r => r.json())
-      .then(progress => {
-        if (progress && !progress.completed && progress.watched_seconds > 0) {
-          player.setCurrentTime(progress.watched_seconds).catch(() => {})
+      .then(r => {
+        if (!r.ok) {
+          return r.json().catch(() => ({})).then(body => {
+            console.error('[VimeoPlayer] Progress API check failed:', r.status, body)
+            if (!hasErrorRef.current) {
+              hasErrorRef.current = true
+              setProgressError(body?.error || `Progress tracking unavailable (${r.status})`)
+            }
+          })
+        }
+        return r.json().then(progress => {
+          if (progress && !progress.completed && progress.watched_seconds > 0) {
+            player.setCurrentTime(progress.watched_seconds).catch(() => {})
+          }
+        })
+      })
+      .catch(() => {
+        if (!hasErrorRef.current) {
+          hasErrorRef.current = true
+          setProgressError('Could not reach progress API')
         }
       })
-      .catch(() => {})
 
     // Track playback — debounced save every PROGRESS_INTERVAL_S
     player.on('timeupdate', (event: { seconds: number; duration: number }) => {
@@ -125,9 +154,25 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   }, [vimeoId, videoId, embedHash, saveProgress])
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full rounded-xl overflow-hidden shadow-lg"
-    />
+    <div>
+      <div
+        ref={containerRef}
+        className="w-full rounded-xl overflow-hidden shadow-lg"
+      />
+      {progressError && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span className="flex-1">
+            <strong>Progress tracking issue:</strong> {progressError}
+          </span>
+          <button
+            onClick={() => setProgressError(null)}
+            className="shrink-0 text-amber-600 hover:text-amber-800"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
