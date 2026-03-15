@@ -16,13 +16,14 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   const playerRef = useRef<Player | null>(null)
   const lastSavedRef = useRef(0)
   const durationRef = useRef(0)
+  const completedRef = useRef(false) // track if video ended to avoid unmount regression
 
   // ── Save progress to API ──────────────────────────────────────
 
   const saveProgress = useCallback(
     async (seconds: number, completed: boolean) => {
       try {
-        await fetch('/api/videos/progress', {
+        const res = await fetch('/api/videos/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -32,8 +33,12 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
             completed,
           }),
         })
-      } catch {
-        // Silently fail — progress tracking is non-critical
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          console.error('[VimeoPlayer] Progress save failed:', res.status, body)
+        }
+      } catch (err) {
+        console.error('[VimeoPlayer] Progress save error:', err)
       }
     },
     [videoId]
@@ -43,6 +48,9 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
 
   useEffect(() => {
     if (!containerRef.current || !vimeoId) return
+
+    // Reset completed flag for this video instance
+    completedRef.current = false
 
     // Clean up any leftover DOM from a previous player instance
     // (React StrictMode double-mounts; destroy() is async so wrapper divs may linger)
@@ -97,14 +105,18 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
 
     // Mark completed on end
     player.on('ended', () => {
+      completedRef.current = true
       saveProgress(durationRef.current, true)
     })
 
     return () => {
-      // Save final position on unmount
-      player.getCurrentTime().then(s => {
-        saveProgress(s, false)
-      }).catch(() => {})
+      // Only save final position on unmount if video didn't already complete
+      // (avoids race condition where unmount overwrites completed=true with false)
+      if (!completedRef.current) {
+        player.getCurrentTime().then(s => {
+          saveProgress(s, false)
+        }).catch(() => {})
+      }
       player.destroy().catch(() => {})
       playerRef.current = null
       // Remove all SDK-injected wrapper divs to prevent stacking on re-mount
