@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Play, Search, Eye, Video, X, Clock, ArrowLeft, Loader2,
   MessageSquare, ThumbsUp, Pin, Trash2, Reply, Send, CornerDownRight,
-  ChevronDown, ChevronUp, User,
+  ChevronDown, ChevronUp, User, SlidersHorizontal, Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -433,6 +433,7 @@ const VideoArchive = () => {
   const [sort, setSort] = useState<typeof sortOptions[number]>("Newest");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeVideo, setActiveVideo] = useState<VideoRecord | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [watchProgress, setWatchProgress] = useState<Record<string, { watched_seconds: number; duration_seconds: number; completed: boolean }>>({});
 
   useEffect(() => {
@@ -665,17 +666,18 @@ const VideoArchive = () => {
 
   /* ═══ LIBRARY GRID VIEW ══════════════════════════════ */
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-6xl w-full overflow-hidden">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Video Library</h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           {videos.length} video{videos.length !== 1 ? "s" : ""} — educational recordings, operative footage, and lectures
         </p>
       </div>
 
       {/* Filters */}
       <div className="space-y-3">
+        {/* Search + sort + mobile filter toggle */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -686,56 +688,73 @@ const VideoArchive = () => {
               className="pl-9"
             />
           </div>
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value as typeof sortOptions[number])}
-            className="h-10 px-3 rounded-md border border-input bg-background text-sm"
-          >
-            {sortOptions.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="sm:hidden h-10 px-3 rounded-md border border-input bg-background text-sm font-medium flex items-center gap-2"
+            >
+              <SlidersHorizontal size={14} />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value as typeof sortOptions[number])}
+              className="h-10 px-3 rounded-md border border-input bg-background text-sm"
+            >
+              {sortOptions.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
         </div>
 
-        {/* Category pills */}
-        <div className="flex gap-2 flex-wrap">
-          {availableCategories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                category === cat
-                  ? "bg-navy text-navy-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* Collapsible filters: always visible on sm+, toggled on mobile */}
+        <div className={`space-y-3 ${showFilters ? "" : "hidden sm:block"}`}>
+          {/* Category pills */}
+          <div className="flex gap-2 flex-wrap">
+            {availableCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  category === cat
+                    ? "bg-navy text-navy-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
-        {/* Tag pills */}
-        <div className="flex gap-2 flex-wrap items-center">
-          <span className="text-xs text-muted-foreground font-medium">Tags:</span>
-          {availableTags.map(tag => (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border ${
-                selectedTags.includes(tag)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-border hover:border-primary/50"
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-          {activeFilterCount > 0 && (
-            <button
-              onClick={() => { setCategory("All"); setSelectedTags([]); }}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              <X size={12} /> Clear filters
-            </button>
-          )}
+          {/* Tag pills */}
+          <div className="flex gap-2 flex-wrap items-center">
+            <span className="text-xs text-muted-foreground font-medium">Tags:</span>
+            {availableTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border ${
+                  selectedTags.includes(tag)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setCategory("All"); setSelectedTags([]); }}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <X size={12} /> Clear filters
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -747,7 +766,7 @@ const VideoArchive = () => {
       )}
 
       {/* Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-5">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
         {filtered.map(video => {
           const dateStr = video.published_at
             ? new Date(video.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
@@ -758,12 +777,12 @@ const VideoArchive = () => {
           return (
             <div
               key={video.id}
-              className="cursor-pointer group"
+              className="cursor-pointer group min-w-0 overflow-hidden h-full"
               onClick={() => { setActiveVideo(video); window.scrollTo({ top: 0, behavior: "smooth" }); }}
             >
               {/* Mobile: horizontal card */}
               <div className="sm:hidden flex rounded-lg border overflow-hidden bg-card hover:shadow-md transition-shadow">
-                <div className="w-28 shrink-0 relative bg-navy">
+                <div className="w-32 shrink-0 relative bg-navy">
                   {video.thumbnail_url ? (
                     <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -774,6 +793,11 @@ const VideoArchive = () => {
                   <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-mono px-1 py-0.5 rounded">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id]?.completed && (
+                    <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow">
+                      <Check size={10} className="text-white" />
+                    </div>
+                  )}
                   {watchProgress[video.id] && (
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
                       <div
@@ -801,7 +825,7 @@ const VideoArchive = () => {
               </div>
 
               {/* Desktop: vertical card */}
-              <Card className="hidden sm:block border overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5">
+              <Card className="hidden sm:flex sm:flex-col border overflow-hidden hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 h-full">
                 <div className="relative aspect-video bg-navy">
                   {video.thumbnail_url ? (
                     <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
@@ -824,6 +848,11 @@ const VideoArchive = () => {
                   <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm">
                     {fmtDuration(video.duration_seconds)}
                   </span>
+                  {watchProgress[video.id]?.completed && (
+                    <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-0.5 shadow">
+                      <Check size={12} className="text-white" />
+                    </div>
+                  )}
                   {watchProgress[video.id] && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
                       <div
@@ -833,7 +862,7 @@ const VideoArchive = () => {
                     </div>
                   )}
                 </div>
-                <CardContent className="p-4">
+                <CardContent className="p-4 flex-1 flex flex-col">
                   {video.tags && video.tags.length > 0 && (
                     <div className="flex gap-1 flex-wrap mb-2">
                       {video.tags.slice(0, 3).map(tag => (
@@ -854,7 +883,7 @@ const VideoArchive = () => {
                   {(video.video_faculty?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground mt-1.5">{video.video_faculty!.map(vf => vf.faculty.full_name).join(", ")}</p>
                   )}
-                  <div className="flex items-center justify-between mt-2.5 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between mt-auto pt-2.5 text-xs text-muted-foreground">
                     <span>{dateStr}</span>
                     {video.vimeo_plays > 0 && (
                       <span className="flex items-center gap-1">

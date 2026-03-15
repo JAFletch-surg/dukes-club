@@ -9,6 +9,12 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import EventsCalendar from "@/components/EventsCalendar";
 
+const VIDEO_BADGE_THRESHOLDS = [
+  { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+  { min: 25, label: 'Silver', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+  { min: 10, label: 'Bronze', bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+];
+
 const MembersDashboard = () => {
   const { profile, user, loading: authLoading } = useAuth();
   const supabase = createClient();
@@ -21,6 +27,7 @@ const MembersDashboard = () => {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [questionStats, setQuestionStats] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [videoStats, setVideoStats] = useState<{ completedCount: number; minutesWatched: number } | null>(null);
 
   useEffect(() => {
     // Don't fetch until auth has resolved on the client
@@ -93,6 +100,24 @@ const MembersDashboard = () => {
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
 
+          // Fetch video watch progress for stats and badges
+          const { data: watchProgress, error: watchErr } = await supabase
+            .from('video_watch_progress')
+            .select('completed, watched_seconds, duration_seconds')
+            .eq('user_id', user.id);
+
+          if (watchErr) console.error('[Dashboard] Watch progress error:', watchErr.message);
+          if (watchProgress && watchProgress.length > 0) {
+            const completedCount = watchProgress.filter((r: any) => r.completed).length;
+            const totalSeconds = watchProgress.reduce((sum: number, r: any) => {
+              // completed → full video duration, in-progress → position reached
+              return sum + (r.completed ? (r.duration_seconds || 0) : (r.watched_seconds || 0));
+            }, 0);
+            setVideoStats({ completedCount, minutesWatched: Math.floor(totalSeconds / 60) });
+          } else if (watchProgress) {
+            setVideoStats({ completedCount: 0, minutesWatched: 0 });
+          }
+
           // Fetch unread message count across all conversations
           const { data: myConvs } = await supabase
             .from('conversation_participants')
@@ -147,6 +172,9 @@ const MembersDashboard = () => {
   };
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Member';
+  const currentBadge = videoStats
+    ? VIDEO_BADGE_THRESHOLDS.find(b => videoStats.completedCount >= b.min) || null
+    : null;
 
   const formatPrice = (pence: number | null) => {
     if (!pence || pence === 0) return 'Free';
@@ -168,7 +196,7 @@ const MembersDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-6xl overflow-hidden">
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
@@ -225,7 +253,7 @@ const MembersDashboard = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Videos watched", value: "–", icon: Video, color: "text-navy" },
+          { label: "Videos watched", value: videoStats?.completedCount ?? "–", icon: Video, color: "text-navy", subtitle: videoStats ? (videoStats.minutesWatched >= 60 ? `${(videoStats.minutesWatched / 60).toFixed(1)} hrs watched` : `${videoStats.minutesWatched} min watched`) : undefined, badge: currentBadge },
           { label: "Questions attempted", value: questionStats?.total_attempted || 0, icon: HelpCircle, color: "text-emerald-600" },
           { label: "Events booked", value: myBookings.length, icon: Calendar, color: "text-gold" },
           { label: "Exam average", value: questionStats?.overall_percentage ? `${questionStats.overall_percentage}%` : "–", icon: BarChart3, color: "text-primary" },
@@ -238,6 +266,17 @@ const MembersDashboard = () => {
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mt-1">
                     {stat.label}
                   </p>
+                  {'subtitle' in stat && stat.subtitle && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{stat.subtitle as string}</p>
+                  )}
+                  {'badge' in stat && stat.badge && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <Award size={12} className={(stat.badge as any).text} />
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${(stat.badge as any).bg} ${(stat.badge as any).text} ${(stat.badge as any).border}`}>
+                        {(stat.badge as any).label}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
                 <stat.icon size={20} className="text-muted-foreground/50" />
               </div>
@@ -345,7 +384,7 @@ const MembersDashboard = () => {
                       <Calendar size={16} className="text-gold" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">{event.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <span>{formatDate(event.starts_at)}</span>
                         <span>·</span>

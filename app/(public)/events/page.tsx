@@ -37,7 +37,7 @@ const formatDate = (dateStr: string) => {
 };
 
 const EventCard = ({ event }: { event: any }) => (
-  <Link href={`/events/${event.slug}`} className="block group">
+  <Link href={`/events/${event.slug}`} className="block group h-full">
     {/* Mobile: horizontal card */}
     <div className="md:hidden flex rounded-lg border border-navy-foreground/30 overflow-hidden bg-navy hover:border-gold/40 transition-colors">
       <div className="w-28 shrink-0 overflow-hidden">
@@ -85,7 +85,7 @@ const EventCard = ({ event }: { event: any }) => (
     </div>
 
     {/* Desktop/tablet: original vertical card */}
-    <div className="hidden md:block rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy">
+    <div className="hidden md:flex md:flex-col rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy h-full">
       <div className="aspect-[4/3] overflow-hidden">
         {event.featured_image_url ? (
           <img src={event.featured_image_url} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
@@ -95,7 +95,7 @@ const EventCard = ({ event }: { event: any }) => (
           </div>
         )}
       </div>
-      <div className="p-6">
+      <div className="p-6 flex-1 flex flex-col">
         <div className="flex flex-wrap gap-1.5 mb-3">
           <Badge className="bg-gold/20 text-gold border-gold/30 hover:bg-gold/30 text-[10px]">
             {event.event_type}
@@ -125,7 +125,7 @@ const EventCard = ({ event }: { event: any }) => (
           </div>
         </div>
         <p className="text-sm text-navy-foreground/70 mb-4 line-clamp-2">{event.description_plain}</p>
-        <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors">
+        <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors mt-auto">
           Read more <ArrowRight size={14} />
         </span>
       </div>
