@@ -10,9 +10,9 @@ import { createClient } from "@/lib/supabase/client";
 import EventsCalendar from "@/components/EventsCalendar";
 
 const VIDEO_BADGE_THRESHOLDS = [
-  { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
-  { min: 25, label: 'Silver', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
-  { min: 10, label: 'Bronze', bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+  { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', icon: '🥇' },
+  { min: 25, label: 'Silver', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: '🥈' },
+  { min: 10, label: 'Bronze', bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', icon: '🥉' },
 ];
 
 const MembersDashboard = () => {
@@ -284,6 +284,71 @@ const MembersDashboard = () => {
           </Card>
         ))}
       </div>
+
+      {/* Video Badge Progress */}
+      {videoStats && (
+        <Card className="border">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Award size={18} className="text-muted-foreground" />
+              <h2 className="text-lg font-semibold text-foreground">Video Badges</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[...VIDEO_BADGE_THRESHOLDS].reverse().map((tier) => {
+                const earned = videoStats.completedCount >= tier.min;
+                const isNext = !earned && (
+                  tier === [...VIDEO_BADGE_THRESHOLDS].reverse().find(t => videoStats.completedCount < t.min)
+                );
+                const progress = isNext
+                  ? Math.min(100, Math.round((videoStats.completedCount / tier.min) * 100))
+                  : earned ? 100 : 0;
+
+                return (
+                  <div
+                    key={tier.label}
+                    className={`relative rounded-lg border p-4 text-center transition-all ${
+                      earned
+                        ? `${tier.bg} ${tier.border}`
+                        : isNext
+                        ? 'border-border bg-muted/20'
+                        : 'border-border/50 bg-muted/10 opacity-50'
+                    }`}
+                  >
+                    <div className={`text-2xl mb-1 ${earned ? '' : 'grayscale opacity-40'}`}>
+                      {tier.icon}
+                    </div>
+                    <p className={`text-sm font-bold ${earned ? tier.text : 'text-muted-foreground'}`}>
+                      {tier.label}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {tier.min} videos
+                    </p>
+                    {earned && (
+                      <div className="flex items-center justify-center gap-1 mt-2">
+                        <Check size={12} className={tier.text} />
+                        <span className={`text-[10px] font-semibold ${tier.text}`}>Earned</span>
+                      </div>
+                    )}
+                    {isNext && (
+                      <div className="mt-2">
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {videoStats.completedCount}/{tier.min} watched
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Unread messages banner */}
       {unreadCount > 0 && (

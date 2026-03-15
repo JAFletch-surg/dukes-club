@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Play, Search, Eye, Video, X, Clock, ArrowLeft, Loader2,
   MessageSquare, ThumbsUp, Pin, Trash2, Reply, Send, CornerDownRight,
-  ChevronDown, ChevronUp, User, SlidersHorizontal, Check,
+  ChevronDown, ChevronUp, User, SlidersHorizontal, Check, Award,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -15,6 +15,12 @@ import VimeoPlayer from "@/components/members/VimeoPlayer";
 
 const defaultCategories = ["All", "Operative", "Complications", "Webinar", "Education", "Lecture"];
 const sortOptions = ["Newest", "Most Viewed", "Duration"] as const;
+
+const VIDEO_BADGE_THRESHOLDS = [
+  { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+  { min: 25, label: 'Silver', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+  { min: 10, label: 'Bronze', bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+];
 const defaultTags = ["Cancer", "Rectal Cancer", "IBD", "Pelvic Floor", "Robotic", "Laparoscopic", "TAMIS", "Emergency", "Fistula", "Proctology", "Peritoneal Malignancy"];
 
 interface VideoRecord {
@@ -674,6 +680,47 @@ const VideoArchive = () => {
           {videos.length} video{videos.length !== 1 ? "s" : ""} — educational recordings, operative footage, and lectures
         </p>
       </div>
+
+      {/* Badge progress banner */}
+      {(() => {
+        const completedCount = Object.values(watchProgress).filter(p => p.completed).length;
+        const currentBadge = VIDEO_BADGE_THRESHOLDS.find(b => completedCount >= b.min) || null;
+        const nextBadge = [...VIDEO_BADGE_THRESHOLDS].reverse().find(b => completedCount < b.min) || null;
+
+        if (!nextBadge && !currentBadge) return null;
+
+        return (
+          <div className={`rounded-lg border p-4 flex items-center gap-4 ${currentBadge ? `${currentBadge.bg} ${currentBadge.border}` : 'bg-muted/20 border-border'}`}>
+            <div className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center shrink-0">
+              <Award size={20} className={currentBadge ? currentBadge.text : 'text-muted-foreground'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              {currentBadge && (
+                <p className={`text-sm font-semibold ${currentBadge.text}`}>
+                  {currentBadge.label} Badge Earned
+                </p>
+              )}
+              {nextBadge ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {completedCount}/{nextBadge.min} videos completed — {nextBadge.min - completedCount} more for {nextBadge.label}
+                  </p>
+                  <div className="h-1.5 bg-white/40 rounded-full overflow-hidden mt-1.5 max-w-xs">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ width: `${Math.round((completedCount / nextBadge.min) * 100)}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {completedCount} videos completed — all badges earned!
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Filters */}
       <div className="space-y-3">
