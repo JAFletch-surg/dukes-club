@@ -142,10 +142,10 @@ type PodcastResource = Resource & { links: { label: string; url: string }[]; app
 const podcasts: PodcastResource[] = [
   {
     title: "First Incision",
-    url: "https://podcasts.apple.com/us/podcast/first-incision/id1525453622",
+    url: "https://podcasts.apple.com/gb/podcast/first-incision/id1525453622",
     appleId: 1525453622,
     links: [
-      { label: "Apple Podcasts", url: "https://podcasts.apple.com/us/podcast/first-incision/id1525453622" },
+      { label: "Apple Podcasts", url: "https://podcasts.apple.com/gb/podcast/first-incision/id1525453622" },
       { label: "Spotify", url: "https://open.spotify.com/show/0eUiOazl5oIxH1Y9ivgXbP" },
       { label: "Buzzsprout", url: "https://www.buzzsprout.com/1246988" },
     ],
@@ -158,6 +158,7 @@ const podcasts: PodcastResource[] = [
     url: "https://scrubbingin.carrd.co",
     appleId: 1688991386,
     links: [
+      { label: "Apple Podcasts", url: "https://podcasts.apple.com/gb/podcast/scrubbing-in/id1688991386" },
       { label: "Website", url: "https://scrubbingin.carrd.co" },
       { label: "YouTube", url: "https://youtube.com/@ScrubbingInPodcast" },
     ],
@@ -169,6 +170,7 @@ const podcasts: PodcastResource[] = [
     url: "https://behindtheknife.org",
     appleId: 980990143,
     links: [
+      { label: "Apple Podcasts", url: "https://podcasts.apple.com/gb/podcast/behind-the-knife-the-surgery-podcast/id980990143" },
       { label: "Website", url: "https://behindtheknife.org" },
       { label: "Episodes", url: "https://behindtheknife.org/listen" },
     ],
@@ -317,6 +319,13 @@ const referenceTexts: TextbookResource[] = [
     url: "https://www.amazon.co.uk/s?k=Sabiston+Textbook+of+Surgery",
     description: "Comprehensive US reference. Strong on pathophysiology and surgical science. Same US/UK guideline caveat applies.",
     coverIsbn: "9780323640626",
+  },
+  {
+    title: "The ABSITE Review",
+    authors: "Fiser",
+    url: "https://www.amazon.co.uk/s?k=ABSITE+Review+Fiser",
+    description: "Bullet-point, high-yield summary covering the breadth of general surgery. Excellent for rapid revision and identifying gaps. Some detail is missing and content is geared towards an American audience — cross-reference UK-specific guidelines.",
+    coverOlid: "OL25813268W",
   },
   {
     title: "Mastery of Surgery",
