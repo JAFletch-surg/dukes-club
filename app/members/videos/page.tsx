@@ -858,7 +858,7 @@ const VideoArchive = () => {
                 </div>
                 <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center gap-0.5">
                   {video.category && (
-                    <span className="text-[10px] font-medium text-muted-foreground">{video.category}</span>
+                    <span className="text-[10px] font-medium text-navy">{video.category}</span>
                   )}
                   <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{video.title}</h3>
                   {(video.video_faculty?.length ?? 0) > 0 && (
@@ -897,7 +897,7 @@ const VideoArchive = () => {
                     </div>
                   </div>
                   {video.category && (
-                    <Badge className="absolute top-2.5 left-2.5 text-[10px] shadow-sm" variant="secondary">
+                    <Badge className="absolute top-2.5 left-2.5 text-[10px] shadow-sm bg-navy text-navy-foreground hover:bg-navy/90">
                       {video.category}
                     </Badge>
                   )}
@@ -922,12 +922,12 @@ const VideoArchive = () => {
                   {video.tags && video.tags.length > 0 && (
                     <div className="flex gap-1 flex-wrap mb-2">
                       {video.tags.slice(0, 3).map(tag => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-navy/10 text-navy font-medium">
                           {tag}
                         </span>
                       ))}
                       {video.tags.length > 3 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy/10 text-navy font-medium">
                           +{video.tags.length - 3}
                         </span>
                       )}
