@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     const res = await fetch(
-      `${VIMEO_API}/videos/${id}?fields=name,description,duration,pictures.sizes`,
+      `${VIMEO_API}/videos/${id}?fields=name,description,duration,pictures.sizes,stats.plays`,
       {
         headers: {
           Authorization: `Bearer ${VIMEO_TOKEN}`,
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       description: video.description || null,
       duration: video.duration || 0,
       thumbnail_url: getBestThumbnail(video.pictures),
+      plays: video.stats?.plays ?? 0,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 })

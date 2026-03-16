@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Play, Search, Eye, Video, X, Clock, ArrowLeft, Loader2,
   MessageSquare, ThumbsUp, Pin, Trash2, Reply, Send, CornerDownRight,
-  ChevronDown, ChevronUp, User, SlidersHorizontal, Check,
+  ChevronDown, ChevronUp, User, SlidersHorizontal, Check, Award,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
@@ -15,6 +15,12 @@ import VimeoPlayer from "@/components/members/VimeoPlayer";
 
 const defaultCategories = ["All", "Operative", "Complications", "Webinar", "Education", "Lecture"];
 const sortOptions = ["Newest", "Most Viewed", "Duration"] as const;
+
+const VIDEO_BADGE_THRESHOLDS = [
+  { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300' },
+  { min: 25, label: 'Silver', bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+  { min: 10, label: 'Bronze', bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
+];
 const defaultTags = ["Cancer", "Rectal Cancer", "IBD", "Pelvic Floor", "Robotic", "Laparoscopic", "TAMIS", "Emergency", "Fistula", "Proctology", "Peritoneal Malignancy"];
 
 interface VideoRecord {
@@ -675,6 +681,47 @@ const VideoArchive = () => {
         </p>
       </div>
 
+      {/* Badge progress banner */}
+      {(() => {
+        const completedCount = Object.values(watchProgress).filter(p => p.completed).length;
+        const currentBadge = VIDEO_BADGE_THRESHOLDS.find(b => completedCount >= b.min) || null;
+        const nextBadge = [...VIDEO_BADGE_THRESHOLDS].reverse().find(b => completedCount < b.min) || null;
+
+        if (!nextBadge && !currentBadge) return null;
+
+        return (
+          <div className={`rounded-lg border p-4 flex items-center gap-4 ${currentBadge ? `${currentBadge.bg} ${currentBadge.border}` : 'bg-muted/20 border-border'}`}>
+            <div className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center shrink-0">
+              <Award size={20} className={currentBadge ? currentBadge.text : 'text-muted-foreground'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              {currentBadge && (
+                <p className={`text-sm font-semibold ${currentBadge.text}`}>
+                  {currentBadge.label} Badge Earned
+                </p>
+              )}
+              {nextBadge ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {completedCount}/{nextBadge.min} videos completed — {nextBadge.min - completedCount} more for {nextBadge.label}
+                  </p>
+                  <div className="h-1.5 bg-white/40 rounded-full overflow-hidden mt-1.5 max-w-xs">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{ width: `${Math.round((completedCount / nextBadge.min) * 100)}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {completedCount} videos completed — all badges earned!
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Filters */}
       <div className="space-y-3">
         {/* Search + sort + mobile filter toggle */}
@@ -794,12 +841,14 @@ const VideoArchive = () => {
                     {fmtDuration(video.duration_seconds)}
                   </span>
                   {watchProgress[video.id]?.completed && (
-                    <div className="absolute top-1 right-1 bg-emerald-500 rounded-full p-0.5 shadow">
-                      <Check size={10} className="text-white" />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="flex items-center gap-1 bg-black/70 text-white text-[10px] font-semibold px-2 py-1 rounded-full">
+                        <Check size={12} /> Watched
+                      </div>
                     </div>
                   )}
                   {watchProgress[video.id] && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
                       <div
                         className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
                         style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
@@ -809,7 +858,7 @@ const VideoArchive = () => {
                 </div>
                 <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-center gap-0.5">
                   {video.category && (
-                    <span className="text-[10px] font-medium text-muted-foreground">{video.category}</span>
+                    <span className="text-[10px] font-medium text-navy">{video.category}</span>
                   )}
                   <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-2">{video.title}</h3>
                   {(video.video_faculty?.length ?? 0) > 0 && (
@@ -819,6 +868,13 @@ const VideoArchive = () => {
                     <span>{dateStr}</span>
                     {video.vimeo_plays > 0 && (
                       <span className="flex items-center gap-0.5"><Eye size={10} /> {video.vimeo_plays.toLocaleString()}</span>
+                    )}
+                    {watchProgress[video.id]?.completed ? (
+                      <span className="flex items-center gap-0.5 text-emerald-600 font-medium"><Check size={10} /> Watched</span>
+                    ) : watchProgress[video.id]?.watched_seconds > 0 && (
+                      <span className="text-primary font-medium">
+                        {Math.min(99, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}% watched
+                      </span>
                     )}
                   </div>
                 </div>
@@ -841,7 +897,7 @@ const VideoArchive = () => {
                     </div>
                   </div>
                   {video.category && (
-                    <Badge className="absolute top-2.5 left-2.5 text-[10px] shadow-sm" variant="secondary">
+                    <Badge className="absolute top-2.5 left-2.5 text-[10px] shadow-sm bg-navy text-navy-foreground hover:bg-navy/90">
                       {video.category}
                     </Badge>
                   )}
@@ -849,12 +905,12 @@ const VideoArchive = () => {
                     {fmtDuration(video.duration_seconds)}
                   </span>
                   {watchProgress[video.id]?.completed && (
-                    <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-0.5 shadow">
-                      <Check size={12} className="text-white" />
+                    <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-semibold px-2 py-1 rounded-full shadow-md">
+                      <Check size={13} /> Watched
                     </div>
                   )}
                   {watchProgress[video.id] && (
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20">
                       <div
                         className={`h-full ${watchProgress[video.id].completed ? 'bg-emerald-400' : 'bg-primary'}`}
                         style={{ width: `${watchProgress[video.id].completed ? 100 : Math.min(100, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}%` }}
@@ -866,12 +922,12 @@ const VideoArchive = () => {
                   {video.tags && video.tags.length > 0 && (
                     <div className="flex gap-1 flex-wrap mb-2">
                       {video.tags.slice(0, 3).map(tag => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-navy/10 text-navy font-medium">
                           {tag}
                         </span>
                       ))}
                       {video.tags.length > 3 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-navy/10 text-navy font-medium">
                           +{video.tags.length - 3}
                         </span>
                       )}
@@ -884,10 +940,19 @@ const VideoArchive = () => {
                     <p className="text-xs text-muted-foreground mt-1.5">{video.video_faculty!.map(vf => vf.faculty.full_name).join(", ")}</p>
                   )}
                   <div className="flex items-center justify-between mt-auto pt-2.5 text-xs text-muted-foreground">
-                    <span>{dateStr}</span>
-                    {video.vimeo_plays > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Eye size={12} /> {video.vimeo_plays.toLocaleString()}
+                    <div className="flex items-center gap-2">
+                      <span>{dateStr}</span>
+                      {video.vimeo_plays > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Eye size={12} /> {video.vimeo_plays.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    {watchProgress[video.id]?.completed ? (
+                      <span className="flex items-center gap-1 text-emerald-600 font-medium"><Check size={12} /> Watched</span>
+                    ) : watchProgress[video.id]?.watched_seconds > 0 && (
+                      <span className="text-primary font-medium">
+                        {Math.min(99, Math.round((watchProgress[video.id].watched_seconds / Math.max(1, watchProgress[video.id].duration_seconds)) * 100))}% watched
                       </span>
                     )}
                   </div>
