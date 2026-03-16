@@ -17,10 +17,19 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   const playerRef = useRef<Player | null>(null)
   const lastSavedRef = useRef(0)
   const durationRef = useRef(0)
-  const completedRef = useRef(false) // track if video ended to avoid unmount regression
-  const hasErrorRef = useRef(false) // only show first error, don't spam
+  const completedRef = useRef(false)
+  const hasErrorRef = useRef(false)
 
   const [progressError, setProgressError] = useState<string | null>(null)
+
+  // ── Helper: show error once ─────────────────────────────────────
+
+  const showError = useCallback((msg: string) => {
+    if (!hasErrorRef.current) {
+      hasErrorRef.current = true
+      setProgressError(msg)
+    }
+  }, [])
 
   // ── Save progress to API ──────────────────────────────────────
 
@@ -40,20 +49,14 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           console.error('[VimeoPlayer] Progress save failed:', res.status, body)
-          if (!hasErrorRef.current) {
-            hasErrorRef.current = true
-            setProgressError(body?.error || `Save failed (${res.status})`)
-          }
+          showError(body?.error || `Save failed (${res.status})`)
         }
       } catch (err) {
         console.error('[VimeoPlayer] Progress save error:', err)
-        if (!hasErrorRef.current) {
-          hasErrorRef.current = true
-          setProgressError('Network error — progress not being tracked')
-        }
+        showError('Network error — progress not being tracked')
       }
     },
-    [videoId]
+    [videoId, showError]
   )
 
   // ── Initialise player & attach event listeners ────────────────
@@ -67,7 +70,6 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
     setProgressError(null)
 
     // Clean up any leftover DOM from a previous player instance
-    // (React StrictMode double-mounts; destroy() is async so wrapper divs may linger)
     if (playerRef.current) {
       playerRef.current.destroy().catch(() => {})
       playerRef.current = null
@@ -83,64 +85,71 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
     }
 
     if (embedHash) {
-      // For unlisted/private videos, use the full URL with hash
       playerOpts.url = `https://player.vimeo.com/video/${vimeoId}?h=${embedHash}`
     } else {
       playerOpts.id = parseInt(vimeoId, 10)
     }
 
     const player = new Player(containerRef.current, playerOpts)
-
     playerRef.current = player
 
-    // Store duration once ready
-    player.getDuration().then(d => {
-      durationRef.current = d
+    // ── Catch player-level errors (embed restrictions, load failures) ──
+
+    player.on('error', (err: { name: string; message: string; method?: string }) => {
+      console.error('[VimeoPlayer] Player error:', err)
+      showError(err.message || 'Video player error')
     })
 
-    // Preflight check: verify progress API is accessible
-    fetch(`/api/videos/progress?video_id=${videoId}`)
-      .then(r => {
-        if (!r.ok) {
-          return r.json().catch(() => ({})).then(body => {
-            console.error('[VimeoPlayer] Progress API check failed:', r.status, body)
-            if (!hasErrorRef.current) {
-              hasErrorRef.current = true
-              setProgressError(body?.error || `Progress tracking unavailable (${r.status})`)
+    // ── Wait for player to be ready before setting up tracking ──
+
+    player.ready().then(() => {
+      console.log('[VimeoPlayer] Player ready — tracking enabled')
+
+      player.getDuration().then(d => {
+        durationRef.current = d
+      }).catch(() => {})
+
+      // Resume from saved position
+      fetch(`/api/videos/progress?video_id=${videoId}`)
+        .then(r => {
+          if (!r.ok) {
+            return r.json().catch(() => ({})).then(body => {
+              console.error('[VimeoPlayer] Progress API check failed:', r.status, body)
+              showError(body?.error || `Progress tracking unavailable (${r.status})`)
+            })
+          }
+          return r.json().then(progress => {
+            if (progress && !progress.completed && progress.watched_seconds > 0) {
+              player.setCurrentTime(progress.watched_seconds).catch(() => {})
             }
           })
-        }
-        return r.json().then(progress => {
-          if (progress && !progress.completed && progress.watched_seconds > 0) {
-            player.setCurrentTime(progress.watched_seconds).catch(() => {})
-          }
         })
-      })
-      .catch(() => {
-        if (!hasErrorRef.current) {
-          hasErrorRef.current = true
-          setProgressError('Could not reach progress API')
+        .catch(() => {
+          showError('Could not reach progress API')
+        })
+
+      // Track playback — save every PROGRESS_INTERVAL_S seconds
+      player.on('timeupdate', (event: { seconds: number; duration: number }) => {
+        durationRef.current = event.duration
+        if (Math.abs(event.seconds - lastSavedRef.current) >= PROGRESS_INTERVAL_S) {
+          lastSavedRef.current = event.seconds
+          saveProgress(event.seconds, false)
         }
       })
 
-    // Track playback — debounced save every PROGRESS_INTERVAL_S
-    player.on('timeupdate', (event: { seconds: number; duration: number }) => {
-      durationRef.current = event.duration
-      if (Math.abs(event.seconds - lastSavedRef.current) >= PROGRESS_INTERVAL_S) {
-        lastSavedRef.current = event.seconds
-        saveProgress(event.seconds, false)
-      }
-    })
+      // Mark completed on end
+      player.on('ended', () => {
+        completedRef.current = true
+        saveProgress(durationRef.current, true)
+      })
 
-    // Mark completed on end
-    player.on('ended', () => {
-      completedRef.current = true
-      saveProgress(durationRef.current, true)
+    }).catch((err: Error) => {
+      // Player failed to load — embed restriction, invalid video, etc.
+      console.error('[VimeoPlayer] Player failed to load:', err)
+      showError(err.message || 'Video could not be loaded — check Vimeo embed domain settings')
     })
 
     return () => {
-      // Only save final position on unmount if video didn't already complete
-      // (avoids race condition where unmount overwrites completed=true with false)
       if (!completedRef.current) {
         player.getCurrentTime().then(s => {
           saveProgress(s, false)
@@ -148,10 +157,9 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       }
       player.destroy().catch(() => {})
       playerRef.current = null
-      // Remove all SDK-injected wrapper divs to prevent stacking on re-mount
       if (containerRef.current) containerRef.current.innerHTML = ''
     }
-  }, [vimeoId, videoId, embedHash, saveProgress])
+  }, [vimeoId, videoId, embedHash, saveProgress, showError])
 
   return (
     <div>
