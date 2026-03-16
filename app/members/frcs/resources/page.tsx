@@ -327,9 +327,25 @@ const referenceTexts: TextbookResource[] = [
 
 // ─── Components ───────────────────────────────────
 
+function SiteThumbnail({ url, title }: { url: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!url || failed) return null;
+
+  return (
+    <img
+      src={`https://image.thum.io/get/width/600/${url}`}
+      alt={`${title} screenshot`}
+      className="w-full h-[100px] sm:h-[120px] object-cover object-top rounded-t-lg bg-muted"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function ResourceCard({ resource, location }: { resource: Resource; location?: string }) {
   return (
-    <Card className="border h-full transition-shadow hover:shadow-md">
+    <Card className="border h-full transition-shadow hover:shadow-md overflow-hidden">
+      <SiteThumbnail url={resource.url} title={resource.title} />
       <CardContent className="p-5 flex flex-col h-full">
         <div className="flex items-start justify-between mb-2">
           <h3 className="text-sm font-semibold text-foreground leading-tight pr-2">{resource.title}</h3>
