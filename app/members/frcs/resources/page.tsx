@@ -8,7 +8,7 @@ import {
   Mic, ScrollText, FileText, MapPin, Star, Lightbulb,
   ChevronRight, ArrowLeft,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // ─── Resource Data ────────────────────────────────
 
@@ -137,12 +137,13 @@ const freeCourses: CourseResource[] = [
   },
 ];
 
-type PodcastResource = Resource & { links: { label: string; url: string }[] };
+type PodcastResource = Resource & { links: { label: string; url: string }[]; appleId?: number };
 
 const podcasts: PodcastResource[] = [
   {
     title: "First Incision",
     url: "https://podcasts.apple.com/us/podcast/first-incision/id1525453622",
+    appleId: 1525453622,
     links: [
       { label: "Apple Podcasts", url: "https://podcasts.apple.com/us/podcast/first-incision/id1525453622" },
       { label: "Spotify", url: "https://open.spotify.com/show/0eUiOazl5oIxH1Y9ivgXbP" },
@@ -155,6 +156,7 @@ const podcasts: PodcastResource[] = [
   {
     title: "Scrubbing In",
     url: "https://scrubbingin.carrd.co",
+    appleId: 1688991386,
     links: [
       { label: "Website", url: "https://scrubbingin.carrd.co" },
       { label: "YouTube", url: "https://youtube.com/@ScrubbingInPodcast" },
@@ -165,6 +167,7 @@ const podcasts: PodcastResource[] = [
   {
     title: "Behind The Knife",
     url: "https://behindtheknife.org",
+    appleId: 980990143,
     links: [
       { label: "Website", url: "https://behindtheknife.org" },
       { label: "Episodes", url: "https://behindtheknife.org/listen" },
@@ -304,7 +307,7 @@ const referenceTexts: TextbookResource[] = [
     authors: "",
     url: "https://www.amazon.co.uk/s?k=Bailey+and+Love+Short+Practice+of+Surgery",
     description: "The standard UK surgical textbook. Good for foundational concepts and breadth. Keep on the shelf — don\u2019t read cover-to-cover for the FRCS.",
-    coverIsbn: "9781498796507",
+    coverIsbn: "9780367548117",
   },
   {
     title: "Sabiston Textbook of Surgery",
@@ -354,13 +357,13 @@ function ResourceCard({ resource, location }: { resource: Resource; location?: s
 function BookCoverImage({ isbn, title }: { isbn: string; title: string }) {
   const [failed, setFailed] = useState(false);
 
-  if (failed) {
-    return (
-      <div className="w-[100px] sm:w-[120px] h-[150px] sm:h-[175px] shrink-0 rounded-lg bg-navy/10 flex items-center justify-center">
-        <BookOpen size={28} className="text-navy/40" />
-      </div>
-    );
-  }
+  const fallback = (
+    <div className="w-[100px] sm:w-[120px] h-[150px] sm:h-[175px] shrink-0 rounded-lg bg-navy/10 flex items-center justify-center">
+      <BookOpen size={28} className="text-navy/40" />
+    </div>
+  );
+
+  if (failed) return fallback;
 
   return (
     <img
@@ -368,6 +371,41 @@ function BookCoverImage({ isbn, title }: { isbn: string; title: string }) {
       alt={title}
       className="w-[100px] sm:w-[120px] h-[150px] sm:h-[175px] shrink-0 rounded-lg object-cover shadow-md bg-muted"
       onError={() => setFailed(true)}
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        if (img.naturalWidth <= 1 && img.naturalHeight <= 1) setFailed(true);
+      }}
+    />
+  );
+}
+
+function PodcastArtwork({ appleId, title }: { appleId: number; title: string }) {
+  const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`https://itunes.apple.com/lookup?id=${appleId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.results?.[0]?.artworkUrl600) {
+          setArtworkUrl(data.results[0].artworkUrl600);
+        }
+      })
+      .catch(() => {});
+  }, [appleId]);
+
+  if (!artworkUrl) {
+    return (
+      <div className="w-16 h-16 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
+        <Mic size={24} className="text-navy" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={artworkUrl}
+      alt={title}
+      className="w-16 h-16 rounded-lg object-cover shadow-sm shrink-0 bg-muted"
     />
   );
 }
@@ -528,17 +566,23 @@ export default function RevisionResourcesPage() {
               <Card key={pod.title} className={`border h-full transition-shadow hover:shadow-md ${pod.highlight ? "ring-2 ring-gold/30 border-gold/40" : ""}`}>
                 <CardContent className="p-5 flex flex-col h-full">
                   <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-lg bg-navy/10 flex items-center justify-center">
-                        <Mic size={18} className="text-navy" />
+                    <div className="flex items-center gap-3">
+                      {pod.appleId ? (
+                        <PodcastArtwork appleId={pod.appleId} title={pod.title} />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
+                          <Mic size={24} className="text-navy" />
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground leading-tight">{pod.title}</h3>
+                        {pod.highlight && (
+                          <Badge className="text-[10px] bg-gold/15 text-gold border-gold/30 mt-1" variant="outline">
+                            <Star size={10} className="mr-1" /> Recommended
+                          </Badge>
+                        )}
                       </div>
-                      <h3 className="text-sm font-semibold text-foreground leading-tight">{pod.title}</h3>
                     </div>
-                    {pod.highlight && (
-                      <Badge className="text-[10px] bg-gold/15 text-gold border-gold/30 shrink-0 ml-2" variant="outline">
-                        <Star size={10} className="mr-1" /> Recommended
-                      </Badge>
-                    )}
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed mt-1 flex-1">{pod.description}</p>
                   <div className="flex flex-wrap gap-2 mt-3">
