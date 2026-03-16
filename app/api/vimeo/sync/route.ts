@@ -21,7 +21,7 @@ const VIMEO_HEADERS = {
   Accept: 'application/vnd.vimeo.*+json;version=3.4',
 }
 
-const FIELDS = 'uri,name,description,duration,created_time,pictures.sizes,tags,privacy,embed.html'
+const FIELDS = 'uri,name,description,duration,created_time,pictures.sizes,tags,privacy,embed.html,stats.plays'
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -37,6 +37,7 @@ interface VimeoVideoData {
   tags: Array<{ name: string }>
   privacy: { embed: string; view: string }
   embed?: { html?: string }
+  stats?: { plays: number }
 }
 
 interface VimeoApiResponse {
@@ -178,6 +179,7 @@ export async function POST(request: NextRequest) {
           .update({
             thumbnail_url: thumbnail,
             duration_seconds: video.duration || 0,
+            vimeo_plays: video.stats?.plays ?? 0,
             vimeo_privacy: video.privacy?.view || null,
             vimeo_embed_hash: embedHash,
             synced_at: new Date().toISOString(),
@@ -200,6 +202,7 @@ export async function POST(request: NextRequest) {
           thumbnail_url: thumbnail,
           tags: tags.length > 0 ? tags : null,
           vimeo_created_at: video.created_time || null,
+          vimeo_plays: video.stats?.plays ?? 0,
           vimeo_privacy: video.privacy?.view || null,
           vimeo_embed_hash: embedHash,
           is_members_only: true,
@@ -266,7 +269,7 @@ export async function GET() {
       return NextResponse.json({ error: 'VIMEO_FOLDER_ID not configured' }, { status: 500 })
     }
 
-    const url = `${VIMEO_API}/me/projects/${VIMEO_FOLDER_ID}/videos?page=1&per_page=5&fields=uri,name,duration,pictures.sizes`
+    const url = `${VIMEO_API}/me/projects/${VIMEO_FOLDER_ID}/videos?page=1&per_page=5&fields=uri,name,duration,pictures.sizes,stats.plays`
 
     const res = await fetch(url, { headers: VIMEO_HEADERS })
 
