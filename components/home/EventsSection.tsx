@@ -91,11 +91,11 @@ const EventsSection = () => {
                 </div>
               </div>
               {/* Desktop: vertical card */}
-              <div className="hidden md:block rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy">
-                <div className="aspect-[4/3] overflow-hidden">
+              <div className="hidden md:flex md:flex-col rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy h-full">
+                <div className="aspect-[4/3] overflow-hidden shrink-0">
                   <img src={event.image} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 </div>
-                <div className="p-6">
+                <div className="p-6 flex flex-col flex-1">
                   <h3 className="text-lg font-sans font-semibold text-navy-foreground mb-3">{event.title}</h3>
                   <div className="space-y-1.5 mb-3">
                     <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
@@ -111,7 +111,7 @@ const EventsSection = () => {
                       <span>{event.price}</span>
                     </div>
                   </div>
-                  <p className="text-sm text-navy-foreground/70 mb-4">{event.description}</p>
+                  <p className="text-sm text-navy-foreground/70 mb-4 flex-1">{event.description}</p>
                   <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors">
                     Read more <ArrowRight size={14} />
                   </span>

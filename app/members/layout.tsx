@@ -2,11 +2,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import GlobalSearch from "@/components/members/GlobalSearch";
 import {
   Home, Video, Play, Mic, BookOpen, FileText, Globe, Users,
-  Settings, ArrowLeft, LogOut, Menu, X, Search, ShieldCheck, ExternalLink, Award, MessageSquare, Calendar,
+  Settings, ArrowLeft, LogOut, Menu, X, ShieldCheck, ExternalLink, Award, MessageSquare, Calendar,
   Shield, Layout,
 } from "lucide-react";
 
@@ -303,12 +303,8 @@ const MembersLayout = ({ children }: { children: React.ReactNode }) => {
                 </Link>
               </div>
             )}
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search..."
-                className="pl-9 w-64 h-9 bg-background"
-              />
+            <div className="hidden sm:block">
+              <GlobalSearch />
             </div>
           </div>
           <div className="flex items-center gap-3">

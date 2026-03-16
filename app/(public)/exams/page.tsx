@@ -101,41 +101,60 @@ const resourceCategories = [
   {
     label: "Question Banks — Section 1",
     items: [
-      { title: "Higher FRCS", href: "https://higherfrcs.co.uk", desc: "The most widely used Section 1 bank among UK trainees. 1,500+ SBAs written by surgeons to the JCIE question-writing guidelines, mapped to the syllabus. Includes guideline summaries, timed mock tests, and performance tracker.", price: "higherfrcs.co.uk · £99 / 1 month · £109 / 3 months · £139 / 6 months" },
-      { title: "eFRCS", href: "https://www.efrcs.com", desc: "1,000 SBAs aligned closely to the FRCS syllabus. Revision notes accompany every question. Includes a daily-updated histogram showing your score relative to other active candidates. Best value platform.", price: "efrcs.com · ~£35 / 4 months · Best value" },
-      { title: "BMJ OnExamination", href: "https://www.onexamination.com/products/frcs-general-surgery", desc: "Large bank of SBAs curated by the BMJ editorial team, not divided into sub-specialties — genuine exam feel. Offline mobile app. Many NHS hospital libraries hold institutional licences — check before paying.", price: "onexamination.com · ~£72 / 3 months · Check your NHS library first" },
-      { title: "FRCS Companion", href: "https://www.frcscompanion.com", desc: "750+ SBAs written by the textbook authors, closely approximating the real exam. Notably includes high-quality CT scans and skin lesion images. Smaller but very high quality-per-question.", price: "frcscompanion.com · Pricing on site" },
-      { title: "Surgery Online FRCS", href: "https://www.surgeryonlinefrcs.com", desc: "The only platform covering all three stages: 393 Section 1 SBAs, 267 Section 2 viva questions with model answers, and 82 consultant interview questions.", price: "surgeryonlinefrcs.com · S1: £45–60 / 30–90 days" },
+      { title: "Higher FRCS", href: "https://higherfrcs.co.uk", desc: "1,500+ questions closely aligned with NICE guidelines. Widely considered the closest match to exam style and difficulty. Tracks timing and cognitive fatigue.", price: "higherfrcs.co.uk · £99/1 month · £139/6 months" },
+      { title: "eFRCS", href: "https://www.efrcs.com", desc: "~1,000 questions with good syllabus breadth. Daily histogram comparing your score to other candidates is a useful benchmark of readiness.", price: "efrcs.com · £40/4 months · £50/6 months" },
+      { title: "Companion to the FRCS", href: "https://frcscompanion.com", desc: "750+ questions written by consultant examiners. Particularly strong on imaging — over 200 media resources including CT and MRI.", price: "frcscompanion.com · £45/1 month · £79/6 months" },
+      { title: "BMJ OnExamination", href: "https://www.onexamination.com/products/frcs-general-surgery", desc: "1,015+ questions. Mobile app with offline download useful for commutes and on-calls. Check your NHS library for institutional access first.", price: "onexamination.com · £69.99/3 months – £159.99/12 months" },
+      { title: "Grab the FRCS", href: "https://www.grabthefrcs.com", desc: "Covers both Section 1 (~1,000 questions) and Section 2 (~250 scenarios), with video resources and virtual classrooms.", price: "grabthefrcs.com · See website" },
+      { title: "SurgeryOnlineFRCS", href: "https://www.surgeryonlinefrcs.com", desc: "Modular and concise. Includes a Consultant Interview module (82 real NHS interview questions) — a rare and useful extra.", price: "surgeryonlinefrcs.com · See website" },
+      { title: "Higher FRCS Viva", href: "https://higherviva.co.uk", desc: "Section 2 resource with 110+ viva scenarios and model audio answers. Record your own answers and compare. Covers major subspecialties.", price: "higherviva.co.uk · See website" },
+    ],
+  },
+  {
+    label: "Courses",
+    items: [
+      { title: "Doctors Academy — Section 2 Course", href: "https://doctorsacademy.org/coursenw/dafrcs/", desc: "6-day hybrid: 4 evenings online + 2 days face-to-face in Liverpool. Running 12+ years. Mapped to JCIE blueprint. Vivas, discussions, and clinical examination with real patients.", price: "Liverpool · From ~£260" },
+      { title: "Christie–Doctors Academy Section 2", href: "https://doctorsacademy.org.uk/coursenw/cdafrcs/", desc: "6-day hybrid: 4 evenings online covering core syllabus topics, then 2 days face-to-face at The Christie. Condensed alternative to the Liverpool course.", price: "Manchester · See website" },
+      { title: "The NORTH Mock VIVA Course", href: "https://www.alsgbi.org/2025/05/02/the-north-general-surgery-frcs-mock-viva-course-leeds-17th-18th-january-2026/", desc: "2-day intensive by ALSGBI. 5-minute scenario / 5-minute feedback loops — efficient for drilling viva technique. ALSGBI members get 11.1% discount.", price: "Leeds · £450" },
+      { title: "Whipps Cross Higher Surgery Course", href: "https://www.wxhighersurgery.com", desc: "7-day programme (virtual and in-person). Runs twice yearly before February and May sittings. Vivas, clinicals, lectures. Capped numbers.", price: "London · £1,300 (Observers: £900)" },
+      { title: "PrepMedico FRCS General Surgery", href: "https://prepmedico.com/frcs-general-surgery/", desc: "Virtual course over several months with lectures and viva sessions. RCSEd-accredited. Sessions recorded. ASiT members get 10% discount.", price: "Virtual · From £850 to £1,650" },
+      { title: "RCSEd Exit Exam Course", href: "https://services.rcsed.ac.uk/events-courses/frcs-preparation-course-for-the-exit-exam-in-general-surgery", desc: "3-day, small-group viva practice. No lectures — purely practice. RCSEd-accredited.", price: "Chennai · See website" },
+      { title: "Doctors Academy — Section 1 Starter", href: "https://doctorsacademy.org/coursenw/frcsp1M25/", desc: "1–2 day course covering high-yield topics from each subspecialty with experienced consultants. Good for kickstarting revision or identifying gaps.", price: "Zoom · ~£195" },
+      { title: "RCSEd–ASGBI Webinar Series", href: "https://services.rcsed.ac.uk/professional-support-development-resources/learning-resources/webinars/rcsed-asgbi-general-surgery-frcs-series", desc: "Monthly webinars from ASGBI and RCSEd Trainee Committee. Clinical cases, viva-style questions, topic reviews. Archived recordings available.", price: "Free (RCSEd membership for archive)" },
+      { title: "Regional / Deanery Teaching Days", desc: "Check with your TPD and regional School of Surgery. Most deaneries run FRCS-specific teaching days. Free, targeted, and often underused.", price: "Free" },
     ],
   },
   {
     label: "Podcasts",
     items: [
-      { title: "Behind the Knife", href: "https://behindtheknife.org", desc: "The world's most popular surgery podcast. The ABSITE review series gives a high-yield overview of every major surgical topic. Clinical Challenges episodes are perfect for Section 2 viva prep.", price: "behindtheknife.org · Free" },
-      { title: "First Incision", href: "https://open.spotify.com/show/0eUiOazl5oIxH1Y9ivgXbP", desc: "Australian trainee-led podcast covering the FRACS general surgery exam curriculum — content maps closely to the FRCS. Series 4 (colorectal) is particularly strong.", price: "Spotify · Free" },
+      { title: "First Incision", href: "https://podcasts.apple.com/gb/podcast/first-incision/id1525453622", desc: "119 episodes structured module-by-module across the entire surgical curriculum. The most comprehensive podcast coverage available. Aus/NZ-focused but invaluable for FRCS.", price: "Apple Podcasts · Free" },
+      { title: "Scrubbing In", href: "https://podcasts.apple.com/gb/podcast/scrubbing-in/id1688991386", desc: "UK surgeons practising in the NHS. Directly aligned with UK guidelines. Strong on Emergency General Surgery algorithms. Episode 12 covers critical appraisal for Section 2.", price: "Apple Podcasts · Free" },
+      { title: "Behind The Knife", href: "https://podcasts.apple.com/gb/podcast/behind-the-knife-the-surgery-podcast/id980990143", desc: "The world's largest surgery podcast, 1,000+ episodes. ABSITE Review episodes are excellent for rapid-fire basic science. Cross-reference US guidelines with NICE.", price: "Apple Podcasts · Free" },
+      { title: "St Mark\u2019s Academic Institute Podcast", href: "https://podcasts.apple.com/gb/podcast/st-marks-hospital-podcast/id1455351827", desc: "Deep dives into colorectal topics: LARS, pouches, robotic surgery, complex fistulae. Directly relevant for colorectal subspecialty vivas.", price: "Apple Podcasts · Free" },
+      { title: "ASGBI Podcast", href: "https://asgbi.podbean.com", desc: "General surgical topics including intestinal failure, sustainability, and the BTK/ASGBI collaborative series.", price: "Podbean · Free" },
     ],
   },
   {
     label: "Key Textbooks",
     items: [
-      { title: "Colorectal Surgery — Oxford Handbook (Phillips / Clark)", href: "https://academic.oup.com/book/35846", desc: "Written as a revision tool for FRCS candidates with a colorectal special interest, mapped directly to the ACPGBI/ISCP curriculum. The closest single-source colorectal FRCS book.", price: "Oxford University Press · Paid" },
-      { title: "Colorectal Disease Journal (Wiley / ACPGBI)", desc: "The official journal of the ACPGBI. Essential reading for Section 2 viva preparation. Focus on the last 2–3 years: landmark trials, systematic reviews, and ACPGBI position statements.", price: "Wiley · Institutional access / OpenAthens" },
-      { title: "SBAs & EMIs for the General Surgery FRCS — \"The Blue Book\"", desc: "The most widely used Section 1 question book among UK trainees. Challenging questions with good breadth. Best used alongside an online bank.", price: "CRC Press · Paid" },
+      { title: "SBAs & EMIs for the General Surgery FRCS — \"The Blue Book\"", href: "https://www.amazon.co.uk/s?k=SBAs+EMIs+General+Surgery+FRCS+Molloy", desc: "Over 600 challenging questions. The most widely used SBA book for Section 1. Best used alongside an online bank.", price: "Molloy et al. · Paid" },
+      { title: "Higher FRCS: SBAs for Section 1", href: "https://www.routledge.com/Higher-FRCS-SBAs-for-Section-1-of-the-General-Surgery-FRCS-Examination/Siddiqui/p/book/9781032076126", desc: "400 SBAs mapped to current UK guidelines. More contemporary than the Blue Book. A good complement rather than replacement.", price: "Siddiqui et al. · Paid" },
+      { title: "Cracking the Intercollegiate FRCS Viva", href: "https://www.amazon.co.uk/s?k=Cracking+Intercollegiate+General+Surgery+FRCS+Viva", desc: "Essential for Section 2. Teaches you how to structure and deliver concise, examiner-friendly viva answers. About technique, not knowledge.", price: "T.Y. Tang et al. · Paid" },
+      { title: "Companion to Specialist Surgical Practice", href: "https://www.amazon.co.uk/s?k=Companion+to+Specialist+Surgical+Practice+7th", desc: "The pre-eminent 8-volume reference series. Read your subspecialty volume thoroughly. Key volumes: Core Topics in General & Emergency Surgery, Colorectal Surgery.", price: "Paterson-Brown & Garden · Paid" },
+      { title: "Bailey & Love\u2019s Short Practice of Surgery", href: "https://www.amazon.co.uk/s?k=Bailey+and+Love+Short+Practice+of+Surgery", desc: "The standard UK surgical textbook. Good for foundational concepts and breadth. Keep on the shelf — don\u2019t read cover-to-cover for the FRCS.", price: "Paid" },
+      { title: "The ABSITE Review", href: "https://www.amazon.co.uk/s?k=ABSITE+Review+Fiser", desc: "Bullet-point, high-yield summary covering the breadth of general surgery. Excellent for rapid revision. US-focused — cross-reference UK guidelines.", price: "Fiser · Paid" },
     ],
   },
   {
-    label: "Section 2 Viva Courses",
+    label: "Guidelines & Curriculum",
     items: [
-      { title: "ACPGBI FRCS Revision Day", href: "https://www.acpgbi.org.uk/education/courses/", desc: "One-day course covering the full Section 2 syllabus through structured lectures by consultant faculty. Excellent for identifying knowledge gaps 6–8 weeks before the exam.", price: "acpgbi.org.uk · Paid" },
-      { title: "RSM FRCS Section 2 Revision Day", href: "https://www.rsm.ac.uk/sections/surgery/", desc: "Annual Section 2 revision day run by experienced FRCS examiners including St Mark's Hospital faculty. CPD accredited.", price: "rsm.ac.uk · Paid" },
-      { title: "The Alpine Course", desc: "Dedicated mock viva course with small-group sessions led by consultant examiners. Particularly strong for sharpening viva delivery and structure under exam conditions.", price: "Search \"Alpine FRCS course\" · Paid" },
-    ],
-  },
-  {
-    label: "Official Curriculum & Exam Resources",
-    items: [
-      { title: "JCIE — Exam information & syllabus", href: "https://www.jcie.org.uk/general-surgery", desc: "The primary source for everything FRCS: syllabus documents, exam regulations, eligibility criteria, and blueprints. Download the current syllabus and read it in full.", price: "jcie.org.uk · Free" },
-      { title: "ISCP General Surgery Curriculum", href: "https://www.iscp.ac.uk/iscp/curriculum/general-surgery-curriculum/", desc: "The 2021 ISCP curriculum defines every CiP, index procedure, indicative number, and assessment requirement. Essential reading for ARCP preparation.", price: "iscp.ac.uk · Free" },
+      { title: "JCIE — Exam information & syllabus", href: "https://www.jcie.org.uk/content/content.aspx?ID=14", desc: "The single most important document. Defines the scope of what can be tested. Read it before you start revising.", price: "jcie.org.uk · Free" },
+      { title: "ISCP General Surgery Curriculum", href: "https://www.iscp.ac.uk/iscp/curriculum/general-surgery-curriculum/", desc: "The 2021 ISCP curriculum defines every CiP, index procedure, indicative number, and assessment requirement.", price: "iscp.ac.uk · Free" },
+      { title: "NICE Guidelines", href: "https://www.nice.org.uk/guidance", desc: "The exam is heavily NICE-aligned. Key areas: colorectal cancer, acute upper GI bleeding, gallstone disease, VTE, sepsis, major trauma.", price: "nice.org.uk · Free" },
+      { title: "EAST Guidelines", href: "https://www.east.org/education-resources/practice-management-guidelines", desc: "Evidence-based trauma guidelines. US-origin but evidence base is largely transferable.", price: "east.org · Free" },
+      { title: "WSES Guidelines", href: "https://www.wses.org.uk", desc: "Particularly useful for emergency laparotomy, complicated intra-abdominal infections, and trauma management protocols.", price: "wses.org.uk · Free" },
+      { title: "Roux Group Mind Maps & Resources", href: "https://rouxgroup.org.uk/frcs_revision/", desc: "Free mind maps covering FRCS syllabus topics from the trainee section of AUGIS. Key paper summaries and guideline digests for Upper GI.", price: "rouxgroup.org.uk · Free" },
+      { title: "Radiopaedia", href: "https://radiopaedia.org", desc: "Essential companion for imaging. Review radiological appearances of common surgical pathology — CT, MRI, and plain film interpretation.", price: "radiopaedia.org · Free" },
     ],
   },
 ]
@@ -630,20 +649,20 @@ export default function ExamsPage() {
 
           {/* Recommended resources dropdown */}
           <AnimatedSection delay={200} className="mt-14">
-            <div className="bg-navy/70 border border-navy-foreground/20 rounded-lg overflow-hidden">
+            <div className="bg-primary/90 border border-primary-foreground/20 rounded-lg overflow-hidden">
               <button
                 onClick={() => setResourcesOpen(!resourcesOpen)}
-                className="w-full flex items-center justify-between px-6 py-5 cursor-pointer hover:bg-navy-foreground/[0.04] transition-colors"
+                className="w-full flex items-center justify-between px-6 py-5 cursor-pointer hover:bg-primary-foreground/[0.04] transition-colors"
               >
                 <div className="flex items-center gap-3.5">
                   <Layers size={20} className="text-gold" />
-                  <span className="font-sans text-lg text-navy-foreground">Dukes&apos; Club Recommended Resources</span>
+                  <span className="font-sans text-lg text-primary-foreground">Dukes&apos; Club Recommended Resources</span>
                 </div>
                 <ChevronDown size={18} className={cn("text-gold transition-transform duration-300", resourcesOpen && "rotate-180")} />
               </button>
 
               {resourcesOpen && (
-                <div className="border-t border-navy-foreground/10 px-6 pb-7 space-y-9">
+                <div className="border-t border-primary-foreground/10 px-6 pb-7 space-y-9">
                   {resourceCategories.map((cat) => (
                     <div key={cat.label} className="pt-7">
                       <p className="font-sans text-[0.72rem] font-bold uppercase tracking-[0.1em] text-gold mb-3.5">{cat.label}</p>
@@ -655,17 +674,17 @@ export default function ExamsPage() {
                                 <p className="font-sans text-[0.85rem] font-bold text-white leading-tight">{item.title}</p>
                                 {item.href && <ExternalLink size={13} className="text-gold shrink-0 mt-0.5" />}
                               </div>
-                              <p className="font-sans text-[0.78rem] text-navy-foreground/70 leading-relaxed mb-2.5">{item.desc}</p>
-                              <p className={cn("font-sans text-[0.68rem] font-semibold tracking-wide", item.price?.includes("£") ? "text-gold/70" : "text-navy-foreground/50")}>{item.price}</p>
+                              <p className="font-sans text-[0.78rem] text-primary-foreground/70 leading-relaxed mb-2.5">{item.desc}</p>
+                              <p className={cn("font-sans text-[0.68rem] font-semibold tracking-wide", item.price?.includes("£") ? "text-gold/70" : "text-primary-foreground/50")}>{item.price}</p>
                             </>
                           )
                           return item.href ? (
                             <a key={item.title} href={item.href} target="_blank" rel="noopener noreferrer"
-                              className="block bg-navy-foreground/[0.07] border border-navy-foreground/[0.18] rounded-lg px-4 py-3.5 hover:border-gold/40 hover:bg-navy-foreground/[0.11] transition-all">
+                              className="block bg-primary-foreground/[0.07] border border-primary-foreground/[0.18] rounded-lg px-4 py-3.5 hover:border-gold/40 hover:bg-primary-foreground/[0.11] transition-all">
                               {inner}
                             </a>
                           ) : (
-                            <div key={item.title} className="bg-navy-foreground/[0.07] border border-navy-foreground/[0.18] rounded-lg px-4 py-3.5">
+                            <div key={item.title} className="bg-primary-foreground/[0.07] border border-primary-foreground/[0.18] rounded-lg px-4 py-3.5">
                               {inner}
                             </div>
                           )

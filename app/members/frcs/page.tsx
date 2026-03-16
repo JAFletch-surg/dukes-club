@@ -3,7 +3,10 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { FileText, BookOpen, GraduationCap, ExternalLink, Trophy, Target, Flame, TrendingUp, ArrowRight, Loader2, Users, Lock, Clock } from "lucide-react";
+import {
+  FileText, BookOpen, GraduationCap, ExternalLink, Trophy, Target, Flame,
+  TrendingUp, ArrowRight, Loader2, Users, Lock, Clock, ChevronRight,
+} from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
 import { isQuestionBankTrialExpired, getTrialDaysRemaining } from "@/lib/membership-gates";
 import { useEffect, useState, useMemo } from "react";
@@ -45,7 +48,7 @@ const resources = [
     title: "Viva Preparation",
     description: "Structured clinical scenarios and model answers for viva practice.",
     icon: BookOpen,
-    badge: "30+ scenarios",
+    badge: "Coming soon",
     link: null,
     available: false,
   },
@@ -58,12 +61,12 @@ const resources = [
     available: false,
   },
   {
-    title: "External Resources",
-    description: "Curated links to courses, question banks, and revision materials.",
+    title: "Revision Resources Guide",
+    description: "Curated question banks, courses, podcasts, textbooks, and study advice for the FRCS.",
     icon: ExternalLink,
-    badge: "Updated",
-    link: null,
-    available: false,
+    badge: "New",
+    link: "/members/frcs/resources",
+    available: true,
   },
 ];
 
@@ -294,6 +297,7 @@ const FRCSResources = () => {
   const totalAttempted = userStats?.total_attempted || 0;
   const streakDays = userStats?.current_streak_days || 0;
   const categories = ["Colorectal", "General Surgery", "Foundations"] as const;
+  const isQBankLocked = trialExpired;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -364,39 +368,48 @@ const FRCSResources = () => {
       {/* Resource Cards */}
       <div className="grid sm:grid-cols-2 gap-4">
         {resources.map((resource) => {
-          const isQBankLocked = resource.title === 'Question Bank' && trialExpired;
-          const isAvailable = resource.available && !isQBankLocked;
-          const Wrapper = isAvailable ? Link : "div";
-          const wrapperProps = isAvailable ? { href: resource.link! } : {};
+          const isQBank = resource.title === "Question Bank";
+          const locked = isQBank && isQBankLocked;
+          const isAvailable = locked ? false : resource.available;
+          const href = locked ? "/members/profile" : resource.link;
+          const Wrapper = isAvailable || locked ? Link : "div";
+          const wrapperProps = (isAvailable || locked) ? { href: href! } : {};
           const badgeText = resource.badgeType === 'count' ? `${questionCount}+ Qs` : resource.badge;
           return (
             <Wrapper key={resource.title} {...(wrapperProps as any)}>
-              <Card className={`border h-full transition-shadow ${isAvailable ? "hover:shadow-md cursor-pointer" : "opacity-70"}`}>
+              <Card className={`border h-full transition-shadow ${isAvailable ? "hover:shadow-md cursor-pointer" : locked ? "opacity-80" : "opacity-70"}`}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-navy/10 flex items-center justify-center">
-                      {isQBankLocked ? (
+                      {locked ? (
                         <Lock size={20} className="text-muted-foreground" />
                       ) : (
                         <resource.icon size={20} className="text-navy" />
                       )}
                     </div>
-                    {isQBankLocked ? (
+                    {locked ? (
                       <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800">Trial Ended</Badge>
+                    ) : resource.badge === "New" ? (
+                      <Badge className="text-[10px] bg-gold/15 text-gold border-gold/30" variant="outline">{badgeText}</Badge>
                     ) : (
-                      <Badge variant={isAvailable ? "default" : "secondary"} className="text-[10px]">
+                      <Badge variant={resource.available ? "default" : "secondary"} className="text-[10px]">
                         {badgeText}
                       </Badge>
                     )}
                   </div>
                   <h3 className="text-base font-semibold text-foreground">{resource.title}</h3>
                   <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{resource.description}</p>
-                  {isQBankLocked && (
+                  {locked && (
                     <p className="text-xs text-amber-700 mt-3">
-                      <a href="/members/profile" className="underline font-medium">Add your ACPGBI number</a> to regain access
+                      <span className="underline font-medium">Add your ACPGBI number</span> to regain access
                     </p>
                   )}
-                  {!resource.available && !isQBankLocked && (
+                  {isAvailable && (
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-primary mt-3 hover:underline">
+                      {isQBank ? "Go to Question Bank" : "Browse Resources"} <ChevronRight size={14} />
+                    </span>
+                  )}
+                  {!isAvailable && !locked && (
                     <p className="text-xs text-muted-foreground/60 mt-3 italic">Coming soon</p>
                   )}
                 </CardContent>
