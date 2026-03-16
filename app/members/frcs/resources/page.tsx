@@ -273,7 +273,7 @@ const companionSeries: TextbookResource[] = [
     authors: "Paterson-Brown & Garden (Editors), 8 volumes",
     url: "https://www.amazon.co.uk/s?k=Companion+to+Specialist+Surgical+Practice+7th",
     description: "The pre-eminent reference series. Mainly used for Section 2 and deepening understanding. Read your subspecialty volume thoroughly. Key volumes include Core Topics in General and Emergency Surgery (human factors, perioperative care, evaluating surgical literature) and Colorectal Surgery (7th Ed., Clark & Tozer).",
-    coverIsbn: "9780702084744",
+    coverIsbn: "0702085014",
   },
 ];
 
