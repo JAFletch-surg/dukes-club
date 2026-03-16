@@ -178,8 +178,10 @@ const podcasts: PodcastResource[] = [
   {
     title: "St Mark\u2019s Academic Institute Podcast",
     url: "https://stmarksacademicinstitute.org.uk/resource-type/podcasts/",
+    appleId: 1455351827,
     links: [
-      { label: "Podcasts", url: "https://stmarksacademicinstitute.org.uk/resource-type/podcasts/" },
+      { label: "Apple Podcasts", url: "https://podcasts.apple.com/gb/podcast/st-marks-hospital-podcast/id1455351827" },
+      { label: "Website", url: "https://stmarksacademicinstitute.org.uk/resource-type/podcasts/" },
     ],
     description: "Deep dives into colorectal topics: LARS, pouches, robotic surgery, complex fistulae. Directly relevant for colorectal subspecialty vivas. The catalogue is relatively small — don\u2019t expect comprehensive syllabus coverage, but what\u2019s there is high quality.",
     price: "Free",
@@ -228,7 +230,7 @@ const guidelines: Resource[] = [
   },
 ];
 
-type TextbookResource = Resource & { authors?: string; coverIsbn?: string };
+type TextbookResource = Resource & { authors?: string; coverIsbn?: string; coverOlid?: string };
 
 const sbaVivaBooks: TextbookResource[] = [
   {
@@ -243,7 +245,7 @@ const sbaVivaBooks: TextbookResource[] = [
     authors: "Siddiqui et al.",
     url: "https://www.routledge.com/Higher-FRCS-SBAs-for-Section-1-of-the-General-Surgery-FRCS-Examination/Siddiqui/p/book/9781032076126",
     description: "400 SBAs mapped to current UK guidelines. More contemporary than the Blue Book. A good complement rather than replacement.",
-    coverIsbn: "9781032076126",
+    coverOlid: "OL39683649M",
   },
   {
     title: "FRCS General Surgery: 500 SBAs and EMIs — \"The Green Book\"",
@@ -321,7 +323,7 @@ const referenceTexts: TextbookResource[] = [
     authors: "Fischer / Ellison",
     url: "https://www.amazon.co.uk/s?k=Mastery+of+Surgery+Fischer",
     description: "Two-volume operative manual. Useful when you need step-by-step procedure descriptions for viva preparation around operative technique.",
-    coverIsbn: "9781975176433",
+    coverOlid: "OL25061514M",
   },
 ];
 
@@ -370,7 +372,7 @@ function ResourceCard({ resource, location }: { resource: Resource; location?: s
   );
 }
 
-function BookCoverImage({ isbn, title }: { isbn: string; title: string }) {
+function BookCoverImage({ isbn, olid, title }: { isbn?: string; olid?: string; title: string }) {
   const [failed, setFailed] = useState(false);
 
   const fallback = (
@@ -379,11 +381,15 @@ function BookCoverImage({ isbn, title }: { isbn: string; title: string }) {
     </div>
   );
 
-  if (failed) return fallback;
+  if (failed || (!isbn && !olid)) return fallback;
+
+  const src = olid
+    ? `https://covers.openlibrary.org/b/olid/${olid}-L.jpg`
+    : `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
 
   return (
     <img
-      src={`https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`}
+      src={src}
       alt={title}
       className="w-[100px] sm:w-[120px] h-[150px] sm:h-[175px] shrink-0 rounded-lg object-cover shadow-md bg-muted"
       onError={() => setFailed(true)}
@@ -430,8 +436,8 @@ function TextbookCard({ book }: { book: TextbookResource }) {
   return (
     <Card className="border h-full transition-shadow hover:shadow-md">
       <CardContent className="p-5 flex gap-4 h-full">
-        {book.coverIsbn && (
-          <BookCoverImage isbn={book.coverIsbn} title={book.title} />
+        {(book.coverIsbn || book.coverOlid) && (
+          <BookCoverImage isbn={book.coverIsbn} olid={book.coverOlid} title={book.title} />
         )}
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex items-start justify-between mb-1">
