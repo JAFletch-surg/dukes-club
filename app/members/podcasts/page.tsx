@@ -1,9 +1,10 @@
 'use client'
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Mic, Search, Clock, Calendar, X, Headphones, ChevronDown, ChevronUp, Loader } from "lucide-react";
 import { useSupabaseTable } from "@/lib/use-supabase-table";
+import { createClient } from "@/lib/supabase/client";
 
 const podcastTagOptions = ["Cancer", "IBD", "Pelvic Floor", "Robotic", "Emergency", "Education", "Research"];
 
@@ -25,6 +26,28 @@ export default function Podcasts() {
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [podcastGuestNames, setPodcastGuestNames] = useState<Record<string, string>>({});
+
+  // Load podcast_faculty with faculty names
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('podcast_faculty').select('podcast_id, faculty:faculty_id(full_name)').then(({ data }: any) => {
+      const map: Record<string, string[]> = {}
+      ;(data || []).forEach((pf: any) => {
+        const name = pf.faculty?.full_name
+        if (!name) return
+        if (!map[pf.podcast_id]) map[pf.podcast_id] = []
+        map[pf.podcast_id].push(name)
+      })
+      const nameMap: Record<string, string> = {}
+      for (const [id, names] of Object.entries(map)) {
+        nameMap[id] = names.join(', ')
+      }
+      setPodcastGuestNames(nameMap)
+    })
+  }, [])
+
+  const getGuestDisplay = (podcast: any) => podcastGuestNames[podcast.id] || podcast.guest_name || '';
 
   const toggleTag = (tag: string) =>
     setSelectedTags((p) => (p.includes(tag) ? p.filter((t) => t !== tag) : [...p, tag]));
@@ -33,14 +56,15 @@ export default function Podcasts() {
     return allPodcasts
       .filter((p: any) => p.status === 'published')
       .filter((p: any) => {
+        const guestDisplay = getGuestDisplay(p)
         const matchesSearch = !search ||
           p.title?.toLowerCase().includes(search.toLowerCase()) ||
-          p.guest_name?.toLowerCase().includes(search.toLowerCase());
+          guestDisplay.toLowerCase().includes(search.toLowerCase());
         const matchesTags = selectedTags.length === 0 ||
           selectedTags.some((t) => (p.subspecialties || []).includes(t));
         return matchesSearch && matchesTags;
       });
-  }, [allPodcasts, search, selectedTags]);
+  }, [allPodcasts, search, selectedTags, podcastGuestNames]);
 
   if (loading) {
     return (
@@ -116,8 +140,8 @@ export default function Podcasts() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
-                      {podcast.guest_name && <span>{podcast.guest_name}</span>}
-                      {podcast.guest_name && podcast.published_at && <span>·</span>}
+                      {getGuestDisplay(podcast) && <span>{getGuestDisplay(podcast)}</span>}
+                      {getGuestDisplay(podcast) && podcast.published_at && <span>·</span>}
                       {podcast.published_at && (
                         <span className="flex items-center gap-1">
                           <Calendar size={10} />

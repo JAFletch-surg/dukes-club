@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
+import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
@@ -71,122 +72,6 @@ function normaliseTimetable(raw: any, startsAt?: string): TimetableDay[] {
 function serialiseTimetable(days: TimetableDay[]): TimetableDay[] | null {
   const nonEmpty = days.filter(d => d.entries.length > 0)
   return nonEmpty.length > 0 ? nonEmpty : null
-}
-
-/* ── Searchable Faculty Picker ──────────────────── */
-function FacultySearch({ faculty, assigned, onAdd }: {
-  faculty: any[]
-  assigned: { faculty_id: string; role: string }[]
-  onAdd: (id: string) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const available = faculty.filter(f => {
-    if (assigned.some(af => af.faculty_id === f.id)) return false
-    if (!query) return true
-    const q = query.toLowerCase()
-    return (
-      f.full_name?.toLowerCase().includes(q) ||
-      f.hospital?.toLowerCase().includes(q) ||
-      f.position_title?.toLowerCase().includes(q)
-    )
-  })
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        border: '1.5px solid #D1D1D6', borderRadius: 10, padding: '0 12px',
-        background: '#fff',
-        ...(open ? { borderColor: '#7C3AED', boxShadow: '0 0 0 3px rgba(124,58,237,0.1)' } : {}),
-      }}>
-        <Search size={15} color="#999" style={{ flexShrink: 0 }} />
-        <input
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          placeholder="Search faculty by name, hospital, or role..."
-          style={{
-            width: '100%', padding: '10px 0', border: 'none', fontSize: 14,
-            color: '#000', background: 'transparent', outline: 'none',
-            fontFamily: 'Montserrat, sans-serif',
-          }}
-        />
-        {query && (
-          <button type="button" onClick={() => { setQuery(''); setOpen(false) }}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#999', padding: 2, flexShrink: 0 }}>
-            <X size={14} />
-          </button>
-        )}
-      </div>
-
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-          marginTop: 4, background: '#fff', border: '1.5px solid #D1D1D6',
-          borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
-          maxHeight: 240, overflowY: 'auto',
-        }}>
-          {available.length === 0 ? (
-            <div style={{ padding: '16px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
-              {query ? 'No matching faculty found' : 'All faculty have been assigned'}
-            </div>
-          ) : (
-            available.slice(0, 20).map(f => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => { onAdd(f.id); setQuery(''); setOpen(false) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                  padding: '10px 14px', border: 'none', background: 'none',
-                  cursor: 'pointer', textAlign: 'left', fontSize: 13,
-                  borderBottom: '1px solid #F1F1F3', transition: 'background 0.1s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#F8F5FF')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-              >
-                {f.photo_url ? (
-                  <img src={f.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                ) : (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%', background: '#059669',
-                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 700, flexShrink: 0,
-                  }}>
-                    {f.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '?'}
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: '#181820', lineHeight: 1.3 }}>{f.full_name}</div>
-                  <div style={{ fontSize: 11, color: '#888', lineHeight: 1.3, marginTop: 1 }}>
-                    {[f.position_title, f.hospital].filter(Boolean).join(' · ') || 'Faculty'}
-                  </div>
-                </div>
-                <Plus size={14} color="#7C3AED" style={{ flexShrink: 0 }} />
-              </button>
-            ))
-          )}
-          {available.length > 20 && (
-            <div style={{ padding: '8px 14px', textAlign: 'center', color: '#999', fontSize: 11 }}>
-              Type to narrow down {available.length} results...
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
 }
 
 const S = {
@@ -677,15 +562,18 @@ export default function EventsAdmin() {
                 )}
                 <div>
                   <label style={S.label}>Add Faculty Member</label>
-                  <FacultySearch
+                  <FacultyPicker
                     faculty={faculty}
-                    assigned={form.assigned_faculty}
+                    selectedIds={form.assigned_faculty.map(af => af.faculty_id)}
                     onAdd={(id) => {
                       if (form.assigned_faculty.some(af => af.faculty_id === id)) { showToast('Already assigned', 'error'); return }
                       setForm({ ...form, assigned_faculty: [...form.assigned_faculty, { faculty_id: id, role: 'Faculty' }] })
                     }}
+                    onRemove={(id) => setForm({ ...form, assigned_faculty: form.assigned_faculty.filter(af => af.faculty_id !== id) })}
+                    onFacultyCreated={(f) => setFaculty(prev => [...prev, f].sort((a, b) => a.full_name.localeCompare(b.full_name)))}
+                    showChips={false}
                   />
-                  <p style={S.hint}>Search by name, hospital, or role. Manage faculty via the <a href="/admin/faculty" style={{ color: '#2563EB', textDecoration: 'underline' }}>Faculty admin page</a>.</p>
+                  <p style={S.hint}>Search by name, hospital, or role. Can&apos;t find someone? Use the search to add a new faculty member inline.</p>
                 </div>
               </div>
 
