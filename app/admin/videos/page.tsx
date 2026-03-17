@@ -5,6 +5,7 @@ import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload,
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
+import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 
 /* ── Constants ───────────────────────────────────── */
 const VIDEO_CATEGORIES = ['Operative', 'Complications', 'Webinar', 'Education', 'Lecture', 'Endoscopy', 'Conference']
@@ -78,6 +79,7 @@ export default function AdminVideosPage() {
   /* ── Faculty state ──────────────────────────────── */
   const [facultyList, setFacultyList] = useState<FacultyMember[]>([])
   const [selectedFacultyIds, setSelectedFacultyIds] = useState<string[]>([])
+  const [editFacultyId, setEditFacultyId] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -575,6 +577,7 @@ export default function AdminVideosPage() {
                   onAdd={(id) => setSelectedFacultyIds(prev => [...prev, id])}
                   onRemove={(id) => setSelectedFacultyIds(prev => prev.filter(fid => fid !== id))}
                   onFacultyCreated={(f) => setFacultyList(prev => [...prev, f].sort((a, b) => a.full_name.localeCompare(b.full_name)))}
+                  onEdit={(id) => setEditFacultyId(id)}
                 />
                 <p style={S.hint}>Search by name, hospital, or role. Can&apos;t find someone? Use the search to add a new faculty member inline.</p>
               </div>
@@ -725,6 +728,15 @@ export default function AdminVideosPage() {
           </div>
         </div>
       )}
+
+      <EditFacultyDialog
+        open={!!editFacultyId}
+        facultyId={editFacultyId}
+        onClose={() => setEditFacultyId(null)}
+        onUpdated={(updated) => {
+          setFacultyList(prev => prev.map(f => f.id === updated.id ? { ...f, ...updated } : f))
+        }}
+      />
     </div>
   )
 }

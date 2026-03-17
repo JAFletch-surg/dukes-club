@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Search, Plus, X, UserPlus } from 'lucide-react'
+import { Search, Plus, X, UserPlus, Pencil } from 'lucide-react'
 import { CreateFacultyDialog, type FacultyMember } from './create-faculty-dialog'
 
 interface FacultyPickerProps {
@@ -10,13 +10,14 @@ interface FacultyPickerProps {
   onAdd: (id: string) => void
   onRemove: (id: string) => void
   onFacultyCreated: (f: FacultyMember) => void
+  onEdit?: (id: string) => void
   placeholder?: string
   showChips?: boolean  // default true — set false when parent renders its own selected list
 }
 
 export { type FacultyMember } from './create-faculty-dialog'
 
-export function FacultyPicker({ faculty, selectedIds, onAdd, onRemove, onFacultyCreated, placeholder, showChips = true }: FacultyPickerProps) {
+export function FacultyPicker({ faculty, selectedIds, onAdd, onRemove, onFacultyCreated, onEdit, placeholder, showChips = true }: FacultyPickerProps) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -65,6 +66,8 @@ export function FacultyPicker({ faculty, selectedIds, onAdd, onRemove, onFaculty
               </div>
             )}
             <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{f?.full_name || 'Unknown'}</span>
+            {onEdit && <button type="button" onClick={() => onEdit(id)} title="Edit faculty profile"
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#7C3AED', padding: 4 }}><Pencil size={14} /></button>}
             <button type="button" onClick={() => onRemove(id)}
               style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
           </div>
