@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare } from 'lucide-react'
+import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
+import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
@@ -95,6 +96,7 @@ export default function EventsAdmin() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('')
+  const [editFacultyId, setEditFacultyId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
@@ -554,6 +556,8 @@ export default function EventsAdmin() {
                             <option value="Speaker">Speaker</option>
                             <option value="Panellist">Panellist</option>
                           </select>
+                          <button type="button" onClick={() => setEditFacultyId(af.faculty_id)} title="Edit faculty profile"
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#7C3AED', padding: 4 }}><Pencil size={14} /></button>
                           <button type="button" onClick={() => setForm({ ...form, assigned_faculty: form.assigned_faculty.filter((_, j) => j !== i) })}
                             style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
                         </div>
@@ -878,6 +882,16 @@ export default function EventsAdmin() {
           </div>
         </div>
       )}
+
+      <EditFacultyDialog
+        open={!!editFacultyId}
+        facultyId={editFacultyId}
+        onClose={() => setEditFacultyId(null)}
+        onUpdated={(updated) => {
+          setFaculty(prev => prev.map(f => f.id === updated.id ? { ...f, ...updated } : f))
+          showToast('Faculty profile updated')
+        }}
+      />
     </div>
   )
 }
