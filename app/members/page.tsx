@@ -410,18 +410,18 @@ const MembersDashboard = () => {
                     <Link
                       key={video.id}
                       href="/members/videos"
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors overflow-hidden"
+                      className="group flex rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
                     >
-                      <div className="w-16 h-11 rounded-md bg-navy flex items-center justify-center shrink-0 overflow-hidden">
+                      <div className="w-20 h-20 shrink-0 bg-navy flex items-center justify-center overflow-hidden">
                         {video.thumbnail_url ? (
-                          <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                          <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         ) : (
-                          <Play size={14} className="text-navy-foreground" />
+                          <Play size={18} className="text-navy-foreground" />
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{video.title}</p>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="p-3 flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-gold transition-colors">{video.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
                           {video.speaker}{durStr ? ` · ${durStr}` : ''}{video.category ? ` · ${video.category}` : ''}
                         </p>
                       </div>
@@ -455,14 +455,14 @@ const MembersDashboard = () => {
                   <Link
                     key={event.id}
                     href={`/events/${event.slug}`}
-                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors overflow-hidden"
+                    className="group flex rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
                   >
-                    <div className="w-11 h-11 rounded-md bg-gold/10 flex items-center justify-center shrink-0">
-                      <Calendar size={16} className="text-gold" />
+                    <div className="w-20 h-20 shrink-0 bg-gold/10 flex items-center justify-center">
+                      <Calendar size={22} className="text-gold" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 overflow-hidden">
+                    <div className="p-3 flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-gold transition-colors">{event.title}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 overflow-hidden">
                         <span className="shrink-0">{formatDate(event.starts_at)}</span>
                         <span className="shrink-0">·</span>
                         <span className="flex items-center gap-1 truncate">
