@@ -208,7 +208,7 @@ const MembersDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl overflow-hidden">
+    <div className="space-y-6 max-w-6xl w-full overflow-hidden">
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
@@ -410,7 +410,7 @@ const MembersDashboard = () => {
                     <Link
                       key={video.id}
                       href="/members/videos"
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors"
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors overflow-hidden"
                     >
                       <div className="w-16 h-11 rounded-md bg-navy flex items-center justify-center shrink-0 overflow-hidden">
                         {video.thumbnail_url ? (
@@ -455,18 +455,18 @@ const MembersDashboard = () => {
                   <Link
                     key={event.id}
                     href={`/events/${event.slug}`}
-                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors"
+                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors overflow-hidden"
                   >
                     <div className="w-11 h-11 rounded-md bg-gold/10 flex items-center justify-center shrink-0">
                       <Calendar size={16} className="text-gold" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{formatDate(event.starts_at)}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <MapPin size={10} />
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 overflow-hidden">
+                        <span className="shrink-0">{formatDate(event.starts_at)}</span>
+                        <span className="shrink-0">·</span>
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin size={10} className="shrink-0" />
                           {event.location?.split(",")[0]}
                         </span>
                       </div>
@@ -501,14 +501,14 @@ const MembersDashboard = () => {
           ) : latestNews.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No news articles yet</p>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-3 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 sm:space-y-0">
               {latestNews.map((post) => (
                 <Link
                   key={post.id}
                   href={`/news/${post.slug}`}
-                  className="group block rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
+                  className="group flex sm:block rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
                 >
-                  <div className="aspect-[16/9] bg-muted relative overflow-hidden">
+                  <div className="w-20 h-20 shrink-0 sm:w-full sm:h-auto sm:aspect-[16/9] bg-muted relative overflow-hidden">
                     {post.featured_image_url ? (
                       <img src={post.featured_image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     ) : (
@@ -522,13 +522,13 @@ const MembersDashboard = () => {
                       </span>
                     )}
                   </div>
-                  <div className="p-3">
+                  <div className="p-3 flex-1 min-w-0">
                     {post.category && (
                       <span className="text-[10px] font-bold uppercase tracking-wider text-gold">{post.category}</span>
                     )}
                     <p className="text-sm font-semibold text-foreground mt-0.5 line-clamp-2 group-hover:text-gold transition-colors">{post.title}</p>
                     {post.excerpt && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{post.excerpt}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 hidden sm:block">{post.excerpt}</p>
                     )}
                     <div className="flex items-center gap-2 mt-2 text-[11px] text-muted-foreground">
                       {post.author_name && <span>{post.author_name}</span>}
