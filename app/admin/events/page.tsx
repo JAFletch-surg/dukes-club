@@ -15,7 +15,8 @@ const SUBSPECIALTIES = [
   'Cancer - Colon','Cancer - Rectal','Cancer - Anal','Cancer - Advanced',
   'Peritoneal Malignancy','IBD','Abdominal Wall','Pelvic Floor',
   'Proctology','Fistula','Intestinal Failure','Emergency','Trauma',
-  'Research','Endoscopy','Training','Radiology','Robotic','Laparoscopic',
+  'Research','Endoscopy','Training','Radiology','Anatomy','Evidence-based Medicine','Pilonidal',
+  'Robotic','Laparoscopic',
   'Open','TAMIS','General',
 ]
 

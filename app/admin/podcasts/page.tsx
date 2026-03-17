@@ -10,7 +10,8 @@ const STATUSES = ['draft', 'published', 'archived']
 const TAGS = [
   'Cancer','Rectal Cancer','IBD','Pelvic Floor','Robotic','Laparoscopic',
   'Intestinal Failure','Proctology','Fistula','Emergency','Upper GI','HPB',
-  'Endocrine','Breast','Trauma','Education','Research','Career',
+  'Endocrine','Breast','Trauma','Anatomy','Evidence-based Medicine','Pilonidal',
+  'Education','Research','Career','Miscellaneous',
 ]
 
 const S = {

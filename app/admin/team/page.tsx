@@ -5,7 +5,7 @@ import { UserCheck, Plus, Edit, Trash2, Save, Loader, X, ImageIcon } from 'lucid
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { useImageUpload } from '@/lib/use-image-upload'
 
-const EXEC_ROLES = ['President','Vice-President','Past-President','Secretary','Treasurer','Web Master','IBD Lead','Abdominal Wall / Intestinal Failure Lead','Pelvic Floor Lead','Proctology Lead','Endoscopy Lead','ASiT Representative','Research Lead','Advanced Cancer Lead','Training and Education Lead','Communications Officer','Events Coordinator','Regional Representative','Robotics Lead']
+const EXEC_ROLES = ['President','Vice-President','Past-President','Secretary','Treasurer','Web Master','IBD Lead','Abdominal Wall / Intestinal Failure Lead','Pelvic Floor Lead','Proctology Lead','Endoscopy Lead','Emergency General Surgery Lead','ASiT Representative','Research Lead','Advanced Cancer Lead','Training and Education Lead','Communications Officer','Events Coordinator','Regional Representative','Robotics Lead']
 const UK_REGIONS = ['North East','North West (Mersey)','North West (North Western)','Yorkshire and the Humber','East Midlands','West Midlands','East of England','London','Kent, Surrey and Sussex','Thames Valley','Wessex','South West (Peninsula)','South West (Severn)','Scotland','Wales','Northern Ireland','Republic of Ireland']
 
 function PhotoUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
