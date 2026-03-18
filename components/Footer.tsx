@@ -59,7 +59,8 @@ const Footer = () => {
         </div>
 
         <div className="mt-10 pt-6 border-t border-navy-foreground/10 text-center text-xs text-navy-foreground/40">
-          © {new Date().getFullYear()} Dukes' Club. All rights reserved.
+          <p>© {new Date().getFullYear()} Dukes&apos; Club. All rights reserved.</p>
+          <p className="mt-1">Designed by Jordan Fletcher</p>
         </div>
       </div>
     </footer>
