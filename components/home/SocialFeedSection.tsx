@@ -1,93 +1,47 @@
-'use client'
-
-import { useEffect, useRef } from 'react'
 import { Twitter, Instagram, Linkedin } from 'lucide-react'
 
 const TWITTER_HANDLE = 'dukes_club'
 const INSTAGRAM_HANDLE = 'the_dukesclub'
 const LINKEDIN_URL = 'https://www.linkedin.com/in/the-dukes-club-4a3492327/'
 
-function TwitterEmbed() {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://platform.twitter.com/widgets.js'
-    script.async = true
-    ref.current?.appendChild(script)
-  }, [])
-
-  return (
-    <div ref={ref} className="min-h-[400px]">
-      <a
-        className="twitter-timeline"
-        data-height="500"
-        data-theme="dark"
-        data-chrome="noheader nofooter noborders transparent"
-        href={`https://twitter.com/${TWITTER_HANDLE}`}
-      >
-        Loading tweets...
-      </a>
-    </div>
-  )
-}
-
-function InstagramEmbed() {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://www.instagram.com/embed.js'
-    script.async = true
-    ref.current?.appendChild(script)
-    return () => {
-      if ((window as any).instgrm) {
-        (window as any).instgrm.Embeds.process()
-      }
-    }
-  }, [])
-
-  return (
-    <div ref={ref} className="min-h-[400px] flex items-center justify-center">
-      <blockquote
-        className="instagram-media"
-        data-instgrm-permalink={`https://www.instagram.com/${INSTAGRAM_HANDLE}/`}
-        data-instgrm-version="14"
-        style={{
-          background: 'transparent',
-          border: 0,
-          margin: '0 auto',
-          maxWidth: '100%',
-          width: '100%',
-          padding: 0,
-        }}
-      >
-        <a href={`https://www.instagram.com/${INSTAGRAM_HANDLE}/`}>Loading Instagram...</a>
-      </blockquote>
-    </div>
-  )
-}
-
-function LinkedInEmbed() {
+function SocialCard({
+  icon: Icon,
+  color,
+  name,
+  handle,
+  description,
+  href,
+  buttonLabel,
+}: {
+  icon: typeof Twitter
+  color: string
+  name: string
+  handle: string
+  description: string
+  href: string
+  buttonLabel: string
+}) {
   return (
     <div className="min-h-[400px] flex flex-col items-center justify-center rounded-lg border border-navy-foreground/10 bg-navy-foreground/5 p-8 text-center">
-      <div className="p-3 rounded-full bg-[#0A66C2]/10 mb-4">
-        <Linkedin size={28} className="text-[#0A66C2]" />
+      <div className={`p-3 rounded-full mb-4`} style={{ backgroundColor: `${color}15` }}>
+        <Icon size={28} style={{ color }} />
       </div>
-      <h3 className="text-lg font-semibold text-navy-foreground mb-2">
-        Dukes&apos; Club on LinkedIn
+      <h3 className="text-lg font-semibold text-navy-foreground mb-1">
+        {name}
       </h3>
+      <p className="text-sm text-navy-foreground/40 mb-3">{handle}</p>
       <p className="text-sm text-navy-foreground/60 mb-5 max-w-xs">
-        Follow us for updates on training opportunities, research fellowships, and career development.
+        {description}
       </p>
       <a
-        href={LINKEDIN_URL}
+        href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0A66C2] text-white text-sm font-semibold hover:bg-[#094d92] transition-colors"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold transition-colors hover:opacity-90"
+        style={{ backgroundColor: color }}
       >
-        <Linkedin size={16} />
-        Follow on LinkedIn
+        <Icon size={16} />
+        {buttonLabel}
       </a>
     </div>
   )
@@ -126,17 +80,35 @@ const SocialFeedSection = () => {
           </a>
         </div>
 
-        {/* Embedded feeds */}
+        {/* Social cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="rounded-lg overflow-hidden">
-            <TwitterEmbed />
-          </div>
-          <div className="rounded-lg overflow-hidden">
-            <InstagramEmbed />
-          </div>
-          <div className="rounded-lg overflow-hidden">
-            <LinkedInEmbed />
-          </div>
+          <SocialCard
+            icon={Twitter}
+            color="#1DA1F2"
+            name="Dukes' Club on X"
+            handle={`@${TWITTER_HANDLE}`}
+            description="Follow us for the latest updates, event highlights, and community news."
+            href={`https://twitter.com/${TWITTER_HANDLE}`}
+            buttonLabel="Follow on X"
+          />
+          <SocialCard
+            icon={Instagram}
+            color="#E4405F"
+            name="Dukes' Club on Instagram"
+            handle={`@${INSTAGRAM_HANDLE}`}
+            description="Behind-the-scenes, event photos, and stories from our community."
+            href={`https://instagram.com/${INSTAGRAM_HANDLE}`}
+            buttonLabel="Follow on Instagram"
+          />
+          <SocialCard
+            icon={Linkedin}
+            color="#0A66C2"
+            name="Dukes' Club on LinkedIn"
+            handle="The Dukes' Club"
+            description="Follow us for updates on training opportunities, research fellowships, and career development."
+            href={LINKEDIN_URL}
+            buttonLabel="Follow on LinkedIn"
+          />
         </div>
       </div>
     </section>
