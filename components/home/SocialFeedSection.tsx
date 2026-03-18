@@ -3,9 +3,9 @@
 import { useEffect, useRef } from 'react'
 import { Twitter, Instagram, Linkedin } from 'lucide-react'
 
-const TWITTER_HANDLE = 'DukesClubUK'
-const INSTAGRAM_HANDLE = 'dukesclubuk'
-const LINKEDIN_URL = 'https://www.linkedin.com/company/dukes-club'
+const TWITTER_HANDLE = 'dukes_club'
+const INSTAGRAM_HANDLE = 'the_dukesclub'
+const LINKEDIN_URL = 'https://www.linkedin.com/in/the-dukes-club-4a3492327/'
 
 function TwitterEmbed() {
   const ref = useRef<HTMLDivElement>(null)
