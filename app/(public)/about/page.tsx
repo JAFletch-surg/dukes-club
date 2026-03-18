@@ -2,8 +2,10 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
-import { ChevronDown, MapPin, User, FileText, Download, BookOpen } from "lucide-react";
+import { ChevronDown, MapPin, User, FileText, Download, BookOpen, Twitter, Instagram, Linkedin, Youtube, Music2, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type SocialLink = { platform: string; url: string; handle: string };
 
 type CommitteeMember = {
   id: string;
@@ -17,7 +19,41 @@ type CommitteeMember = {
   is_active: boolean;
   social_media_tag: string | null;
   social_media_url: string | null;
+  social_links: SocialLink[] | null;
 };
+
+const SOCIAL_ICON_MAP: Record<string, React.ElementType> = {
+  twitter: Twitter,
+  linkedin: Linkedin,
+  instagram: Instagram,
+  youtube: Youtube,
+  tiktok: Music2,
+  website: Globe,
+};
+
+function SocialIcons({ links, size = 16, className = "" }: { links: SocialLink[]; size?: number; className?: string }) {
+  if (!links || links.length === 0) return null;
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      {links.filter(l => l.url).map((link, i) => {
+        const Icon = SOCIAL_ICON_MAP[link.platform] || Globe;
+        return (
+          <a
+            key={i}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-navy-foreground/50 hover:text-gold transition-colors"
+            title={link.handle || link.platform}
+          >
+            <Icon size={size} />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 
 const AnimatedSection = ({
   children,
@@ -95,6 +131,9 @@ const CommitteeCard = ({
               <span className="truncate">{member.region}</span>
             </div>
           )}
+          {member.social_links && member.social_links.length > 0 && (
+            <SocialIcons links={member.social_links} size={14} className="mt-1.5" />
+          )}
         </div>
       </div>
       {/* Mobile expandable statement */}
@@ -148,10 +187,13 @@ const CommitteeCard = ({
             {member.role}
           </span>
           {member.region && (
-            <div className="flex items-center justify-center gap-1.5 text-sm text-navy-foreground/60 mb-4">
+            <div className="flex items-center justify-center gap-1.5 text-sm text-navy-foreground/60 mb-2">
               <MapPin size={13} className="text-gold shrink-0" />
               <span>{member.region}</span>
             </div>
+          )}
+          {member.social_links && member.social_links.length > 0 && (
+            <SocialIcons links={member.social_links} size={16} className="justify-center mb-4" />
           )}
 
           {/* Expandable statement */}

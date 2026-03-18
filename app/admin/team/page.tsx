@@ -1,9 +1,83 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { UserCheck, Plus, Edit, Trash2, Save, Loader, X, ImageIcon } from 'lucide-react'
+import { UserCheck, Plus, Edit, Trash2, Save, Loader, X, ImageIcon, Twitter, Instagram, Linkedin, Globe, Youtube, Music2 } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { useImageUpload } from '@/lib/use-image-upload'
+
+const SOCIAL_PLATFORMS = [
+  { value: 'twitter', label: 'Twitter / X', icon: Twitter, placeholder: 'https://twitter.com/username' },
+  { value: 'linkedin', label: 'LinkedIn', icon: Linkedin, placeholder: 'https://linkedin.com/in/username' },
+  { value: 'instagram', label: 'Instagram', icon: Instagram, placeholder: 'https://instagram.com/username' },
+  { value: 'youtube', label: 'YouTube', icon: Youtube, placeholder: 'https://youtube.com/@channel' },
+  { value: 'tiktok', label: 'TikTok', icon: Music2, placeholder: 'https://tiktok.com/@username' },
+  { value: 'website', label: 'Website', icon: Globe, placeholder: 'https://example.com' },
+] as const
+
+type SocialLink = { platform: string; url: string; handle: string }
+
+function SocialLinksEditor({ value, onChange }: { value: SocialLink[]; onChange: (links: SocialLink[]) => void }) {
+  const addLink = () => onChange([...value, { platform: 'twitter', url: '', handle: '' }])
+  const removeLink = (i: number) => onChange(value.filter((_, idx) => idx !== i))
+  const updateLink = (i: number, field: keyof SocialLink, val: string) => {
+    const updated = [...value]
+    updated[i] = { ...updated[i], [field]: val }
+    onChange(updated)
+  }
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-2">Social Media Links</label>
+      {value.length === 0 && (
+        <p className="text-xs text-gray-400 mb-2">No social links added yet.</p>
+      )}
+      <div className="space-y-3">
+        {value.map((link, i) => {
+          const platform = SOCIAL_PLATFORMS.find(p => p.value === link.platform) || SOCIAL_PLATFORMS[0]
+          const Icon = platform.icon
+          return (
+            <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="flex items-center gap-2 mb-2">
+                <Icon size={14} className="text-gray-500 shrink-0" />
+                <select
+                  className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  value={link.platform}
+                  onChange={(e) => updateLink(i, 'platform', e.target.value)}
+                >
+                  {SOCIAL_PLATFORMS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => removeLink(i)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600">
+                  <X size={14} />
+                </button>
+              </div>
+              <input
+                className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm mb-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                value={link.url}
+                onChange={(e) => updateLink(i, 'url', e.target.value)}
+                placeholder={platform.placeholder}
+              />
+              <input
+                className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                value={link.handle}
+                onChange={(e) => updateLink(i, 'handle', e.target.value)}
+                placeholder="@handle (optional)"
+              />
+            </div>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={addLink}
+        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-gray-300 rounded-lg text-xs text-gray-600 hover:border-gray-400 hover:text-gray-700"
+      >
+        <Plus size={12} /> Add social link
+      </button>
+    </div>
+  )
+}
 
 const EXEC_ROLES = ['President','Vice-President','Past-President','Secretary','Treasurer','Web Master','IBD Lead','Abdominal Wall / Intestinal Failure Lead','Pelvic Floor Lead','Proctology Lead','Endoscopy Lead','Emergency General Surgery Lead','ASiT Representative','Research Lead','Advanced Cancer Lead','Training and Education Lead','Communications Officer','Events Coordinator','Regional Representative','Robotics Lead']
 const UK_REGIONS = ['North East','North West (Mersey)','North West (North Western)','Yorkshire and the Humber','East Midlands','West Midlands','East of England','London','Kent, Surrey and Sussex','Thames Valley','Wessex','South West (Peninsula)','South West (Severn)','Scotland','Wales','Northern Ireland','Republic of Ireland']
@@ -46,12 +120,12 @@ export default function TeamAdmin() {
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const showToast = (msg: string, type = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
-  const emptyForm = { full_name: '', role: 'Regional Representative' as string, region: 'Mersey' as string, statement: '', email: '', sort_order: 0, is_active: true, photo_url: '', social_media_tag: '', social_media_url: '' }
+  const emptyForm = { full_name: '', role: 'Regional Representative' as string, region: 'Mersey' as string, statement: '', email: '', sort_order: 0, is_active: true, photo_url: '', social_links: [] as SocialLink[] }
   const [form, setForm] = useState(emptyForm)
 
   const openNew = () => { setForm(emptyForm); setEditing('new') }
   const openEdit = (m: any) => {
-    setForm({ full_name: m.full_name || '', role: m.role || 'Regional Representative', region: m.region || 'Mersey', statement: m.statement || '', email: m.email || '', sort_order: m.sort_order || 0, is_active: m.is_active ?? true, photo_url: m.photo_url || '', social_media_tag: m.social_media_tag || '', social_media_url: m.social_media_url || '' })
+    setForm({ full_name: m.full_name || '', role: m.role || 'Regional Representative', region: m.region || 'Mersey', statement: m.statement || '', email: m.email || '', sort_order: m.sort_order || 0, is_active: m.is_active ?? true, photo_url: m.photo_url || '', social_links: Array.isArray(m.social_links) ? m.social_links : [] })
     setEditing(m.id)
   }
 
@@ -167,7 +241,7 @@ export default function TeamAdmin() {
                 <div><label className="block text-xs font-semibold text-gray-700 mb-1">Region</label><select className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>{UK_REGIONS.map((r) => <option key={r}>{r}</option>)}</select></div>
               </div>
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">Email</label><input type="email" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-xs font-semibold text-gray-700 mb-1">Social Media Handle</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.social_media_tag} onChange={(e) => setForm({ ...form, social_media_tag: e.target.value })} placeholder="@username" /></div><div><label className="block text-xs font-semibold text-gray-700 mb-1">Social Media URL</label><input className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.social_media_url} onChange={(e) => setForm({ ...form, social_media_url: e.target.value })} placeholder="https://twitter.com/..." /></div></div>
+              <SocialLinksEditor value={form.social_links} onChange={(links) => setForm({ ...form, social_links: links })} />
               <div><label className="block text-xs font-semibold text-gray-700 mb-1">Statement / Bio</label><textarea className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.statement} onChange={(e) => setForm({ ...form, statement: e.target.value })} /></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className="block text-xs font-semibold text-gray-700 mb-1">Sort Order</label><input type="number" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} /></div>
