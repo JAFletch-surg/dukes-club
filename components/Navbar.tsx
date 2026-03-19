@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogIn } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
 
 const navLinks = [
@@ -69,13 +69,31 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile Toggle */}
-        <button
-          className="lg:hidden text-navy-foreground"
-          onClick={() => setMobileOpen(!mobileOpen)}
-        >
-          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        {/* Mobile: Login + Toggle */}
+        <div className="lg:hidden flex items-center gap-2">
+          {!loading && (
+            user ? (
+              <Link href="/members">
+                <Button variant="gold" size="sm" className="text-xs px-3 py-1.5 h-auto">
+                  Members
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button variant="gold" size="sm" className="text-xs px-3 py-1.5 h-auto gap-1.5">
+                  <LogIn size={14} />
+                  Login
+                </Button>
+              </Link>
+            )
+          )}
+          <button
+            className="text-navy-foreground"
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
+            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}

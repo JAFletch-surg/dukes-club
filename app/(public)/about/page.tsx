@@ -2,8 +2,10 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
-import { ChevronDown, MapPin, User, FileText, Download, BookOpen } from "lucide-react";
+import { ChevronDown, MapPin, User, FileText, Download, BookOpen, Twitter, Instagram, Linkedin, Youtube, Music2, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type SocialLink = { platform: string; url: string; handle: string };
 
 type CommitteeMember = {
   id: string;
@@ -17,7 +19,41 @@ type CommitteeMember = {
   is_active: boolean;
   social_media_tag: string | null;
   social_media_url: string | null;
+  social_links: SocialLink[] | null;
 };
+
+const SOCIAL_ICON_MAP: Record<string, React.ElementType> = {
+  twitter: Twitter,
+  linkedin: Linkedin,
+  instagram: Instagram,
+  youtube: Youtube,
+  tiktok: Music2,
+  website: Globe,
+};
+
+function SocialIcons({ links, size = 16, className = "" }: { links: SocialLink[]; size?: number; className?: string }) {
+  if (!links || links.length === 0) return null;
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      {links.filter(l => l.url).map((link, i) => {
+        const Icon = SOCIAL_ICON_MAP[link.platform] || Globe;
+        return (
+          <a
+            key={i}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-navy-foreground/50 hover:text-gold transition-colors"
+            title={link.handle || link.platform}
+          >
+            <Icon size={size} />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 
 const AnimatedSection = ({
   children,
@@ -74,28 +110,53 @@ const CommitteeCard = ({
       <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/80 to-transparent pointer-events-none" />
 
       {/* Mobile: horizontal compact layout */}
-      <div className="relative z-10 flex items-center gap-3 p-3 sm:hidden">
-        <div className="w-16 h-16 shrink-0 rounded-full bg-navy-foreground/10 flex items-center justify-center overflow-hidden shadow-md">
-          {member.photo_url ? (
-            <img src={member.photo_url} alt={member.full_name} className="w-full h-full object-cover" />
-          ) : (
-            <User className="text-gold/60" size={28} />
-          )}
+      <div className="relative z-10 p-3 sm:hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-16 h-16 shrink-0 rounded-full bg-navy-foreground/10 flex items-center justify-center overflow-hidden shadow-md">
+            {member.photo_url ? (
+              <img src={member.photo_url} alt={member.full_name} className="w-full h-full object-cover" />
+            ) : (
+              <User className="text-gold/60" size={28} />
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-sans font-semibold text-navy-foreground leading-tight truncate">
+              {member.full_name}
+            </h3>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gold/20 text-gold inline-block mt-1">
+              {member.role}
+            </span>
+            {member.region && (
+              <div className="flex items-center gap-1 text-xs text-navy-foreground/60 mt-0.5">
+                <MapPin size={10} className="text-gold shrink-0" />
+                <span className="truncate">{member.region}</span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h3 className="text-sm font-sans font-semibold text-navy-foreground leading-tight truncate">
-            {member.full_name}
-          </h3>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gold/20 text-gold inline-block mt-1">
-            {member.role}
-          </span>
-          {member.region && (
-            <div className="flex items-center gap-1 text-xs text-navy-foreground/60 mt-0.5">
-              <MapPin size={10} className="text-gold shrink-0" />
-              <span className="truncate">{member.region}</span>
-            </div>
-          )}
-        </div>
+        {member.social_links && member.social_links.length > 0 && (
+          <div className="flex items-center gap-2 mt-2.5 pl-1">
+            {member.social_links.filter(l => l.url).map((link, i) => {
+              const Icon = SOCIAL_ICON_MAP[link.platform] || Globe;
+              return (
+                <a
+                  key={i}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy-foreground/10 text-navy-foreground/60 hover:bg-gold/20 hover:text-gold transition-colors"
+                  title={link.handle || link.platform}
+                >
+                  <Icon size={13} />
+                  {link.handle && (
+                    <span className="text-[11px] font-medium">{link.handle}</span>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
       {/* Mobile expandable statement */}
       {member.statement && (
@@ -148,10 +209,13 @@ const CommitteeCard = ({
             {member.role}
           </span>
           {member.region && (
-            <div className="flex items-center justify-center gap-1.5 text-sm text-navy-foreground/60 mb-4">
+            <div className="flex items-center justify-center gap-1.5 text-sm text-navy-foreground/60 mb-2">
               <MapPin size={13} className="text-gold shrink-0" />
               <span>{member.region}</span>
             </div>
+          )}
+          {member.social_links && member.social_links.length > 0 && (
+            <SocialIcons links={member.social_links} size={16} className="justify-center mb-4" />
           )}
 
           {/* Expandable statement */}

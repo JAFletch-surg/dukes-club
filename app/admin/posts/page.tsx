@@ -17,7 +17,7 @@ const SUBSPECIALTIES = [
   'Robotic','Laparoscopic','Open','TAMIS','Cancer','Rectal Cancer','Advanced Cancer',
   'Peritoneal Malignancy','Anal Cancer','IBD','Intestinal Failure','Pelvic Floor',
   'Proctology','Fistula','Emergency','Trauma','Abdominal Wall Reconstruction','Endoscopy',
-  'Training','Research','General',
+  'Training','Research','Anatomy','Evidence-based Medicine','Pilonidal','Miscellaneous','General',
 ]
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Video, HelpCircle, Calendar, BarChart3, Play, MapPin, ArrowRight, Clock, Check, X as XIcon, Loader2, AlertCircle, Award, MessageSquare, ExternalLink, ShieldCheck } from "lucide-react";
+import { Video, HelpCircle, Calendar, BarChart3, Play, MapPin, ArrowRight, Clock, Check, X as XIcon, Loader2, AlertCircle, Award, MessageSquare, ExternalLink, ShieldCheck, Newspaper } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +28,7 @@ const MembersDashboard = () => {
   const [questionStats, setQuestionStats] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [videoStats, setVideoStats] = useState<{ completedCount: number; minutesWatched: number } | null>(null);
+  const [latestNews, setLatestNews] = useState<any[]>([]);
 
   useEffect(() => {
     // Don't fetch until auth has resolved on the client
@@ -78,6 +79,17 @@ const MembersDashboard = () => {
 
         if (videosErr) console.error('[Dashboard] Videos error:', videosErr.message);
         if (videos) setLatestVideos(videos);
+
+        // Fetch latest published news posts
+        const { data: news, error: newsErr } = await supabase
+          .from('posts')
+          .select('id, title, slug, excerpt, category, featured_image_url, author_name, published_at, is_featured')
+          .eq('status', 'published')
+          .order('published_at', { ascending: false })
+          .limit(4);
+
+        if (newsErr) console.error('[Dashboard] News error:', newsErr.message);
+        if (news) setLatestNews(news);
 
         // Fetch user's event bookings and question stats
         if (user) {
@@ -196,7 +208,7 @@ const MembersDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl overflow-hidden">
+    <div className="space-y-6 max-w-6xl w-full overflow-hidden">
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
@@ -398,18 +410,18 @@ const MembersDashboard = () => {
                     <Link
                       key={video.id}
                       href="/members/videos"
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors"
+                      className="group flex rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
                     >
-                      <div className="w-16 h-11 rounded-md bg-navy flex items-center justify-center shrink-0 overflow-hidden">
+                      <div className="w-20 h-20 shrink-0 bg-navy flex items-center justify-center overflow-hidden">
                         {video.thumbnail_url ? (
-                          <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                          <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                         ) : (
-                          <Play size={14} className="text-navy-foreground" />
+                          <Play size={18} className="text-navy-foreground" />
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{video.title}</p>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="p-3 flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-gold transition-colors">{video.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
                           {video.speaker}{durStr ? ` · ${durStr}` : ''}{video.category ? ` · ${video.category}` : ''}
                         </p>
                       </div>
@@ -443,18 +455,18 @@ const MembersDashboard = () => {
                   <Link
                     key={event.id}
                     href={`/events/${event.slug}`}
-                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors"
+                    className="group flex rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
                   >
-                    <div className="w-11 h-11 rounded-md bg-gold/10 flex items-center justify-center shrink-0">
-                      <Calendar size={16} className="text-gold" />
+                    <div className="w-20 h-20 shrink-0 bg-gold/10 flex items-center justify-center">
+                      <Calendar size={22} className="text-gold" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{formatDate(event.starts_at)}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <MapPin size={10} />
+                    <div className="p-3 flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-gold transition-colors">{event.title}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 overflow-hidden">
+                        <span className="shrink-0">{formatDate(event.starts_at)}</span>
+                        <span className="shrink-0">·</span>
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin size={10} className="shrink-0" />
                           {event.location?.split(",")[0]}
                         </span>
                       </div>
@@ -476,6 +488,67 @@ const MembersDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Latest News */}
+      <Card className="border">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Newspaper size={18} className="text-muted-foreground" />
+            <h2 className="text-lg font-semibold text-foreground">Latest News</h2>
+          </div>
+          {loadingData ? (
+            <p className="text-sm text-muted-foreground py-4">Loading...</p>
+          ) : latestNews.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No news articles yet</p>
+          ) : (
+            <div className="space-y-3 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 sm:space-y-0">
+              {latestNews.map((post) => (
+                <Link
+                  key={post.id}
+                  href={`/news/${post.slug}`}
+                  className="group flex sm:block rounded-xl border border-border overflow-hidden hover:shadow-md transition-all"
+                >
+                  <div className="w-20 h-20 shrink-0 sm:w-full sm:h-auto sm:aspect-[16/9] bg-muted relative overflow-hidden">
+                    {post.featured_image_url ? (
+                      <img src={post.featured_image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-navy/5">
+                        <Newspaper size={24} className="text-muted-foreground/40" />
+                      </div>
+                    )}
+                    {post.is_featured && (
+                      <span className="absolute top-2 left-2 bg-gold text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Featured
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 flex-1 min-w-0">
+                    {post.category && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gold">{post.category}</span>
+                    )}
+                    <p className="text-sm font-semibold text-foreground mt-0.5 line-clamp-2 group-hover:text-gold transition-colors">{post.title}</p>
+                    {post.excerpt && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 hidden sm:block">{post.excerpt}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2 text-[11px] text-muted-foreground">
+                      {post.author_name && <span>{post.author_name}</span>}
+                      {post.author_name && post.published_at && <span>·</span>}
+                      {post.published_at && (
+                        <span>{new Date(post.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+          <Link href="/news">
+            <Button variant="ghost" size="sm" className="mt-3 w-full">
+              View All News <ArrowRight size={14} className="ml-1" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Calendar */}
       {!loadingData && (allEvents.length > 0 || calendarDates.length > 0) && (

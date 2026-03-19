@@ -373,6 +373,30 @@ CREATE POLICY "video_faculty_delete_admin"
   TO authenticated
   USING (is_admin());
 
+-- ═══════════════════════════════════════════════════════════════════
+-- TABLE: podcast_faculty
+-- ═══════════════════════════════════════════════════════════════════
+
+ALTER TABLE podcast_faculty ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "podcast_faculty_select_public" ON podcast_faculty;
+DROP POLICY IF EXISTS "podcast_faculty_insert_admin" ON podcast_faculty;
+DROP POLICY IF EXISTS "podcast_faculty_delete_admin" ON podcast_faculty;
+
+CREATE POLICY "podcast_faculty_select_public"
+  ON podcast_faculty FOR SELECT
+  USING (true);
+
+CREATE POLICY "podcast_faculty_insert_admin"
+  ON podcast_faculty FOR INSERT
+  TO authenticated
+  WITH CHECK (is_admin());
+
+CREATE POLICY "podcast_faculty_delete_admin"
+  ON podcast_faculty FOR DELETE
+  TO authenticated
+  USING (is_admin());
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SECTION 3: CONTENT TABLES
 -- ─────────────────────────────────────────────────────────────────────────────

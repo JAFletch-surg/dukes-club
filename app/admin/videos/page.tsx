@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
+import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
+import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 
 /* ── Constants ───────────────────────────────────── */
 const VIDEO_CATEGORIES = ['Operative', 'Complications', 'Webinar', 'Education', 'Lecture', 'Endoscopy', 'Conference']
@@ -12,7 +14,8 @@ const SUBSPECIALTIES = [
   'Cancer - Colon','Cancer - Rectal','Cancer - Anal','Cancer - Advanced',
   'Peritoneal Malignancy','IBD','Abdominal Wall','Pelvic Floor',
   'Proctology','Fistula','Intestinal Failure','Emergency','Trauma',
-  'Research','Endoscopy','Training','Radiology','Robotic','Laparoscopic',
+  'Research','Endoscopy','Training','Radiology','Anatomy','Evidence-based Medicine','Pilonidal',
+  'Robotic','Laparoscopic',
   'Open','TAMIS','General',
 ]
 
@@ -58,129 +61,6 @@ interface VideoRecord {
   created_at: string
 }
 
-interface FacultyMember {
-  id: string
-  full_name: string
-  photo_url: string | null
-  position_title: string | null
-  hospital: string | null
-}
-
-/* ── Searchable Faculty Picker (matches events pattern) ── */
-function FacultySearch({ faculty, selectedIds, onAdd }: {
-  faculty: FacultyMember[]
-  selectedIds: string[]
-  onAdd: (id: string) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const available = faculty.filter(f => {
-    if (selectedIds.includes(f.id)) return false
-    if (!query) return true
-    const q = query.toLowerCase()
-    return (
-      f.full_name?.toLowerCase().includes(q) ||
-      f.hospital?.toLowerCase().includes(q) ||
-      f.position_title?.toLowerCase().includes(q)
-    )
-  })
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        border: '1.5px solid #D1D1D6', borderRadius: 10, padding: '0 12px',
-        background: '#fff',
-        ...(open ? { borderColor: '#7C3AED', boxShadow: '0 0 0 3px rgba(124,58,237,0.1)' } : {}),
-      }}>
-        <Search size={15} color="#999" style={{ flexShrink: 0 }} />
-        <input
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          placeholder="Search faculty by name, hospital, or role..."
-          style={{
-            width: '100%', padding: '10px 0', border: 'none', fontSize: 14,
-            color: '#000', background: 'transparent', outline: 'none',
-            fontFamily: 'Montserrat, sans-serif',
-          }}
-        />
-        {query && (
-          <button type="button" onClick={() => { setQuery(''); setOpen(false) }}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#999', padding: 2, flexShrink: 0 }}>
-            <X size={14} />
-          </button>
-        )}
-      </div>
-
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-          marginTop: 4, background: '#fff', border: '1.5px solid #D1D1D6',
-          borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
-          maxHeight: 240, overflowY: 'auto',
-        }}>
-          {available.length === 0 ? (
-            <div style={{ padding: '16px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
-              {query ? 'No matching faculty found' : 'All faculty have been assigned'}
-            </div>
-          ) : (
-            available.slice(0, 20).map(f => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => { onAdd(f.id); setQuery(''); setOpen(false) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                  padding: '10px 14px', border: 'none', background: 'none',
-                  cursor: 'pointer', textAlign: 'left', fontSize: 13,
-                  borderBottom: '1px solid #F1F1F3', transition: 'background 0.1s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#F8F5FF')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-              >
-                {f.photo_url ? (
-                  <img src={f.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                ) : (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%', background: '#059669',
-                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 700, flexShrink: 0,
-                  }}>
-                    {f.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '?'}
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: '#181820', lineHeight: 1.3 }}>{f.full_name}</div>
-                  <div style={{ fontSize: 11, color: '#888', lineHeight: 1.3, marginTop: 1 }}>
-                    {[f.position_title, f.hospital].filter(Boolean).join(' · ') || 'Faculty'}
-                  </div>
-                </div>
-                <Plus size={14} color="#7C3AED" style={{ flexShrink: 0 }} />
-              </button>
-            ))
-          )}
-          {available.length > 20 && (
-            <div style={{ padding: '8px 14px', textAlign: 'center', color: '#999', fontSize: 11 }}>
-              Type to narrow down {available.length} results...
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 /* ═════════════════════════════════════════════════════
    MAIN ADMIN VIDEOS PAGE
    ═════════════════════════════════════════════════════ */
@@ -199,6 +79,7 @@ export default function AdminVideosPage() {
   /* ── Faculty state ──────────────────────────────── */
   const [facultyList, setFacultyList] = useState<FacultyMember[]>([])
   const [selectedFacultyIds, setSelectedFacultyIds] = useState<string[]>([])
+  const [editFacultyId, setEditFacultyId] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -690,33 +571,15 @@ export default function AdminVideosPage() {
               {/* Faculty / Speakers */}
               <div>
                 <label style={S.label}>Speakers / Faculty</label>
-                {selectedFacultyIds.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                    {selectedFacultyIds.map(id => {
-                      const f = facultyList.find(x => x.id === id)
-                      return (
-                        <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fff', border: '1px solid #E4E4E8', borderRadius: 8 }}>
-                          {f?.photo_url ? (
-                            <img src={f.photo_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
-                          ) : (
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
-                              {f?.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '?'}
-                            </div>
-                          )}
-                          <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{f?.full_name || 'Unknown'}</span>
-                          <button type="button" onClick={() => setSelectedFacultyIds(prev => prev.filter(fid => fid !== id))}
-                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                <FacultySearch
+                <FacultyPicker
                   faculty={facultyList}
                   selectedIds={selectedFacultyIds}
                   onAdd={(id) => setSelectedFacultyIds(prev => [...prev, id])}
+                  onRemove={(id) => setSelectedFacultyIds(prev => prev.filter(fid => fid !== id))}
+                  onFacultyCreated={(f) => setFacultyList(prev => [...prev, f].sort((a, b) => a.full_name.localeCompare(b.full_name)))}
+                  onEdit={(id) => setEditFacultyId(id)}
                 />
-                <p style={S.hint}>Search by name, hospital, or role. Manage faculty via the <a href="/admin/faculty" style={{ color: '#2563EB', textDecoration: 'underline' }}>Faculty admin page</a>.</p>
+                <p style={S.hint}>Search by name, hospital, or role. Can&apos;t find someone? Use the search to add a new faculty member inline.</p>
               </div>
 
               {/* Description */}
@@ -865,6 +728,15 @@ export default function AdminVideosPage() {
           </div>
         </div>
       )}
+
+      <EditFacultyDialog
+        open={!!editFacultyId}
+        facultyId={editFacultyId}
+        onClose={() => setEditFacultyId(null)}
+        onUpdated={(updated) => {
+          setFacultyList(prev => prev.map(f => f.id === updated.id ? { ...f, ...updated } : f))
+        }}
+      />
     </div>
   )
 }
