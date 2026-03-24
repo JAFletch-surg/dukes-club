@@ -1,6 +1,9 @@
 title: "Dukes' Club Docs"
 remote_theme: just-the-docs/just-the-docs
 
+plugins:
+  - jekyll-remote-theme
+
 permalink: pretty
 
 exclude:
