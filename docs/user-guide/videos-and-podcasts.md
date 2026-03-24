@@ -1,3 +1,9 @@
+---
+title: Videos & Podcasts
+parent: User Guide
+nav_order: 6
+---
+
 # Videos & Podcasts
 
 ## Videos

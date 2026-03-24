@@ -1,3 +1,9 @@
+---
+title: Getting Started
+parent: Admin Guide
+nav_order: 1
+---
+
 # Getting Started
 
 ## Accessing the Admin Panel

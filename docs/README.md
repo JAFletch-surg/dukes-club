@@ -1,3 +1,8 @@
+---
+title: Overview
+nav_order: 2
+---
+
 # The Dukes' Club Documentation
 
 Welcome to The Dukes' Club platform documentation.

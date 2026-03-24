@@ -1,3 +1,9 @@
+---
+title: Member Portal
+parent: User Guide
+nav_order: 4
+---
+
 # Member Portal
 
 After logging in, you can access the member portal at `/members`.

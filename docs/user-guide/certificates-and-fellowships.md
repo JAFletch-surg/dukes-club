@@ -1,3 +1,9 @@
+---
+title: Certificates & Fellowships
+parent: User Guide
+nav_order: 8
+---
+
 # Certificates & Fellowships
 
 ## Certificates

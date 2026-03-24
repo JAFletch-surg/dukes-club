@@ -1,3 +1,9 @@
+---
+title: FRCS Exam Preparation
+parent: User Guide
+nav_order: 7
+---
+
 # FRCS Exam Preparation
 
 ## Exam Hub

@@ -1,3 +1,9 @@
+---
+title: Events
+parent: User Guide
+nav_order: 5
+---
+
 # Events
 
 ## Browsing Events

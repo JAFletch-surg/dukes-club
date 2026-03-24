@@ -1,3 +1,9 @@
+---
+title: Membership Tiers
+parent: User Guide
+nav_order: 2
+---
+
 # Membership Tiers
 
 | Tier              | How to get it                                     | What you can access                                                                                          |

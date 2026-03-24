@@ -1,3 +1,9 @@
+---
+title: Content
+parent: Admin Guide
+nav_order: 3
+---
+
 # Content
 
 ## News & Posts
