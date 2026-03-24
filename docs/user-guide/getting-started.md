@@ -18,9 +18,7 @@ nav_order: 1
 
 ## Auto-Approval
 
-{% hint style="info" %}
-If you register with an **NHS** (.nhs.net, .nhs.uk), **doctors.org.uk**, or **.ac.uk** email address, your account is approved automatically as a Trainee. Other email domains require manual admin approval, which typically takes 1–2 working days.
-{% endhint %}
+> **Note:** If you register with an **NHS** (.nhs.net, .nhs.uk), **doctors.org.uk**, or **.ac.uk** email address, your account is approved automatically as a Trainee. Other email domains require manual admin approval, which typically takes 1–2 working days.
 
 ## Logging In
 

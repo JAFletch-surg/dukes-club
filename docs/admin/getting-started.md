@@ -10,9 +10,7 @@ nav_order: 1
 
 Navigate to `/admin` in your browser. You must be logged in with an **admin** or **super\_admin** role to access the panel.
 
-{% hint style="warning" %}
-The [Members](people.md#members) page is further restricted to **admin** and **super\_admin** roles only. Editors cannot access member management.
-{% endhint %}
+> **Warning:** The [Members](people.md#members) page is further restricted to **admin** and **super\_admin** roles only. Editors cannot access member management.
 
 ## Dashboard Overview
 

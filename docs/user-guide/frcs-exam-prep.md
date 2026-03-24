@@ -23,15 +23,8 @@ Practice with 1,000+ MCQs covering Colorectal, General Surgery, and Foundations 
 
 ### Practice Modes
 
-{% tabs %}
-{% tab title="Untimed Practice" %}
-Answer questions with immediate feedback and explanations after each question. Ideal for learning and revision.
-{% endtab %}
-
-{% tab title="Exam Simulation" %}
-Timed test with no feedback until the end. Simulates real exam conditions.
-{% endtab %}
-{% endtabs %}
+* **Untimed Practice** — Answer questions with immediate feedback and explanations after each question. Ideal for learning and revision.
+* **Exam Simulation** — Timed test with no feedback until the end. Simulates real exam conditions.
 
 ### Features
 
@@ -42,9 +35,7 @@ Timed test with no feedback until the end. Simulates real exam conditions.
 
 ### Access
 
-{% hint style="warning" %}
-**Trainees** get a 7-day free trial. **Full Members** (with verified ACPGBI number) get unlimited access. Add your ACPGBI number in your [Profile](member-portal.md#acpgbi-membership) to upgrade.
-{% endhint %}
+> **Warning:** **Trainees** get a 7-day free trial. **Full Members** (with verified ACPGBI number) get unlimited access. Add your ACPGBI number in your [Profile](member-portal.md#acpgbi-membership) to upgrade.
 
 ## Resources
 

@@ -9,8 +9,8 @@ Welcome to The Dukes' Club platform documentation.
 
 ## Who is this for?
 
-{% tabs %}
-{% tab title="Members & Visitors" %}
+### Members & Visitors
+
 The **User Guide** covers everything you need as a site visitor or member:
 
 * Creating an account and getting approved
@@ -19,10 +19,10 @@ The **User Guide** covers everything you need as a site visitor or member:
 * Managing your profile and privacy settings
 * Certificates, fellowships, directory, and messaging
 
-👉 [Start with the User Guide](user-guide/getting-started.md)
-{% endtab %}
+[Start with the User Guide](user-guide/getting-started.md)
 
-{% tab title="Site Administrators" %}
+### Site Administrators
+
 The **Admin Guide** covers managing the platform:
 
 * Dashboard overview and navigation
@@ -32,9 +32,7 @@ The **Admin Guide** covers managing the platform:
 * Approving members, managing faculty, and the executive team
 * Institutions and sponsors
 
-👉 [Start with the Admin Guide](admin/getting-started.md)
-{% endtab %}
-{% endtabs %}
+[Start with the Admin Guide](admin/getting-started.md)
 
 ## Quick links
 

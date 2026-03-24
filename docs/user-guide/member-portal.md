@@ -25,9 +25,7 @@ Update your name, hospital, region, training stage, subspecialty interests, and 
 * Enter your ACPGBI membership number to unlock [Full Member](membership-tiers.md) access.
 * Status shows as **Full Member** (verified), **Pending Verification**, or a prompt to submit your number.
 
-{% hint style="warning" %}
-Without a verified ACPGBI number, access to the question bank expires after a 7-day trial and in-person course booking is unavailable.
-{% endhint %}
+> **Warning:** Without a verified ACPGBI number, access to the question bank expires after a 7-day trial and in-person course booking is unavailable.
 
 ### Privacy Settings
 

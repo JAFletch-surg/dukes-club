@@ -31,9 +31,7 @@ The content editor includes a toolbar with:
 * **Links** — Insert hyperlinks.
 * **Alignment** — Left, centre, right text alignment.
 
-{% hint style="info" %}
-Use the **preview** button (eye icon) to see how the post will look before publishing.
-{% endhint %}
+> **Note:** Use the **preview** button (eye icon) to see how the post will look before publishing.
 
 ### Author
 
@@ -62,9 +60,7 @@ The quickest way to populate the library:
    * **Archives** records for videos that have been removed from Vimeo.
 3. A summary toast shows: created, updated, skipped, archived, and total counts.
 
-{% hint style="success" %}
-**Tip:** Run Vimeo Sync regularly to keep the library up to date. New uploads to Vimeo are automatically pulled in.
-{% endhint %}
+> **Tip:** Run Vimeo Sync regularly to keep the library up to date. New uploads to Vimeo are automatically pulled in.
 
 ### Manual Video Entry
 

@@ -14,9 +14,7 @@ Download your certificates from the certificates page.
 * Each certificate shows: event title, certificate type, date issued, CPD points (if applicable), and a verification code.
 * Click **Download** to save the certificate as a PDF.
 
-{% hint style="info" %}
-If you have pending feedback to complete, a banner at the top of the page links you to the relevant feedback form. Complete the feedback to unlock your certificate.
-{% endhint %}
+> **Note:** If you have pending feedback to complete, a banner at the top of the page links you to the relevant feedback form. Complete the feedback to unlock your certificate.
 
 ## Fellowships
 

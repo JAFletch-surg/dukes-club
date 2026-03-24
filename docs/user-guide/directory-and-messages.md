@@ -16,9 +16,7 @@ Find other members from the directory page.
 * Click **Message** to send a direct message (if the member allows it).
 * Your own card is marked with a "You" label.
 
-{% hint style="info" %}
-Only members who have enabled directory visibility in their [Privacy Settings](member-portal.md#privacy-settings) appear here. Update your own visibility from your profile.
-{% endhint %}
+> **Note:** Only members who have enabled directory visibility in their [Privacy Settings](member-portal.md#privacy-settings) appear here. Update your own visibility from your profile.
 
 ## Messages
 

@@ -10,9 +10,7 @@ nav_order: 5
 
 Approve and manage site members from the Members page.
 
-{% hint style="warning" %}
-This page is restricted to **admin** and **super\_admin** roles only.
-{% endhint %}
+> **Warning:** This page is restricted to **admin** and **super\_admin** roles only.
 
 ### Member Approval Workflow
 
@@ -22,9 +20,7 @@ This page is restricted to **admin** and **super\_admin** roles only.
 4. **Approve** — Sets the status to "Approved" and the role to "Trainee". An approval email is sent automatically.
 5. **Reject** — Sets the status to "Rejected".
 
-{% hint style="info" %}
-Users with NHS (.nhs.net, .nhs.uk), doctors.org.uk, or .ac.uk email addresses are auto-approved at registration. They will not appear in the Pending list.
-{% endhint %}
+> **Note:** Users with NHS (.nhs.net, .nhs.uk), doctors.org.uk, or .ac.uk email addresses are auto-approved at registration. They will not appear in the Pending list.
 
 ### Verification
 
@@ -76,9 +72,7 @@ Faculty profiles are linked to:
 * **Podcasts** — As guests.
 * **Posts** — As authors.
 
-{% hint style="success" %}
-When you add a new faculty member here, they become immediately available in the faculty picker across all these sections.
-{% endhint %}
+> **Tip:** When you add a new faculty member here, they become immediately available in the faculty picker across all these sections.
 
 ---
 
