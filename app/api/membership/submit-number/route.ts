@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { adminMembershipNumberEmail } from '@/lib/emails/templates'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'contact@dukesclub.org.uk'
 
 function getSupabase() {

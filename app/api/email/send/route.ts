@@ -18,7 +18,7 @@ function getSupabase() {
   )
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
 
 type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration'
 
