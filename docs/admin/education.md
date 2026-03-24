@@ -48,9 +48,7 @@ Members can flag questions they believe have issues. Flags appear in the admin p
 | Duplicate        | The question is a repeat                           |
 | Other            | Any other issue                                    |
 
-{% hint style="warning" %}
-Review flagged questions regularly and either update the question or dismiss the flag. Unresolved flags affect member trust in the question bank.
-{% endhint %}
+> **Warning:** Review flagged questions regularly and either update the question or dismiss the flag. Unresolved flags affect member trust in the question bank.
 
 ### Search and Filter
 
@@ -92,15 +90,8 @@ Manage fellowship programme listings from the Fellowships page.
 
 ### Supervisor / Lead
 
-{% tabs %}
-{% tab title="Database Mode" %}
-Search the [Faculty database](people.md#faculty) and select an existing profile. Use this when the supervisor is already in your system.
-{% endtab %}
-
-{% tab title="Manual Mode" %}
-Type in names directly. Use this for external supervisors who are not in the Faculty database.
-{% endtab %}
-{% endtabs %}
+* **Database Mode** — Search the [Faculty database](people.md#faculty) and select an existing profile. Use this when the supervisor is already in your system.
+* **Manual Mode** — Type in names directly. Use this for external supervisors who are not in the Faculty database.
 
 Toggle between modes using the DB/Manual switch.
 

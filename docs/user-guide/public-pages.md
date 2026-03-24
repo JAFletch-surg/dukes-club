@@ -20,9 +20,7 @@ Learn about the club's mission, view executive committee profiles, download gove
 
 Browse upcoming events in **list** or **calendar** view. Filter by event type (Webinar, Workshop, Conference, etc.), subspecialty, or search by keyword. Each event card shows the date, location, price, and capacity.
 
-{% hint style="info" %}
-To register for events you need to be logged in. See [Events](events.md) for full details on booking and applications.
-{% endhint %}
+> **Note:** To register for events you need to be logged in. See [Events](events.md) for full details on booking and applications.
 
 ## News
 

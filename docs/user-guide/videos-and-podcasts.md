@@ -15,9 +15,7 @@ Access the video library from the member portal. Browse operative videos, lectur
 * **Watch** directly on the page (Vimeo embed).
 * **Track progress** — the system records which videos you have watched.
 
-{% hint style="info" %}
-Videos are members-only content. You must be logged in with an approved account to access the video library.
-{% endhint %}
+> **Note:** Videos are members-only content. You must be logged in with an approved account to access the video library.
 
 ## Podcasts
 

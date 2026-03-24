@@ -16,15 +16,15 @@ Click an event to see full details: description, timetable (single or multi-day)
 
 ## Registering for Events
 
-{% tabs %}
-{% tab title="Online Events" %}
+#### Online Events
+
 **Webinars and Online Lectures:**
 
 1. Click **Register for Webinar**.
 2. Once approved, a join button and meeting details (Zoom link, Meeting ID, Passcode) appear on the event page.
-{% endtab %}
 
-{% tab title="Application-Based Events" %}
+#### Application-Based Events
+
 **Workshops and In Person Courses:**
 
 1. Fill in the application form (motivation statement, answers to custom questions).
@@ -32,14 +32,12 @@ Click an event to see full details: description, timetable (single or multi-day)
 3. Check your status: Pending → Approved / Rejected / Waitlisted.
 4. You will receive an email when your status changes.
 5. If approved, confirm your attendance.
-{% endtab %}
 
-{% tab title="Full Member Events" %}
+#### Full Member Events
+
 **In-person courses for Full Members:**
 
 Some in-person courses require a verified ACPGBI membership number. Add your number in your [Profile](member-portal.md#acpgbi-membership) to gain access.
-{% endtab %}
-{% endtabs %}
 
 ## Cancelling
 

@@ -55,9 +55,7 @@ Choose from the **stock image library** (surgical theatre, conference room, lapa
 
 ### Streaming Configuration
 
-{% hint style="info" %}
-Streaming settings are only available for **Webinar**, **Online Lecture**, and **Hybrid** event types.
-{% endhint %}
+> **Note:** Streaming settings are only available for **Webinar**, **Online Lecture**, and **Hybrid** event types.
 
 * **Stream Type** — Zoom, Vimeo Live, or Hybrid.
 * **Zoom** — URL, Meeting ID, and Passcode.
@@ -85,9 +83,7 @@ Assign faculty members as speakers or facilitators:
 
 ## Applications and Registration
 
-{% hint style="info" %}
-Application settings are only available for **Practical Workshop** and **In Person Course** event types.
-{% endhint %}
+> **Note:** Application settings are only available for **Practical Workshop** and **In Person Course** event types.
 
 * **Applications Enabled** — Toggle on to accept applications.
 * **Eligibility Criteria** — Free-text description of who can apply.
@@ -129,8 +125,8 @@ Navigate to an event's **Applicants** page to review and manage applications.
 
 Navigate to an event's **Feedback** page. This has three tabs:
 
-{% tabs %}
-{% tab title="Builder" %}
+### Builder
+
 Design a feedback survey:
 
 1. Set a **title** and **description** for the form.
@@ -144,19 +140,17 @@ Design a feedback survey:
 5. Reorder questions by dragging.
 
 A set of **default questions** is provided (overall rating, content quality, faculty quality, relevance, recommendation, best aspect, improvements).
-{% endtab %}
 
-{% tab title="Responses" %}
+### Responses
+
 * View all submitted feedback with respondent details.
 * See aggregate rating statistics.
 * Search and filter responses.
 * **Export** responses for external analysis.
-{% endtab %}
 
-{% tab title="Certificates" %}
+### Certificates
+
 * **Enable certificates** for the event.
 * Set a **certificate title** (e.g. "Certificate of Attendance").
 * Specify **CPD points** awarded.
 * Certificates are generated and available for download by attendees who completed the feedback form.
-{% endtab %}
-{% endtabs %}
