@@ -1,3 +1,9 @@
+---
+title: Public Pages
+parent: User Guide
+nav_order: 3
+---
+
 # Public Pages
 
 These pages are accessible to everyone, including visitors without an account.

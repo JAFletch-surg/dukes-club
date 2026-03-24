@@ -77,7 +77,7 @@ const HeroSection = () => {
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative h-[150vh]">
+    <section ref={sectionRef} className="relative h-[120vh]">
       <div className="sticky top-0 h-screen overflow-hidden">
         <video
           ref={videoRef}

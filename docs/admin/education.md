@@ -1,3 +1,9 @@
+---
+title: Education
+parent: Admin Guide
+nav_order: 4
+---
+
 # Education
 
 ## Question Bank

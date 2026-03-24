@@ -1,3 +1,9 @@
+---
+title: Events
+parent: Admin Guide
+nav_order: 2
+---
+
 # Events
 
 ## Overview

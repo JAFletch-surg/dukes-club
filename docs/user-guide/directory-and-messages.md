@@ -1,3 +1,9 @@
+---
+title: Directory & Messages
+parent: User Guide
+nav_order: 9
+---
+
 # Directory & Messages
 
 ## Member Directory

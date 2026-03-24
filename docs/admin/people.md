@@ -1,3 +1,9 @@
+---
+title: People
+parent: Admin Guide
+nav_order: 5
+---
+
 # People
 
 ## Members

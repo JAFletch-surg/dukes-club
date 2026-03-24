@@ -382,7 +382,7 @@ export function feedbackRequestEmail(params: {
 }): { subject: string; html: string } {
   const { name, eventTitle, eventId } = params
   const firstName = name.split(' ')[0] || name
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
 
   return {
     subject: `We'd love your feedback — ${eventTitle}`,
@@ -519,7 +519,7 @@ export function certificateReadyEmail(params: {
 }): { subject: string; html: string } {
   const { name, eventTitle, eventId, certificateId, cpdPoints } = params
   const firstName = name.split(' ')[0] || name
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
 
   return {
     subject: `Your Certificate — ${eventTitle}`,

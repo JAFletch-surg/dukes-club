@@ -1,3 +1,9 @@
+---
+title: Organisation
+parent: Admin Guide
+nav_order: 6
+---
+
 # Organisation
 
 ## Institutions

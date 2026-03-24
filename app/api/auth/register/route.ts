@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { welcomeEmail, adminNewRegistrationEmail } from '@/lib/emails/templates'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://dukesclub.org.uk'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
 
 const APPROVED_DOMAINS = ['nhs.net', 'nhs.uk', 'doctors.org.uk']
 const APPROVED_SUFFIX = '.ac.uk'

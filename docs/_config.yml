@@ -1,0 +1,8 @@
+title: "Dukes' Club Docs"
+remote_theme: just-the-docs/just-the-docs
+
+permalink: pretty
+
+exclude:
+  - node_modules/
+  - vendor/
