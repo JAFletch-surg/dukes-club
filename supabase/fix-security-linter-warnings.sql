@@ -471,10 +471,27 @@ DO $$ BEGIN RAISE NOTICE '  ✓ Proper policies added for 9 database-only tables
 
 DO $$ BEGIN RAISE NOTICE '── Section 5: Fixing storage bucket listing policies ──'; END $$;
 
-DROP POLICY IF EXISTS "Media: public read"           ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can view sponsor logos" ON storage.objects;
+-- Replace broad anon SELECT (allows listing all files) with authenticated-only
+-- SELECT (allows admin file browsing but prevents anonymous enumeration).
+-- Public URL access is unaffected — public buckets serve files without RLS.
 
-DO $$ BEGIN RAISE NOTICE '  ✓ Broad SELECT policies dropped from media and sponsor-logos buckets'; END $$;
+DROP POLICY IF EXISTS "Media: public read"           ON storage.objects;
+DROP POLICY IF EXISTS "media_select_authenticated"   ON storage.objects;
+
+CREATE POLICY "media_select_authenticated"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (bucket_id = 'media');
+
+DROP POLICY IF EXISTS "Anyone can view sponsor logos"        ON storage.objects;
+DROP POLICY IF EXISTS "sponsor_logos_select_authenticated"   ON storage.objects;
+
+CREATE POLICY "sponsor_logos_select_authenticated"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (bucket_id = 'sponsor-logos');
+
+DO $$ BEGIN RAISE NOTICE '  ✓ Bucket SELECT policies scoped to authenticated users only'; END $$;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -492,11 +509,14 @@ BEGIN
     WHERE extname = 'pg_trgm'
       AND extnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
   ) THEN
+    CREATE SCHEMA IF NOT EXISTS extensions;
     ALTER EXTENSION pg_trgm SET SCHEMA extensions;
     RAISE NOTICE '  ✓ pg_trgm moved to extensions schema';
   ELSE
     RAISE NOTICE '  ⊘ pg_trgm not in public schema (already moved or not installed)';
   END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING '  ⚠ Could not move pg_trgm: %. Drop dependent indexes first if needed.', SQLERRM;
 END $$;
 
 
