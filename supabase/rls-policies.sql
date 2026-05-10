@@ -22,7 +22,7 @@ RETURNS boolean AS $$
       AND role IN ('admin', 'super_admin', 'editor')
       AND approval_status = 'approved'
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public;
 
 -- Check if current user is an approved member (any role, as long as approved)
 CREATE OR REPLACE FUNCTION is_approved_member()
@@ -32,7 +32,7 @@ RETURNS boolean AS $$
     WHERE id = auth.uid()
       AND approval_status = 'approved'
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public;
 
 -- Check if current user is a participant of a given conversation.
 -- SECURITY DEFINER so it bypasses RLS on conversation_participants,
@@ -44,7 +44,7 @@ RETURNS boolean AS $$
     WHERE conversation_id = conv_id
       AND user_id = auth.uid()
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public;
 
 -- Find or create a DM conversation between two users.
 -- SECURITY DEFINER so it bypasses RLS (enforces its own auth checks).
