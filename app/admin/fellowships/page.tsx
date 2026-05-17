@@ -9,10 +9,12 @@ import { createClient } from '@/lib/supabase/client'
 const STATUSES = ['draft', 'published', 'archived']
 const DURATIONS = ['6 months', '12 months']
 const SUBSPECIALTIES = [
-  'Robotic','Laparoscopic','Open','TAMIS','Cancer','Rectal Cancer','Advanced Cancer',
-  'Peritoneal Malignancy','Anal Cancer','IBD','Intestinal Failure','Pelvic Floor',
-  'Proctology','Fistula','Emergency','Trauma','Abdominal Wall Reconstruction','Endoscopy','Anatomy',
-  'Evidence-based Medicine','Pilonidal'
+  'Robotic','Laparoscopic','Open','TAMIS','General',
+  'Cancer - Colon','Cancer - Rectal','Cancer - Anal','Cancer - Advanced',
+  'Peritoneal Malignancy','IBD','Abdominal Wall','Pelvic Floor',
+  'Proctology','Fistula','Intestinal Failure',
+  'Emergency','Trauma',
+  'Research','Endoscopy','Training','Radiology',
 ]
 const ACCREDITATION_BODIES = ['ACPGBI','ESCP','RCS Eng','RCS Ed','RCS Ireland','RCPS Glasgow','Other']
 const ON_CALL_OPTIONS = ['None','1 in 2','1 in 2-3','1 in 3-4','1 in 4-5','1 in 5-6','1 in 6-7','1 in 8','Other']
