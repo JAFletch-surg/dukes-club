@@ -139,7 +139,7 @@ export function welcomeEmail(params: {
       </table>
       <p style="margin:0;font-size:14px;color:#888;">
         If you have any questions, reply to this email or contact us at
-        <a href="mailto:contact@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@thedukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -204,7 +204,7 @@ export function rejectionEmail(params: {
       ` : ''}
       <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
         If you believe this is an error or would like more information, please contact us at
-        <a href="mailto:contact@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@thedukesclub.org.uk</a>.
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>.
       </p>
     `),
   }
@@ -276,7 +276,7 @@ export function bookingConfirmationEmail(params: {
 
       <p style="margin:0;font-size:14px;color:#888;">
         Need to cancel or have questions? Visit your profile or contact us at
-        <a href="mailto:contact@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@thedukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -340,7 +340,7 @@ export function bookingStatusEmail(params: {
       ${newStatus === 'approved' ? button('View My Bookings', `${siteUrl}/members/profile`) : ''}
       <p style="margin:0;font-size:14px;color:#888;">
         Questions? Contact us at
-        <a href="mailto:contact@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@thedukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -414,7 +414,7 @@ export function feedbackRequestEmail(params: {
       ${button('Submit Feedback', `${siteUrl}/members/events/${eventId}/feedback`)}
       <p style="margin:0;font-size:14px;color:#888;line-height:1.6;">
         If you have any questions, contact us at
-        <a href="mailto:contact@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@thedukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -574,7 +574,7 @@ export function contactAutoReplyEmail(params: {
       </p>
       <p style="margin:0;font-size:14px;color:#888;">
         In the meantime, if your enquiry is urgent, you can reach us directly at
-        <a href="mailto:contact@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@thedukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
