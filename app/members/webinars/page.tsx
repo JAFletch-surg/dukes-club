@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/lib/use-auth'
 import { sendEmail } from '@/lib/emails/send-email'
+import { STREAMING_EVENT_TYPES, registerForEvent } from '@/lib/events'
 
 // ─── Types ───────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const formatDuration = (secs: number) => {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`
 }
 
-const STREAMING_TYPES = ['Webinar', 'Online Lecture', 'Hybrid']
+const STREAMING_TYPES: string[] = [...STREAMING_EVENT_TYPES]
 
 // ─── Page ────────────────────────────────────────────
 
@@ -171,16 +172,16 @@ export default function LiveWebinars() {
 
     const status = event.auto_approve ? 'approved' : 'pending'
 
-    const { data: booking, error } = await supabase.from('event_bookings').insert({
-      event_id: event.id,
-      user_id: user.id,
-      applicant_name: profile.full_name || user.email?.split('@')[0] || 'Unknown',
-      applicant_email: user.email || '',
-      applicant_training_level: profile.training_stage || '',
-      applicant_hospital: (profile as any)?.hospital || '',
-      applicant_deanery: profile.region || '',
+    const { booking, error } = await registerForEvent(supabase, {
+      eventId: event.id,
+      userId: user.id,
+      applicantName: profile.full_name || user.email?.split('@')[0] || 'Unknown',
+      applicantEmail: user.email || '',
+      applicantTrainingLevel: profile.training_stage || '',
+      applicantHospital: (profile as any)?.hospital || '',
+      applicantDeanery: profile.region || '',
       status,
-    }).select('id, status').single()
+    })
 
     if (!error && booking) {
       setEvents(prev => prev.map(e =>

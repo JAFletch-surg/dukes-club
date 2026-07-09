@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mail, MapPin, Send, CheckCircle } from "lucide-react";
+import { Mail, MapPin, Send, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
 
@@ -45,15 +45,39 @@ const AnimatedSection = ({
 
 const ContactPage = () => {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [company, setCompany] = useState(""); // honeypot, kept blank by real users
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Wire up to backend
-    setSubmitted(true);
+    setError("");
+    setSubmitting(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, subject, message, company }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || "Something went wrong. Please try again.");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError("Something went wrong. Please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -115,10 +139,10 @@ const ContactPage = () => {
                         Email
                       </p>
                       <a
-                        href="mailto:info@dukesclub.org.uk"
+                        href="mailto:info@thedukesclub.org.uk"
                         className="text-sm text-foreground/70 hover:text-gold transition-colors"
                       >
-                        info@dukesclub.org.uk
+                        info@thedukesclub.org.uk
                       </a>
                     </div>
                   </div>
@@ -163,10 +187,12 @@ const ContactPage = () => {
                         className="mt-8"
                         onClick={() => {
                           setSubmitted(false);
+                          setError("");
                           setName("");
                           setEmail("");
                           setSubject("");
                           setMessage("");
+                          setCompany("");
                         }}
                       >
                         Send another message
@@ -181,6 +207,25 @@ const ContactPage = () => {
                         Fill in the form below and we'll get back to you shortly.
                       </p>
                       <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* Honeypot field: hidden from real users, catches simple bots */}
+                        <input
+                          type="text"
+                          name="company"
+                          value={company}
+                          onChange={(e) => setCompany(e.target.value)}
+                          tabIndex={-1}
+                          autoComplete="off"
+                          className="hidden"
+                          aria-hidden="true"
+                        />
+
+                        {error && (
+                          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                            <span>{error}</span>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                           <div className="space-y-2">
                             <Label htmlFor="name" className="text-foreground/80">
@@ -254,8 +299,17 @@ const ContactPage = () => {
                           variant="gold"
                           size="lg"
                           className="w-full sm:w-auto"
+                          disabled={submitting}
                         >
-                          Send Message <Send size={16} className="ml-2" />
+                          {submitting ? (
+                            <>
+                              Sending <Loader2 size={16} className="ml-2 animate-spin" />
+                            </>
+                          ) : (
+                            <>
+                              Send Message <Send size={16} className="ml-2" />
+                            </>
+                          )}
                         </Button>
                       </form>
                     </>

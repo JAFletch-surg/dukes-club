@@ -7,6 +7,7 @@ import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
+import { isStreamingEvent } from '@/lib/events'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
@@ -33,7 +34,7 @@ const STOCK_IMAGES = [
   { label: 'Robot Blue', url: '/images/events/robot.png' },
 ]
 
-const isStreamingType = (t: string) => ['Webinar', 'Online Lecture', 'Hybrid'].includes(t)
+const isStreamingType = isStreamingEvent
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -206,8 +207,11 @@ export default function EventsAdmin() {
         subspecialties: form.subspecialties,
         timetable_data: serialiseTimetable(form.timetable_data),
         published_at: form.status === 'published' ? new Date().toISOString() : null,
-        // Application fields
-        applications_enabled: form.applications_enabled,
+        // Application fields — force off for non-application event types, since the
+        // toggle to disable it is hidden from the form once the type is switched away
+        // from Practical Workshop / In Person Course, which otherwise leaves a stale
+        // `true` stuck on the row forever.
+        applications_enabled: isApplicationType(form.event_type) ? form.applications_enabled : false,
         eligibility_criteria: form.eligibility_criteria || null,
         eligibility_training_levels: form.eligibility_training_levels,
         application_deadline: form.application_deadline ? new Date(form.application_deadline).toISOString() : null,
@@ -359,14 +363,14 @@ export default function EventsAdmin() {
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
-                      {e.applications_enabled && (
+                      {(e.applications_enabled || isStreamingType(e.event_type)) && (
                         <Link href={`/admin/events/${e.id}/applicants`} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
                           borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
                           background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE',
                           cursor: 'pointer', whiteSpace: 'nowrap',
                         }}>
-                          <Users size={12} /> Applicants
+                          <Users size={12} /> Attendees
                         </Link>
                       )}
                       <Link href={`/admin/events/${e.id}/feedback`} style={{
@@ -437,7 +441,7 @@ export default function EventsAdmin() {
                   )}>{e.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {e.applications_enabled && (
+                  {(e.applications_enabled || isStreamingType(e.event_type)) && (
                     <Link href={`/admin/events/${e.id}/applicants`} className="p-2 rounded-lg bg-blue-50 text-blue-700">
                       <Users size={14} />
                     </Link>

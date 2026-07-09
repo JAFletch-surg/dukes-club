@@ -3,6 +3,15 @@
 
 const LOGO_URL = 'https://wdajcvoqpcxtqpfmzndj.supabase.co/storage/v1/object/public/media/Dukes%20club%20modern%20title%20white.png'
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function layout(content: string): string {
   return `
 <!DOCTYPE html>
@@ -130,7 +139,7 @@ export function welcomeEmail(params: {
       </table>
       <p style="margin:0;font-size:14px;color:#888;">
         If you have any questions, reply to this email or contact us at
-        <a href="mailto:contact@dukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@dukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -195,7 +204,7 @@ export function rejectionEmail(params: {
       ` : ''}
       <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
         If you believe this is an error or would like more information, please contact us at
-        <a href="mailto:contact@dukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@dukesclub.org.uk</a>.
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>.
       </p>
     `),
   }
@@ -267,7 +276,7 @@ export function bookingConfirmationEmail(params: {
 
       <p style="margin:0;font-size:14px;color:#888;">
         Need to cancel or have questions? Visit your profile or contact us at
-        <a href="mailto:contact@dukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@dukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -331,7 +340,7 @@ export function bookingStatusEmail(params: {
       ${newStatus === 'approved' ? button('View My Bookings', `${siteUrl}/members/profile`) : ''}
       <p style="margin:0;font-size:14px;color:#888;">
         Questions? Contact us at
-        <a href="mailto:contact@dukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@dukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -382,7 +391,7 @@ export function feedbackRequestEmail(params: {
 }): { subject: string; html: string } {
   const { name, eventTitle, eventId } = params
   const firstName = name.split(' ')[0] || name
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
   return {
     subject: `We'd love your feedback — ${eventTitle}`,
@@ -405,7 +414,7 @@ export function feedbackRequestEmail(params: {
       ${button('Submit Feedback', `${siteUrl}/members/events/${eventId}/feedback`)}
       <p style="margin:0;font-size:14px;color:#888;line-height:1.6;">
         If you have any questions, contact us at
-        <a href="mailto:contact@dukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">contact@dukesclub.org.uk</a>
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
       </p>
     `),
   }
@@ -508,7 +517,70 @@ export function adminMembershipNumberEmail(params: {
   }
 }
 
-// 10. Certificate Ready
+// 10. Contact Form Submission (to admin inbox)
+// ─────────────────────────────────────────
+export function contactFormEmail(params: {
+  name: string
+  email: string
+  subject: string
+  message: string
+}): { subject: string; html: string } {
+  const { name, email, subject, message } = params
+
+  return {
+    subject: `Contact form: ${subject}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        New Contact Form Message
+      </h2>
+      <div style="background-color:#F9F8F5;border:1px solid #E8E6E1;border-radius:8px;padding:20px;margin:0 0 24px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;width:80px;">Name</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${escapeHtml(name)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">Email</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${escapeHtml(email)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">Subject</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${escapeHtml(subject)}</td>
+          </tr>
+        </table>
+      </div>
+      <p style="margin:0 0 8px;font-size:13px;color:#888;">Message</p>
+      <p style="margin:0;font-size:15px;color:#444;line-height:1.7;white-space:pre-wrap;">${escapeHtml(message)}</p>
+    `),
+  }
+}
+
+// 11. Contact Form Auto-Reply (to sender)
+// ─────────────────────────────────────────
+export function contactAutoReplyEmail(params: {
+  name: string
+}): { subject: string; html: string } {
+  const { name } = params
+  const firstName = escapeHtml(name.split(' ')[0] || name)
+
+  return {
+    subject: 'We\'ve received your message',
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        Thanks for getting in touch, ${firstName}
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        We've received your message and a member of our committee will respond to your enquiry as soon as possible.
+      </p>
+      <p style="margin:0;font-size:14px;color:#888;">
+        In the meantime, if your enquiry is urgent, you can reach us directly at
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
+      </p>
+    `),
+  }
+}
+
+// 12. Certificate Ready
 // ─────────────────────────────────────────
 export function certificateReadyEmail(params: {
   name: string
@@ -519,7 +591,7 @@ export function certificateReadyEmail(params: {
 }): { subject: string; html: string } {
   const { name, eventTitle, eventId, certificateId, cpdPoints } = params
   const firstName = name.split(' ')[0] || name
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
   return {
     subject: `Your Certificate — ${eventTitle}`,

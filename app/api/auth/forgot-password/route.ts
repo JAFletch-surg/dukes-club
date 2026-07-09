@@ -11,7 +11,7 @@ function getSupabase() {
   )
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.dukesclub.org'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 const TOKEN_EXPIRY_HOURS = 1
 
 export async function POST(request: NextRequest) {
