@@ -7,6 +7,7 @@ import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
+import { isStreamingEvent } from '@/lib/events'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
@@ -33,7 +34,7 @@ const STOCK_IMAGES = [
   { label: 'Robot Blue', url: '/images/events/robot.png' },
 ]
 
-const isStreamingType = (t: string) => ['Webinar', 'Online Lecture', 'Hybrid'].includes(t)
+const isStreamingType = isStreamingEvent
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')

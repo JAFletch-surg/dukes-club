@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   CalendarDays, MapPin, PoundSterling, Users, User, Clock, Lock,
-  ArrowLeft, ExternalLink, Globe, Loader2, Check, X as XIcon,
+  ArrowLeft, ExternalLink, Globe, Loader2, Check, X as XIcon, Copy, CheckCheck,
 } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
+import { isStreamingEvent } from "@/lib/events";
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -53,6 +54,10 @@ const EventDetailPage = () => {
   const [motivation, setMotivation] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [applyError, setApplyError] = useState('');
+  const [registering, setRegistering] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [bookingCount, setBookingCount] = useState(0);
 
   useEffect(() => {
     async function fetchEvent() {
@@ -76,6 +81,16 @@ const EventDetailPage = () => {
             .eq('user_id', user.id)
             .maybeSingle();
           if (booking) setExistingBooking(booking);
+        }
+
+        // Active booking count, for spots-left display on streaming events
+        if (isStreamingEvent(eventData.event_type)) {
+          const { count } = await supabase
+            .from('event_bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('event_id', eventData.id)
+            .in('status', ['approved', 'confirmed', 'pending']);
+          setBookingCount(count || 0);
         }
 
         // Fetch faculty via junction table (two-step to avoid FK join issues)
@@ -177,7 +192,70 @@ const EventDetailPage = () => {
     setApplying(false);
   };
 
+  const handleRegister = async () => {
+    if (!user || !event) return;
+    setRegistering(true);
+    try {
+      const status = event.auto_approve ? 'approved' : 'pending';
+      const { data: booking, error } = await supabase.from('event_bookings').insert({
+        event_id: event.id,
+        user_id: user.id,
+        applicant_name: profile?.full_name || user.email?.split('@')[0] || 'Unknown',
+        applicant_email: user.email || '',
+        applicant_training_level: profile?.training_stage || '',
+        applicant_hospital: (profile as any)?.hospital || '',
+        applicant_deanery: profile?.region || '',
+        status,
+      }).select('id, status').single();
+
+      if (!error && booking) {
+        setExistingBooking(booking);
+        setBookingCount((c) => c + 1);
+
+        const eventDate = new Date(event.starts_at).toLocaleDateString('en-GB', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        });
+        sendEmail({
+          type: 'booking_confirmation',
+          to: user.email || '',
+          data: {
+            name: profile?.full_name || user.email?.split('@')[0] || 'Member',
+            eventTitle: event.title,
+            eventDate,
+            eventLocation: 'Online',
+            status,
+          },
+        }).catch(err => console.error('Booking email failed:', err));
+      }
+    } catch (e) {
+      console.error('Registration failed:', e);
+    }
+    setRegistering(false);
+  };
+
+  const handleCancel = async () => {
+    if (!existingBooking?.id) return;
+    setCancelling(true);
+    const { error } = await supabase
+      .from('event_bookings')
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+      .eq('id', existingBooking.id);
+    if (!error) {
+      setExistingBooking(null);
+      setBookingCount((c) => Math.max(0, c - 1));
+    }
+    setCancelling(false);
+  };
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   const isApplicationEvent = event?.applications_enabled;
+  const isOnlineEvent = isStreamingEvent(event?.event_type);
+  const spotsLeft = event?.capacity ? event.capacity - bookingCount : null;
   const deadlinePassed = event?.application_deadline && new Date(event.application_deadline) < new Date();
   const questions: { question: string; required: boolean }[] = event?.application_questions || [];
 
@@ -453,15 +531,126 @@ const EventDetailPage = () => {
                           </p>
                         )}
                       </div>
+                    ) : isOnlineEvent ? (
+                      /* ── Online event: register on-site ── */
+                      <div className="mb-6">
+                        {existingBooking && existingBooking.status !== 'cancelled' ? (
+                          <div className="text-center">
+                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${
+                              existingBooking.status === 'approved' || existingBooking.status === 'confirmed'
+                                ? 'bg-emerald-500/10 text-emerald-400'
+                                : 'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {existingBooking.status === 'pending' && <><Clock size={14} /> Registration Pending</>}
+                              {(existingBooking.status === 'approved' || existingBooking.status === 'confirmed') && <><Check size={14} /> You&apos;re Registered</>}
+                            </div>
+
+                            {['approved', 'confirmed'].includes(existingBooking.status) && (event.zoom_url || event.vimeo_live_embed_url || event.zoom_meeting_id || event.zoom_passcode) && (
+                              <div className="mt-4 text-left space-y-3 rounded-lg border border-navy-foreground/20 bg-navy-foreground/5 p-4">
+                                {event.zoom_url && (
+                                  <a
+                                    href={event.zoom_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors"
+                                  >
+                                    <ExternalLink size={14} /> Join on Zoom
+                                  </a>
+                                )}
+                                {(event.zoom_meeting_id || event.zoom_passcode) && (
+                                  <div className="space-y-1.5">
+                                    {event.zoom_meeting_id && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-navy-foreground/60 truncate mr-2">Meeting ID: <span className="font-mono text-navy-foreground">{event.zoom_meeting_id}</span></span>
+                                        <button onClick={() => handleCopy(event.zoom_meeting_id, 'mid')} className="text-navy-foreground/60 hover:text-navy-foreground shrink-0">
+                                          {copiedField === 'mid' ? <CheckCheck size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                                        </button>
+                                      </div>
+                                    )}
+                                    {event.zoom_passcode && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-navy-foreground/60 truncate mr-2">Passcode: <span className="font-mono text-navy-foreground">{event.zoom_passcode}</span></span>
+                                        <button onClick={() => handleCopy(event.zoom_passcode, 'pc')} className="text-navy-foreground/60 hover:text-navy-foreground shrink-0">
+                                          {copiedField === 'pc' ? <CheckCheck size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {event.vimeo_live_embed_url && !event.zoom_url && (
+                                  <a
+                                    href={event.vimeo_live_embed_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors"
+                                  >
+                                    Watch Live
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
+                            <button
+                              onClick={handleCancel}
+                              disabled={cancelling}
+                              className="mt-3 text-xs text-red-400 hover:underline"
+                            >
+                              {cancelling ? 'Cancelling...' : 'Cancel registration'}
+                            </button>
+                          </div>
+                        ) : !user ? (
+                          <div>
+                            <Link href="/login">
+                              <Button variant="gold" size="lg" className="w-full">
+                                Log in to Register
+                              </Button>
+                            </Link>
+                            <p className="text-xs text-center text-navy-foreground/50 mt-2">Members only — <Link href="/register" className="text-gold underline">join now</Link></p>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="gold"
+                            size="lg"
+                            className="w-full"
+                            onClick={handleRegister}
+                            disabled={registering || (spotsLeft !== null && spotsLeft <= 0)}
+                          >
+                            {registering ? (
+                              <Loader2 size={16} className="animate-spin mr-2" />
+                            ) : spotsLeft !== null && spotsLeft <= 0 ? (
+                              'Full'
+                            ) : (
+                              'Register for Webinar'
+                            )}
+                          </Button>
+                        )}
+
+                        {spotsLeft !== null && (!existingBooking || existingBooking.status === 'cancelled') && (
+                          <p className="text-xs text-navy-foreground/40 mt-2 text-center">
+                            {Math.max(0, spotsLeft)} spot{Math.max(0, spotsLeft) !== 1 ? 's' : ''} left
+                          </p>
+                        )}
+
+                        {event.booking_url && (
+                          <a
+                            href={event.booking_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 flex items-center justify-center gap-1.5 text-xs text-navy-foreground/60 hover:text-navy-foreground transition-colors"
+                          >
+                            <ExternalLink size={12} /> External registration
+                          </a>
+                        )}
+                      </div>
                     ) : (
-                      /* ── Standard booking (webinars, external URL) ── */
+                      /* ── Standard booking (external URL only) ── */
                       <>
                     {user ? (
                       <>
                         {event.booking_url ? (
                           <a href={event.booking_url} target="_blank" rel="noopener noreferrer" className="block mb-6">
                             <Button variant="gold" size="lg" className="w-full">
-                              {['Webinar', 'Online Lecture'].includes(event.event_type) ? 'Register Now' : 'Book Now'} <ExternalLink size={14} className="ml-2" />
+                              Book Now <ExternalLink size={14} className="ml-2" />
                             </Button>
                           </a>
                         ) : event.zoom_url ? (
@@ -475,7 +664,7 @@ const EventDetailPage = () => {
                     ) : (event.booking_url || event.zoom_url) ? (
                       <Link href="/login" className="block mb-6">
                         <Button variant="gold" size="lg" className="w-full">
-                          Log in to {['Webinar', 'Online Lecture'].includes(event.event_type) ? 'Register' : 'Book'}
+                          Log in to Book
                         </Button>
                         <p className="text-xs text-center text-navy-foreground/50 mt-2">Members only — <Link href="/register" className="text-gold underline">join now</Link></p>
                       </Link>

@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/lib/use-auth'
 import { sendEmail } from '@/lib/emails/send-email'
+import { STREAMING_EVENT_TYPES } from '@/lib/events'
 
 // ─── Types ───────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const formatDuration = (secs: number) => {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`
 }
 
-const STREAMING_TYPES = ['Webinar', 'Online Lecture', 'Hybrid']
+const STREAMING_TYPES: string[] = [...STREAMING_EVENT_TYPES]
 
 // ─── Page ────────────────────────────────────────────
 
