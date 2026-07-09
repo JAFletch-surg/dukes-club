@@ -207,8 +207,11 @@ export default function EventsAdmin() {
         subspecialties: form.subspecialties,
         timetable_data: serialiseTimetable(form.timetable_data),
         published_at: form.status === 'published' ? new Date().toISOString() : null,
-        // Application fields
-        applications_enabled: form.applications_enabled,
+        // Application fields — force off for non-application event types, since the
+        // toggle to disable it is hidden from the form once the type is switched away
+        // from Practical Workshop / In Person Course, which otherwise leaves a stale
+        // `true` stuck on the row forever.
+        applications_enabled: isApplicationType(form.event_type) ? form.applications_enabled : false,
         eligibility_criteria: form.eligibility_criteria || null,
         eligibility_training_levels: form.eligibility_training_levels,
         application_deadline: form.application_deadline ? new Date(form.application_deadline).toISOString() : null,

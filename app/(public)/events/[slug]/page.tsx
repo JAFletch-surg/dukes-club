@@ -403,7 +403,7 @@ const EventDetailPage = () => {
                     {isApplicationEvent ? (
                       /* ── Application-based event ── */
                       <div className="mb-6">
-                        {existingBooking ? (
+                        {existingBooking && existingBooking.status !== 'cancelled' ? (
                           <div className="text-center">
                             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${
                               existingBooking.status === 'approved' || existingBooking.status === 'confirmed'
@@ -419,7 +419,6 @@ const EventDetailPage = () => {
                               {existingBooking.status === 'confirmed' && <><Check size={14} /> Confirmed</>}
                               {existingBooking.status === 'rejected' && <><XIcon size={14} /> Application Not Successful</>}
                               {existingBooking.status === 'waitlisted' && <><Clock size={14} /> On Waitlist</>}
-                              {existingBooking.status === 'cancelled' && <><XIcon size={14} /> Cancelled</>}
                             </div>
                             {existingBooking.status === 'approved' && event.confirmation_message && (
                               <p className="text-xs text-navy-foreground/60 mt-3 text-left">{event.confirmation_message}</p>
@@ -525,14 +524,14 @@ const EventDetailPage = () => {
                         )}
 
                         {/* Eligibility info */}
-                        {event.eligibility_criteria && !existingBooking && (
+                        {event.eligibility_criteria && (!existingBooking || existingBooking.status === 'cancelled') && (
                           <div className="mt-4 p-3 rounded-lg bg-navy-foreground/5 border border-navy-foreground/10">
                             <p className="text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-1">Eligibility</p>
                             <p className="text-xs text-navy-foreground/70 leading-relaxed">{event.eligibility_criteria}</p>
                           </div>
                         )}
 
-                        {event.places_available && !existingBooking && (
+                        {event.places_available && (!existingBooking || existingBooking.status === 'cancelled') && (
                           <p className="text-xs text-navy-foreground/40 mt-2 text-center">
                             {event.places_available} places available
                           </p>
