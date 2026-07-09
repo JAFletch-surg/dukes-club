@@ -194,6 +194,13 @@ const EventDetailPage = () => {
 
   const handleRegister = async () => {
     if (!user || !event) return;
+
+    // Open synchronously, in the same click gesture, so browsers don't block the popup —
+    // once we `await` below, it's no longer treated as a direct user interaction.
+    if (event.booking_url) {
+      window.open(event.booking_url, '_blank', 'noopener,noreferrer');
+    }
+
     setRegistering(true);
     try {
       const status = event.auto_approve ? 'approved' : 'pending';
@@ -631,15 +638,10 @@ const EventDetailPage = () => {
                           </p>
                         )}
 
-                        {event.booking_url && (
-                          <a
-                            href={event.booking_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-4 flex items-center justify-center gap-1.5 text-xs text-navy-foreground/60 hover:text-navy-foreground transition-colors"
-                          >
-                            <ExternalLink size={12} /> External registration
-                          </a>
+                        {event.booking_url && (!existingBooking || existingBooking.status === 'cancelled') && (
+                          <p className="text-xs text-navy-foreground/40 mt-2 text-center">
+                            You&apos;ll also be registered on our external platform in a new tab
+                          </p>
                         )}
                       </div>
                     ) : (
