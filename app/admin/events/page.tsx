@@ -363,14 +363,14 @@ export default function EventsAdmin() {
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
-                      {e.applications_enabled && (
+                      {(e.applications_enabled || isStreamingType(e.event_type)) && (
                         <Link href={`/admin/events/${e.id}/applicants`} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
                           borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
                           background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE',
                           cursor: 'pointer', whiteSpace: 'nowrap',
                         }}>
-                          <Users size={12} /> Applicants
+                          <Users size={12} /> Attendees
                         </Link>
                       )}
                       <Link href={`/admin/events/${e.id}/feedback`} style={{
@@ -441,7 +441,7 @@ export default function EventsAdmin() {
                   )}>{e.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {e.applications_enabled && (
+                  {(e.applications_enabled || isStreamingType(e.event_type)) && (
                     <Link href={`/admin/events/${e.id}/applicants`} className="p-2 rounded-lg bg-blue-50 text-blue-700">
                       <Users size={14} />
                     </Link>
