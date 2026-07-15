@@ -237,8 +237,11 @@ export default function EventFeedbackAdmin() {
     setSendingReminders(true)
     const supabase = createClient()
 
+    let sentCount = 0
+    const sentIds: string[] = []
+
     for (const booking of unrequested) {
-      await sendEmail({
+      const result = await sendEmail({
         type: 'feedback_request',
         to: booking.applicant_email,
         data: {
@@ -246,7 +249,15 @@ export default function EventFeedbackAdmin() {
           eventTitle: event?.title,
           eventId: eventId,
         },
-      }).catch(err => console.error('Feedback email failed:', err))
+      }).catch(err => ({ success: false, error: err?.message || 'Network error' }))
+
+      if (!result.success) {
+        console.error('Feedback email failed:', result.error)
+        continue
+      }
+
+      sentCount++
+      sentIds.push(booking.id)
 
       await supabase
         .from('event_bookings')
@@ -254,8 +265,15 @@ export default function EventFeedbackAdmin() {
         .eq('id', booking.id)
     }
 
-    setBookings(prev => prev.map(b => ({ ...b, feedback_requested_at: new Date().toISOString() })))
-    showToast(`Sent ${unrequested.length} feedback request emails`)
+    setBookings(prev => prev.map(b => sentIds.includes(b.id) ? { ...b, feedback_requested_at: new Date().toISOString() } : b))
+
+    if (sentCount === unrequested.length) {
+      showToast(`Sent ${sentCount} feedback request emails`)
+    } else if (sentCount > 0) {
+      showToast(`Sent ${sentCount} of ${unrequested.length} emails — some failed, see console`, 'error')
+    } else {
+      showToast('Failed to send feedback request emails', 'error')
+    }
     setSendingReminders(false)
   }
 
