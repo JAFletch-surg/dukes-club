@@ -5,7 +5,7 @@ import {
   Newspaper, Plus, Edit, Trash2, Save, Loader, X, ImageIcon, Search,
   Users, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote,
   Image as ImageLucide, Video, Link2, Minus, AlignLeft, Eye, Calendar,
-  Type, ChevronDown, Sparkles, FileText, Table2
+  Type, ChevronDown, Sparkles, FileText, Table2, Upload
 } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { useImageUpload } from '@/lib/use-image-upload'
@@ -263,11 +263,53 @@ function htmlToBlocks(html: string): Block[] {
   return blocks.length > 0 ? blocks : [{ type: 'paragraph', text: '' }]
 }
 
-function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Block[]) => void }) {
+/* ── CSV parsing for table blocks ────────────────────
+   RFC4180-style state machine: handles quoted fields containing commas or
+   newlines, escaped "" inside quoted fields, and CRLF/LF line endings.
+   Trims trailing blank lines and pads ragged rows to a rectangular grid. */
+const MAX_CSV_BYTES = 2 * 1024 * 1024
+const MAX_CSV_ROWS = 200
+const MAX_CSV_COLS = 20
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQuotes = false
+  let i = 0
+  const n = text.length
+
+  while (i < n) {
+    const char = text[i]
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue }
+        inQuotes = false; i++; continue
+      }
+      field += char; i++; continue
+    } else {
+      if (char === '"') { inQuotes = true; i++; continue }
+      if (char === ',') { row.push(field); field = ''; i++; continue }
+      if (char === '\r') { i++; continue }
+      if (char === '\n') { row.push(field); field = ''; rows.push(row); row = []; i++; continue }
+      field += char; i++; continue
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row) }
+
+  while (rows.length > 0 && rows[rows.length - 1].every(c => c.trim() === '')) rows.pop()
+
+  const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0)
+  return rows.map(r => r.length < maxCols ? [...r, ...Array(maxCols - r.length).fill('')] : r)
+}
+
+function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange: (b: Block[]) => void; onNotice?: (msg: string, type?: 'ok' | 'error') => void }) {
   const { upload, uploading } = useImageUpload()
   const fileRef = useRef<HTMLInputElement>(null)
   const pdfRef = useRef<HTMLInputElement>(null)
+  const csvRef = useRef<HTMLInputElement>(null)
   const [insertIdx, setInsertIdx] = useState<number>(-1)
+  const [csvTargetIdx, setCsvTargetIdx] = useState<number>(-1)
 
   const updateBlock = (i: number, updates: Partial<Block>) => {
     const nb = [...blocks]
@@ -306,6 +348,43 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
       addBlockAfter(blocks.length - 1, { type: 'pdf', url, title })
     }
     e.target.value = ''
+  }
+
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f || csvTargetIdx < 0) return
+
+    if (f.size > MAX_CSV_BYTES) {
+      onNotice?.('CSV must be under 2MB', 'error')
+      return
+    }
+
+    try {
+      const text = await f.text()
+      let rows = parseCsv(text)
+      if (rows.length === 0) {
+        onNotice?.('CSV appears to be empty', 'error')
+        return
+      }
+
+      const originalRows = rows.length
+      const originalCols = rows[0]?.length || 0
+      let truncated = false
+      if (rows.length > MAX_CSV_ROWS) { rows = rows.slice(0, MAX_CSV_ROWS); truncated = true }
+      if (originalCols > MAX_CSV_COLS) { rows = rows.map(r => r.slice(0, MAX_CSV_COLS)); truncated = true }
+
+      updateBlock(csvTargetIdx, { rows, hasHeader: true })
+
+      onNotice?.(
+        truncated
+          ? `Imported ${rows.length} rows × ${rows[0]?.length || 0} columns (trimmed from ${originalRows} × ${originalCols} — split large data into multiple tables)`
+          : `Imported ${rows.length} rows from CSV`,
+        'ok'
+      )
+    } catch (err: any) {
+      onNotice?.(err?.message || 'Failed to read CSV file', 'error')
+    }
   }
 
   const toolbarBtnStyle = (active = false) => ({
@@ -459,6 +538,11 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
                     <button type="button" onClick={() => {
                       updateBlock(i, { rows: block.rows.map(r => [...r, '']) })
                     }} style={{ ...toolbarBtnStyle(), fontSize: 11, padding: '4px 8px', border: `1px solid ${C.muted}` }}>+ Column</button>
+                    <button type="button" onClick={() => { setCsvTargetIdx(i); csvRef.current?.click() }}
+                      style={{ ...toolbarBtnStyle(), fontSize: 11, padding: '4px 8px', border: `1px solid ${C.muted}`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Upload size={11} /> Upload CSV
+                    </button>
+                    <span style={{ fontSize: 10, color: '#aaa' }}>CSV up to 2MB · first row becomes the header · replaces current cells</span>
                   </div>
 
                   <div style={{ overflowX: 'auto' }}>
@@ -544,6 +628,7 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
 
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
         <input ref={pdfRef} type="file" accept=".pdf,application/pdf" style={{ display: 'none' }} onChange={handlePdfUpload} />
+        <input ref={csvRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleCsvUpload} />
       </div>
       <p style={S.hint}>Click a text block to see formatting options · <b>Ctrl+B</b> bold · <b>Ctrl+I</b> italic · <b>Ctrl+K</b> link · Enter for new paragraph</p>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -824,7 +909,7 @@ export default function PostsAdmin() {
 
               {/* Block editor */}
               <div style={S.section}>
-                <BlockEditor blocks={form.content_blocks} onChange={(b) => setForm({ ...form, content_blocks: b })} />
+                <BlockEditor blocks={form.content_blocks} onChange={(b) => setForm({ ...form, content_blocks: b })} onNotice={(msg, type) => showToast(msg, type)} />
               </div>
             </div>
 

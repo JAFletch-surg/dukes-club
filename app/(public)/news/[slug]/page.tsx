@@ -379,6 +379,7 @@ const PostDetailPage = () => {
               margin: 2em 0;
               clear: both;
               overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
               border-radius: 10px;
               box-shadow: 0 4px 20px rgba(0,0,0,0.08);
             }
@@ -416,6 +417,30 @@ const PostDetailPage = () => {
               margin-top: 8px;
               text-align: center;
               padding: 0 4px;
+            }
+            @media (max-width: 767px) {
+              .article-content table {
+                min-width: 320px;
+                font-size: 0.85em;
+              }
+              .article-content thead th {
+                padding: 10px 10px;
+              }
+              .article-content td, .article-content th {
+                padding: 8px 10px;
+              }
+              .article-content .table-wrap {
+                position: relative;
+              }
+              .article-content .table-wrap::after {
+                content: 'Scroll to see more →';
+                display: block;
+                font-size: 0.75em;
+                color: hsl(240 5% 55%);
+                font-style: italic;
+                text-align: right;
+                padding: 6px 16px 0;
+              }
             }
 
             /* ── Video embed ── */
