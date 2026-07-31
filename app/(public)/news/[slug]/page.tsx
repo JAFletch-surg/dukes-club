@@ -374,6 +374,75 @@ const PostDetailPage = () => {
               margin: 2.5em 0;
             }
 
+            /* ── Table ── */
+            .article-content .table-wrap {
+              margin: 2em 0;
+              clear: both;
+              overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
+              border-radius: 10px;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            }
+            .article-content table {
+              width: 100%;
+              min-width: 420px;
+              border-collapse: collapse;
+              font-size: 0.95em;
+            }
+            .article-content thead th {
+              background: hsl(220 60% 15%);
+              color: hsl(210 40% 98%);
+              font-family: var(--font-sans, 'Montserrat', sans-serif);
+              font-weight: 700;
+              text-align: left;
+              padding: 12px 16px;
+              border-bottom: 2px solid hsl(42 87% 55%);
+            }
+            .article-content td, .article-content th {
+              padding: 10px 16px;
+              border-bottom: 1px solid hsl(42 87% 90%);
+              line-height: 1.6;
+              vertical-align: top;
+            }
+            .article-content tbody tr:last-child td {
+              border-bottom: none;
+            }
+            .article-content tbody tr:nth-child(even) {
+              background: hsl(42 87% 97%);
+            }
+            .article-content .table-caption {
+              font-size: 0.8em;
+              color: hsl(240 5% 50%);
+              font-style: italic;
+              margin-top: 8px;
+              text-align: center;
+              padding: 0 4px;
+            }
+            @media (max-width: 767px) {
+              .article-content table {
+                min-width: 320px;
+                font-size: 0.85em;
+              }
+              .article-content thead th {
+                padding: 10px 10px;
+              }
+              .article-content td, .article-content th {
+                padding: 8px 10px;
+              }
+              .article-content .table-wrap {
+                position: relative;
+              }
+              .article-content .table-wrap::after {
+                content: 'Scroll to see more →';
+                display: block;
+                font-size: 0.75em;
+                color: hsl(240 5% 55%);
+                font-style: italic;
+                text-align: right;
+                padding: 6px 16px 0;
+              }
+            }
+
             /* ── Video embed ── */
             .video-embed {
               position: relative;

@@ -103,38 +103,37 @@ export async function POST(request: NextRequest) {
       // User was created but email failed — log but don't fail the request
     }
 
-    // For non-approved domains, notify admins that a new registration needs review
-    if (!approved) {
-      try {
-        const { data: admins } = await supabase
-          .from('profiles')
-          .select('email')
-          .in('role', ['admin', 'super_admin'])
+    // Notify admins of every new registration (auto-approved or pending review)
+    try {
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('email')
+        .in('role', ['admin', 'super_admin'])
 
-        const adminEmails = (admins || [])
-          .map((a: { email: string | null }) => a.email)
-          .filter(Boolean) as string[]
+      const adminEmails = (admins || [])
+        .map((a: { email: string | null }) => a.email)
+        .filter(Boolean) as string[]
 
-        if (adminEmails.length > 0) {
-          const adminEmail = adminNewRegistrationEmail({
-            userName: fullName,
-            userEmail: email,
-            region,
-            trainingStage,
-            siteUrl: SITE_URL,
-          })
+      if (adminEmails.length > 0) {
+        const adminEmail = adminNewRegistrationEmail({
+          userName: fullName,
+          userEmail: email,
+          region,
+          trainingStage,
+          siteUrl: SITE_URL,
+          approved,
+        })
 
-          await resend.emails.send({
-            from: FROM_EMAIL,
-            to: adminEmails,
-            subject: adminEmail.subject,
-            html: adminEmail.html,
-          })
-        }
-      } catch (adminNotifyError) {
-        console.error('Admin notification error:', adminNotifyError)
-        // Don't fail registration if admin notification fails
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: adminEmails,
+          subject: adminEmail.subject,
+          html: adminEmail.html,
+        })
       }
+    } catch (adminNotifyError) {
+      console.error('Admin notification error:', adminNotifyError)
+      // Don't fail registration if admin notification fails
     }
 
     return NextResponse.json({ success: true })

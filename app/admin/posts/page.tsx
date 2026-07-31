@@ -5,11 +5,12 @@ import {
   Newspaper, Plus, Edit, Trash2, Save, Loader, X, ImageIcon, Search,
   Users, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote,
   Image as ImageLucide, Video, Link2, Minus, AlignLeft, Eye, Calendar,
-  Type, ChevronDown, Sparkles, FileText
+  Type, ChevronDown, Sparkles, FileText, Table2, Upload
 } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { useImageUpload } from '@/lib/use-image-upload'
 import { createClient } from '@/lib/supabase/client'
+import { escapeHtml } from '@/lib/utils'
 
 const STATUSES = ['draft', 'published', 'archived']
 const CATEGORIES = ['Announcement', 'Education', 'Careers', 'Research', 'Events', 'Policy', 'Member News', 'General']
@@ -169,6 +170,7 @@ type Block =
   | { type: 'pdf'; url: string; title: string }
   | { type: 'quote'; text: string; attribution: string }
   | { type: 'divider' }
+  | { type: 'table'; rows: string[][]; hasHeader: boolean; caption: string }
 
 function blocksToHtml(blocks: Block[]): string {
   return blocks.map(b => {
@@ -187,6 +189,14 @@ function blocksToHtml(blocks: Block[]): string {
       case 'quote': return `<blockquote><p>${b.text}</p>${b.attribution ? `<cite>${b.attribution}</cite>` : ''}</blockquote>`
       case 'pdf': return `<div class="pdf-embed"><a href="${b.url}" target="_blank" rel="noopener noreferrer" class="pdf-link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>${b.title || 'Download PDF'}</a></div>`
       case 'divider': return '<hr />'
+      case 'table': {
+        const dataRows = b.hasHeader ? b.rows.slice(1) : b.rows
+        const headRow = b.hasHeader ? b.rows[0] : null
+        const thead = headRow ? `<thead><tr>${headRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>` : ''
+        const tbody = `<tbody>${dataRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody>`
+        const caption = b.caption ? `<p class="table-caption">${escapeHtml(b.caption)}</p>` : ''
+        return `<div class="table-wrap"><table>${thead}${tbody}</table>${caption}</div>`
+      }
       default: return ''
     }
   }).join('\n')
@@ -200,6 +210,10 @@ function blocksToPlain(blocks: Block[]): string {
     }
     if (b.type === 'image' || b.type === 'video') return b.caption || ''
     if (b.type === 'pdf') return b.title || 'PDF attachment'
+    if (b.type === 'table') {
+      const table = b.rows.map(row => row.join(' | ')).join('\n')
+      return b.caption ? `${table}\n${b.caption}` : table
+    }
     return ''
   }).filter(Boolean).join('\n\n')
 }
@@ -226,6 +240,15 @@ function htmlToBlocks(html: string): Block[] {
       const a = el.querySelector('a')
       blocks.push({ type: 'pdf', url: a?.href || '', title: a?.textContent || 'PDF' })
     }
+    else if (tag === 'div' && el.classList.contains('table-wrap')) {
+      const headCells = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent || '')
+      const bodyRows = Array.from(el.querySelectorAll('tbody tr')).map(tr =>
+        Array.from(tr.querySelectorAll('td')).map(td => td.textContent || '')
+      )
+      const rows = headCells.length > 0 ? [headCells, ...bodyRows] : bodyRows
+      const caption = el.querySelector('.table-caption')?.textContent || ''
+      blocks.push({ type: 'table', rows: rows.length > 0 ? rows : [['', '']], hasHeader: headCells.length > 0, caption })
+    }
     else if (tag === 'figure') {
       const img = el.querySelector('img')
       const video = el.querySelector('video')
@@ -240,11 +263,53 @@ function htmlToBlocks(html: string): Block[] {
   return blocks.length > 0 ? blocks : [{ type: 'paragraph', text: '' }]
 }
 
-function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Block[]) => void }) {
+/* ── CSV parsing for table blocks ────────────────────
+   RFC4180-style state machine: handles quoted fields containing commas or
+   newlines, escaped "" inside quoted fields, and CRLF/LF line endings.
+   Trims trailing blank lines and pads ragged rows to a rectangular grid. */
+const MAX_CSV_BYTES = 2 * 1024 * 1024
+const MAX_CSV_ROWS = 200
+const MAX_CSV_COLS = 20
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQuotes = false
+  let i = 0
+  const n = text.length
+
+  while (i < n) {
+    const char = text[i]
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue }
+        inQuotes = false; i++; continue
+      }
+      field += char; i++; continue
+    } else {
+      if (char === '"') { inQuotes = true; i++; continue }
+      if (char === ',') { row.push(field); field = ''; i++; continue }
+      if (char === '\r') { i++; continue }
+      if (char === '\n') { row.push(field); field = ''; rows.push(row); row = []; i++; continue }
+      field += char; i++; continue
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row) }
+
+  while (rows.length > 0 && rows[rows.length - 1].every(c => c.trim() === '')) rows.pop()
+
+  const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0)
+  return rows.map(r => r.length < maxCols ? [...r, ...Array(maxCols - r.length).fill('')] : r)
+}
+
+function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange: (b: Block[]) => void; onNotice?: (msg: string, type?: 'ok' | 'error') => void }) {
   const { upload, uploading } = useImageUpload()
   const fileRef = useRef<HTMLInputElement>(null)
   const pdfRef = useRef<HTMLInputElement>(null)
+  const csvRef = useRef<HTMLInputElement>(null)
   const [insertIdx, setInsertIdx] = useState<number>(-1)
+  const [csvTargetIdx, setCsvTargetIdx] = useState<number>(-1)
 
   const updateBlock = (i: number, updates: Partial<Block>) => {
     const nb = [...blocks]
@@ -283,6 +348,43 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
       addBlockAfter(blocks.length - 1, { type: 'pdf', url, title })
     }
     e.target.value = ''
+  }
+
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f || csvTargetIdx < 0) return
+
+    if (f.size > MAX_CSV_BYTES) {
+      onNotice?.('CSV must be under 2MB', 'error')
+      return
+    }
+
+    try {
+      const text = await f.text()
+      let rows = parseCsv(text)
+      if (rows.length === 0) {
+        onNotice?.('CSV appears to be empty', 'error')
+        return
+      }
+
+      const originalRows = rows.length
+      const originalCols = rows[0]?.length || 0
+      let truncated = false
+      if (rows.length > MAX_CSV_ROWS) { rows = rows.slice(0, MAX_CSV_ROWS); truncated = true }
+      if (originalCols > MAX_CSV_COLS) { rows = rows.map(r => r.slice(0, MAX_CSV_COLS)); truncated = true }
+
+      updateBlock(csvTargetIdx, { rows, hasHeader: true })
+
+      onNotice?.(
+        truncated
+          ? `Imported ${rows.length} rows × ${rows[0]?.length || 0} columns (trimmed from ${originalRows} × ${originalCols} — split large data into multiple tables)`
+          : `Imported ${rows.length} rows from CSV`,
+        'ok'
+      )
+    } catch (err: any) {
+      onNotice?.(err?.message || 'Failed to read CSV file', 'error')
+    }
   }
 
   const toolbarBtnStyle = (active = false) => ({
@@ -422,6 +524,82 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
                 <div style={{ margin: '16px 0', borderTop: '2px solid #eee' }} />
               )}
 
+              {block.type === 'table' && (
+                <div style={{ margin: '12px 0', padding: 14, border: `1px solid #eee`, borderRadius: 10, background: '#fafafa' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.secondary, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={block.hasHeader} onChange={(e) => updateBlock(i, { hasHeader: e.target.checked })} />
+                      First row is header
+                    </label>
+                    <button type="button" onClick={() => {
+                      const cols = block.rows[0]?.length || 1
+                      updateBlock(i, { rows: [...block.rows, Array(cols).fill('')] })
+                    }} style={{ ...toolbarBtnStyle(), fontSize: 11, padding: '4px 8px', border: `1px solid ${C.muted}` }}>+ Row</button>
+                    <button type="button" onClick={() => {
+                      updateBlock(i, { rows: block.rows.map(r => [...r, '']) })
+                    }} style={{ ...toolbarBtnStyle(), fontSize: 11, padding: '4px 8px', border: `1px solid ${C.muted}` }}>+ Column</button>
+                    <button type="button" onClick={() => { setCsvTargetIdx(i); csvRef.current?.click() }}
+                      style={{ ...toolbarBtnStyle(), fontSize: 11, padding: '4px 8px', border: `1px solid ${C.muted}`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Upload size={11} /> Upload CSV
+                    </button>
+                    <span style={{ fontSize: 10, color: '#aaa' }}>CSV up to 2MB · first row becomes the header · replaces current cells</span>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {block.rows.map((row, ri) => (
+                          <tr key={ri}>
+                            {row.map((cell, ci) => (
+                              <td key={ci} style={{ padding: 2 }}>
+                                <input
+                                  value={cell}
+                                  onChange={(e) => {
+                                    const nr = block.rows.map(r => [...r])
+                                    nr[ri] = [...nr[ri]]
+                                    nr[ri][ci] = e.target.value
+                                    updateBlock(i, { rows: nr })
+                                  }}
+                                  placeholder={block.hasHeader && ri === 0 ? `Header ${ci + 1}` : 'Cell'}
+                                  style={{
+                                    width: 120, padding: '6px 8px', borderRadius: 6, fontSize: 12,
+                                    fontFamily: 'Montserrat, sans-serif', outline: 'none',
+                                    border: `1.5px solid ${C.muted}`,
+                                    fontWeight: block.hasHeader && ri === 0 ? 700 : 400,
+                                    background: block.hasHeader && ri === 0 ? '#fff' : 'transparent',
+                                    color: block.hasHeader && ri === 0 ? C.navy : C.fg,
+                                  }}
+                                />
+                              </td>
+                            ))}
+                            <td style={{ padding: 2 }}>
+                              {block.rows.length > 1 && (
+                                <button type="button" onClick={() => updateBlock(i, { rows: block.rows.filter((_, idx) => idx !== ri) })}
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.destructive, padding: 4, display: 'flex' }} title="Remove row"><X size={12} /></button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          {block.rows[0]?.map((_, ci) => (
+                            <td key={ci} style={{ textAlign: 'center' }}>
+                              {block.rows[0].length > 1 && (
+                                <button type="button" onClick={() => updateBlock(i, { rows: block.rows.map(r => r.filter((_, idx) => idx !== ci)) })}
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.destructive, fontSize: 10, padding: 2 }} title="Remove column">✕ col</button>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <input value={block.caption} onChange={(e) => updateBlock(i, { caption: e.target.value })}
+                    placeholder="Table caption (optional)"
+                    style={{ width: '100%', border: 'none', borderTop: '1px solid #eee', padding: '8px 4px 2px', marginTop: 10, fontSize: 12, color: '#999', fontStyle: 'italic', outline: 'none', background: 'transparent', fontFamily: 'Montserrat, sans-serif' }} />
+                </div>
+              )}
+
               {/* Block controls (hover) */}
               <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 2, opacity: 0.3, transition: 'opacity 0.15s' }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '1' }}
@@ -444,11 +622,13 @@ function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (b: Bloc
           <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'video', url: '', caption: '' })} style={toolbarBtnStyle()} title="Video"><Video size={14} /></button>
           <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'quote', text: '', attribution: '' })} style={toolbarBtnStyle()} title="Quote"><Quote size={14} /></button>
           <button type="button" onClick={() => { setInsertIdx(blocks.length - 1); pdfRef.current?.click() }} style={toolbarBtnStyle()} title="PDF"><FileText size={14} /></button>
+          <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'table', rows: [['', '', ''], ['', '', '']], hasHeader: true, caption: '' })} style={toolbarBtnStyle()} title="Table"><Table2 size={14} /></button>
           <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'divider' })} style={toolbarBtnStyle()} title="Divider"><Minus size={14} /></button>
         </div>
 
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
         <input ref={pdfRef} type="file" accept=".pdf,application/pdf" style={{ display: 'none' }} onChange={handlePdfUpload} />
+        <input ref={csvRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleCsvUpload} />
       </div>
       <p style={S.hint}>Click a text block to see formatting options · <b>Ctrl+B</b> bold · <b>Ctrl+I</b> italic · <b>Ctrl+K</b> link · Enter for new paragraph</p>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -729,7 +909,7 @@ export default function PostsAdmin() {
 
               {/* Block editor */}
               <div style={S.section}>
-                <BlockEditor blocks={form.content_blocks} onChange={(b) => setForm({ ...form, content_blocks: b })} />
+                <BlockEditor blocks={form.content_blocks} onChange={(b) => setForm({ ...form, content_blocks: b })} onNotice={(msg, type) => showToast(msg, type)} />
               </div>
             </div>
 

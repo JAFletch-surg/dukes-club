@@ -428,17 +428,22 @@ export function adminNewRegistrationEmail(params: {
   region: string
   trainingStage: string
   siteUrl: string
+  approved?: boolean
 }): { subject: string; html: string } {
-  const { userName, userEmail, region, trainingStage, siteUrl } = params
+  const { userName, userEmail, region, trainingStage, siteUrl, approved } = params
 
   return {
-    subject: `New registration pending review — ${userName}`,
+    subject: approved
+      ? `New registration (auto-approved) — ${userName}`
+      : `New registration pending review — ${userName}`,
     html: layout(`
       <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
         New Member Registration
       </h2>
       <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.7;">
-        A new user has registered with a non-NHS email and requires admin review.
+        ${approved
+          ? 'A new user has registered with an approved NHS/academic email and has been automatically approved.'
+          : 'A new user has registered with a non-NHS email and requires admin review.'}
       </p>
 
       <div style="background-color:#F9F8F5;border:1px solid #E8E6E1;border-radius:8px;padding:20px;margin:0 0 24px;">

@@ -9,6 +9,8 @@ import {
   bookingStatusEmail,
   passwordResetEmail,
   adminNewRegistrationEmail,
+  feedbackRequestEmail,
+  certificateReadyEmail,
 } from '@/lib/emails/templates'
 
 function getSupabase() {
@@ -20,7 +22,7 @@ function getSupabase() {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
-type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration'
+type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration' | 'feedback_request' | 'certificate_ready'
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,6 +123,25 @@ export async function POST(request: NextRequest) {
           region: data.region || 'Not specified',
           trainingStage: data.trainingStage || 'Not specified',
           siteUrl: SITE_URL,
+          approved: data.approved,
+        })
+        break
+
+      case 'feedback_request':
+        email = feedbackRequestEmail({
+          name: data.name || 'Member',
+          eventTitle: data.eventTitle,
+          eventId: data.eventId,
+        })
+        break
+
+      case 'certificate_ready':
+        email = certificateReadyEmail({
+          name: data.name || 'Member',
+          eventTitle: data.eventTitle,
+          eventId: data.eventId,
+          certificateId: data.certificateId,
+          cpdPoints: data.cpdPoints,
         })
         break
 
