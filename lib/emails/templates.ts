@@ -388,10 +388,10 @@ export function feedbackRequestEmail(params: {
   name: string
   eventTitle: string
   eventId: string
+  siteUrl: string
 }): { subject: string; html: string } {
-  const { name, eventTitle, eventId } = params
+  const { name, eventTitle, eventId, siteUrl } = params
   const firstName = name.split(' ')[0] || name
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
   return {
     subject: `We'd love your feedback — ${eventTitle}`,
@@ -593,10 +593,10 @@ export function certificateReadyEmail(params: {
   eventId: string
   certificateId: string
   cpdPoints?: number | null
+  siteUrl: string
 }): { subject: string; html: string } {
-  const { name, eventTitle, eventId, certificateId, cpdPoints } = params
+  const { name, eventTitle, eventId, certificateId, cpdPoints, siteUrl } = params
   const firstName = name.split(' ')[0] || name
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
   return {
     subject: `Your Certificate — ${eventTitle}`,

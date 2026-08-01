@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { passwordResetEmail } from '@/lib/emails/templates'
+import { SITE_URL } from '@/lib/site-url'
 
 function getSupabase() {
   return createClient(
@@ -11,7 +12,6 @@ function getSupabase() {
   )
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 const TOKEN_EXPIRY_HOURS = 1
 
 export async function POST(request: NextRequest) {

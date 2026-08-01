@@ -12,6 +12,7 @@ import {
   feedbackRequestEmail,
   certificateReadyEmail,
 } from '@/lib/emails/templates'
+import { SITE_URL } from '@/lib/site-url'
 
 function getSupabase() {
   return createClient(
@@ -19,8 +20,6 @@ function getSupabase() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
 type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration' | 'feedback_request' | 'certificate_ready'
 
@@ -132,6 +131,7 @@ export async function POST(request: NextRequest) {
           name: data.name || 'Member',
           eventTitle: data.eventTitle,
           eventId: data.eventId,
+          siteUrl: SITE_URL,
         })
         break
 
@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
           eventId: data.eventId,
           certificateId: data.certificateId,
           cpdPoints: data.cpdPoints,
+          siteUrl: SITE_URL,
         })
         break
 

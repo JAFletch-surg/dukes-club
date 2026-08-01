@@ -6,7 +6,10 @@ import {
   bookingConfirmationEmail,
   bookingStatusEmail,
   passwordResetEmail,
+  feedbackRequestEmail,
+  certificateReadyEmail,
 } from '@/lib/emails/templates'
+import { SITE_URL } from '@/lib/site-url'
 
 // GET /api/email/preview?template=welcome
 // Dev-only route to preview email templates in the browser
@@ -61,6 +64,22 @@ export async function GET(request: NextRequest) {
     password_reset: passwordResetEmail({
       name: 'Jordan Fletcher',
       resetUrl: `${siteUrl}/reset-password?token=xyz789`,
+    }),
+    // These two use the resolved SITE_URL rather than localhost so the preview
+    // shows the exact links production would send.
+    feedback_request: feedbackRequestEmail({
+      name: 'Jordan Fletcher',
+      eventTitle: 'Laparoscopic Skills Masterclass',
+      eventId: 'demo-event-id',
+      siteUrl: SITE_URL,
+    }),
+    certificate_ready: certificateReadyEmail({
+      name: 'Jordan Fletcher',
+      eventTitle: 'Laparoscopic Skills Masterclass',
+      eventId: 'demo-event-id',
+      certificateId: 'demo-certificate-id',
+      cpdPoints: 6,
+      siteUrl: SITE_URL,
     }),
   }
 

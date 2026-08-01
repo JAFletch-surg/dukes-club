@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { welcomeEmail, adminNewRegistrationEmail } from '@/lib/emails/templates'
+import { SITE_URL } from '@/lib/site-url'
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'info@thedukesclub.org.uk'
 
 const APPROVED_DOMAINS = ['nhs.net', 'nhs.uk', 'doctors.org.uk']
 const APPROVED_SUFFIX = '.ac.uk'
@@ -114,22 +115,33 @@ export async function POST(request: NextRequest) {
         .map((a: { email: string | null }) => a.email)
         .filter(Boolean) as string[]
 
-      if (adminEmails.length > 0) {
-        const adminEmail = adminNewRegistrationEmail({
-          userName: fullName,
-          userEmail: email,
-          region,
-          trainingStage,
-          siteUrl: SITE_URL,
-          approved,
-        })
+      // Never let a missing admin address swallow the notification silently —
+      // fall back to the club inbox so a registration is always visible.
+      if (adminEmails.length === 0) {
+        console.warn(
+          `No admin profile has an email address; sending new-registration notice to ${ADMIN_EMAIL}`
+        )
+      }
+      const recipients = adminEmails.length > 0 ? adminEmails : [ADMIN_EMAIL]
 
-        await resend.emails.send({
-          from: FROM_EMAIL,
-          to: adminEmails,
-          subject: adminEmail.subject,
-          html: adminEmail.html,
-        })
+      const adminEmail = adminNewRegistrationEmail({
+        userName: fullName,
+        userEmail: email,
+        region,
+        trainingStage,
+        siteUrl: SITE_URL,
+        approved,
+      })
+
+      const { error: adminSendError } = await resend.emails.send({
+        from: FROM_EMAIL,
+        to: recipients,
+        subject: adminEmail.subject,
+        html: adminEmail.html,
+      })
+
+      if (adminSendError) {
+        console.error('Admin notification Resend error:', adminSendError)
       }
     } catch (adminNotifyError) {
       console.error('Admin notification error:', adminNotifyError)
