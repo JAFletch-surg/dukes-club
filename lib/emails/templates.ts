@@ -625,3 +625,230 @@ export function certificateReadyEmail(params: {
     `),
   }
 }
+// ─────────────────────────────────────────
+// 13. Dukes Weekend — booking confirmation
+// ─────────────────────────────────────────
+// The weekend books as one row covering up to three days, so the confirmation
+// has to spell out which days the member actually holds, how they are joining
+// Saturday, and whether a room was requested — none of which the generic
+// booking confirmation can express.
+
+export function weekendBookingEmail(params: {
+  name: string
+  eventTitle: string
+  eventDates: string
+  eventLocation: string
+  days: { friday: boolean; saturday: boolean; sunday: boolean }
+  saturdayMode: 'in_person' | 'stream' | null
+  courses: string[]
+  roomFriday: boolean
+  roomSaturday: boolean
+  depositPence: number
+  eventSlug: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const {
+    name, eventTitle, eventDates, eventLocation, days, saturdayMode,
+    courses, roomFriday, roomSaturday, depositPence, eventSlug, siteUrl,
+  } = params
+  const firstName = name.split(' ')[0] || name
+
+  const attending = [
+    days.friday ? 'Friday' : null,
+    days.saturday ? (saturdayMode === 'stream' ? 'Saturday (online)' : 'Saturday') : null,
+    days.sunday ? 'Sunday' : null,
+  ].filter(Boolean).join(', ')
+
+  const rooms = [
+    roomFriday ? 'Friday night' : null,
+    roomSaturday ? 'Saturday night' : null,
+  ].filter(Boolean).join(' and ')
+
+  const row = (label: string, value: string) => `
+    <tr>
+      <td style="padding:4px 12px 4px 0;font-size:13px;color:#888;vertical-align:top;">${label}</td>
+      <td style="padding:4px 0;font-size:14px;color:#444;font-weight:600;">${value}</td>
+    </tr>`
+
+  return {
+    subject: `Booking Confirmed — ${eventTitle}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        Booking Confirmed
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName}, your place at ${escapeHtml(eventTitle)} is booked. Here is what you have.
+      </p>
+
+      <div style="background-color:#F9F8F5;border:1px solid #E8E6E1;border-radius:8px;padding:20px;margin:24px 0;">
+        <h3 style="margin:0 0 12px;font-size:16px;font-weight:700;color:#0F1F3D;">
+          ${escapeHtml(eventTitle)}
+        </h3>
+        <table role="presentation" cellpadding="0" cellspacing="0">
+          ${row('Dates', escapeHtml(eventDates))}
+          ${row('Location', escapeHtml(eventLocation))}
+          ${row('Attending', escapeHtml(attending))}
+          ${courses.length > 0 ? row('Courses', courses.map(escapeHtml).join('<br />')) : ''}
+          ${rooms ? row('Room requested', escapeHtml(rooms)) : ''}
+        </table>
+      </div>
+
+      ${depositPence > 0 ? `
+      <div style="background-color:#FFF8E7;border:1.5px solid #E5A718;padding:14px 20px;margin:0 0 24px;border-radius:10px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#92400E;">
+          Refundable deposit: £${(depositPence / 100).toFixed(depositPence % 100 === 0 ? 0 : 2)}
+        </p>
+        <p style="margin:0;font-size:13px;color:#92400E;line-height:1.6;">
+          One deposit covers the whole weekend, however many days or courses you book.
+          It is returned after the event.
+        </p>
+      </div>
+      ` : ''}
+
+      ${rooms ? `
+      <p style="margin:0 0 20px;font-size:13px;color:#888;line-height:1.6;">
+        Rooms are allocated by the Dukes' Club — we will confirm your room nearer the time.
+      </p>
+      ` : ''}
+
+      ${button('View the Event', `${siteUrl}/events/${eventSlug}`)}
+
+      <p style="margin:0;font-size:14px;color:#888;">
+        Need to change your booking? You can update it on the event page until bookings close,
+        or contact us at
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
+      </p>
+    `),
+  }
+}
+
+// ─────────────────────────────────────────
+// 14. Dukes Weekend — promoted off a course waitlist
+// ─────────────────────────────────────────
+// Sent the moment a place frees up and the member is moved into it. They did
+// not ask for this at this instant, so it says plainly that they now hold a
+// place and how to give it up if they no longer want it.
+
+export function weekendWaitlistPromotedEmail(params: {
+  name: string
+  eventTitle: string
+  courseTitle: string
+  courseTime: string
+  eventSlug: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { name, eventTitle, courseTitle, courseTime, eventSlug, siteUrl } = params
+  const firstName = name.split(' ')[0] || name
+
+  return {
+    subject: `You're in — ${courseTitle}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        A Place Has Opened Up
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName}, a place has come free on <strong>${escapeHtml(courseTitle)}</strong>
+        at ${escapeHtml(eventTitle)}, and you were next on the waitlist. You now hold that place —
+        there is nothing further you need to do.
+      </p>
+
+      <div style="background-color:#F9F8F5;border:1px solid #E8E6E1;border-radius:8px;padding:20px;margin:24px 0;">
+        <h3 style="margin:0 0 8px;font-size:16px;font-weight:700;color:#0F1F3D;">
+          ${escapeHtml(courseTitle)}
+        </h3>
+        <p style="margin:0;font-size:14px;color:#444;font-weight:600;">${escapeHtml(courseTime)}</p>
+      </div>
+
+      ${button('View the Event', `${siteUrl}/events/${eventSlug}`)}
+
+      <p style="margin:0;font-size:14px;color:#888;">
+        If you no longer want this place, please release it on the event page so
+        someone else can take it.
+      </p>
+    `),
+  }
+}
+
+// ─────────────────────────────────────────
+// 15. Dukes Weekend — room request invalidated
+// ─────────────────────────────────────────
+// A Friday night room depends on holding a Friday course. If the member drops
+// the course that made them eligible, the request falls away with it — telling
+// them is the whole point, since otherwise they would turn up expecting a bed.
+
+export function weekendRoomInvalidatedEmail(params: {
+  name: string
+  eventTitle: string
+  night: 'Friday' | 'Saturday'
+  reason: string
+  eventSlug: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { name, eventTitle, night, reason, eventSlug, siteUrl } = params
+  const firstName = name.split(' ')[0] || name
+
+  return {
+    subject: `${night} night room request cancelled — ${eventTitle}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        ${night} Night Room Request Cancelled
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName}, your request for a ${night.toLowerCase()} night room at
+        ${escapeHtml(eventTitle)} has been cancelled because ${escapeHtml(reason)}
+      </p>
+
+      <div style="background-color:#FFF8E7;border:1.5px solid #E5A718;padding:14px 20px;margin:0 0 24px;border-radius:10px;">
+        <p style="margin:0;font-size:14px;color:#92400E;line-height:1.6;">
+          You will not have a room for ${night.toLowerCase()} night. If that is not what you
+          intended, you can rebook on the event page — rooms are limited and allocated in order.
+        </p>
+      </div>
+
+      ${button('View the Event', `${siteUrl}/events/${eventSlug}`)}
+
+      <p style="margin:0;font-size:14px;color:#888;">
+        Questions? Contact us at
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
+      </p>
+    `),
+  }
+}
+
+// ─────────────────────────────────────────
+// 16. Dukes Weekend — deposit refunded
+// ─────────────────────────────────────────
+
+export function weekendDepositRefundedEmail(params: {
+  name: string
+  eventTitle: string
+  amountPence: number
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { name, eventTitle, amountPence, siteUrl } = params
+  const firstName = name.split(' ')[0] || name
+  const amount = `£${(amountPence / 100).toFixed(amountPence % 100 === 0 ? 0 : 2)}`
+
+  return {
+    subject: `Deposit refunded — ${eventTitle}`,
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        Your Deposit Has Been Refunded
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName}, your ${amount} deposit for ${escapeHtml(eventTitle)} has been refunded.
+        Thank you for joining us.
+      </p>
+      <p style="margin:0 0 24px;font-size:14px;color:#888;line-height:1.6;">
+        Please allow a few working days for it to reach your account.
+      </p>
+
+      ${button('Back to the Members Area', `${siteUrl}/members`)}
+
+      <p style="margin:0;font-size:14px;color:#888;">
+        If you think this is wrong, contact us at
+        <a href="mailto:info@thedukesclub.org.uk" style="color:#E5A718;text-decoration:none;font-weight:600;">info@thedukesclub.org.uk</a>
+      </p>
+    `),
+  }
+}

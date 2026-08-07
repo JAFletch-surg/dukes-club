@@ -1,6 +1,9 @@
 import type { Profile } from '@/lib/auth-provider'
 
-const IN_PERSON_EVENT_TYPES = ['In Person Course', 'Practical Workshop', 'Conference', 'Hybrid']
+// A Dukes Weekend is members-only by definition, so it belongs here rather
+// than needing a gate of its own — trainees get the same "Full Members Only"
+// panel every other in-person event type shows them.
+const IN_PERSON_EVENT_TYPES = ['In Person Course', 'Practical Workshop', 'Conference', 'Hybrid', 'Dukes Weekend']
 
 /**
  * Check if a trainee's 3-month question bank trial has expired.

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Star, Loader, CheckCircle, Award, Download, ArrowLeft, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -32,9 +32,13 @@ interface FeedbackForm {
 
 export default function EventFeedbackPage() {
   const { eventId } = useParams<{ eventId: string }>()
+  // ?courseId= asks for one weekend course's feedback rather than the event's.
+  const searchParams = useSearchParams()
+  const courseId = searchParams.get('courseId')
   const router = useRouter()
   const { user, profile } = useAuth()
 
+  const [course, setCourse] = useState<{ id: string; title: string } | null>(null)
   const [event, setEvent] = useState<any>(null)
   const [form, setForm] = useState<FeedbackForm | null>(null)
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -58,13 +62,29 @@ export default function EventFeedbackPage() {
         .single()
       if (ev) setEvent(ev)
 
-      // Load active feedback form
-      const { data: fbForm } = await supabase
+      // Load the active feedback form for whichever level was asked for.
+      //
+      // A weekend has one form per course plus one for the event overall, so
+      // the course_id filter is what keeps these apart — without it this
+      // query would match several rows and fail.
+      let formQuery = supabase
         .from('event_feedback_forms')
         .select('*')
         .eq('event_id', eventId)
         .eq('is_active', true)
-        .single()
+
+      formQuery = courseId ? formQuery.eq('course_id', courseId) : formQuery.is('course_id', null)
+
+      const { data: fbForm } = await formQuery.maybeSingle()
+
+      if (courseId) {
+        const { data: c } = await supabase
+          .from('weekend_courses')
+          .select('id, title')
+          .eq('id', courseId)
+          .single()
+        if (c) setCourse(c)
+      }
 
       if (!fbForm) {
         setError('Feedback is not currently available for this event.')
@@ -110,7 +130,7 @@ export default function EventFeedbackPage() {
       setLoading(false)
     }
     load()
-  }, [eventId, user])
+  }, [eventId, user, courseId])
 
   // ── Submit feedback ────────────────────────────────────────
 
@@ -151,6 +171,7 @@ export default function EventFeedbackPage() {
         .insert({
           form_id: form.id,
           event_id: eventId,
+          course_id: courseId || null,
           user_id: user.id,
           booking_id: booking?.id || null,
           answers,
@@ -297,7 +318,11 @@ export default function EventFeedbackPage() {
           <ArrowLeft size={14} /> Back to Dashboard
         </Link>
         <h1 className="text-2xl font-bold text-foreground">{form.title}</h1>
-        {event && (
+        {course ? (
+          <p className="text-muted-foreground text-sm mt-1">
+            {course.title}{event && <span className="opacity-60"> · {event.title}</span>}
+          </p>
+        ) : event && (
           <p className="text-muted-foreground text-sm mt-1">{event.title}</p>
         )}
         {form.description && (

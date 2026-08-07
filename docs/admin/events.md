@@ -49,6 +49,7 @@ A tag-free copy of the description is stored separately and is what the event ca
 | Conference         | Large-scale event                             |
 | In Person Course   | In-person teaching (applications enabled)     |
 | Hybrid             | Combined online and in-person                 |
+| Dukes Weekend      | Three-day members-only weekend — see [Dukes Weekend](#dukes-weekend) |
 
 ### Access Levels
 
@@ -168,3 +169,74 @@ A set of **default questions** is provided (overall rating, content quality, fac
 * Set a **certificate title** (e.g. "Certificate of Attendance").
 * Specify **CPD points** awarded.
 * Certificates are generated and available for download by attendees who completed the feedback form.
+
+## Dukes Weekend
+
+A **Dukes Weekend** is an event type like any other, but it books differently: one event spanning three days, with its own courses, accommodation and deposit.
+
+| Day | Contents | Bookable alone? |
+| --- | --- | --- |
+| Friday | Any number of in-person courses | Yes |
+| Saturday | The main programme | Yes |
+| Sunday | Courses, including the revision course | **No** — requires Saturday |
+
+Members may book Friday only, Saturday only, Friday + Saturday, Saturday + Sunday, or all three. Sunday never stands alone.
+
+> **Setup:** Run `supabase/create-dukes-weekend.sql` and then `supabase/dukes-weekend-functions.sql` once against the database. The second file carries the booking rules, so a weekend will not work with only the first applied. To check the rules afterwards, run `supabase/dukes-weekend-tests.sql` — it exercises every rule against a throwaway weekend and rolls back.
+
+### Creating one
+
+Choose **Dukes Weekend** as the event type. The core details are the same as any event (title, dates, venue, description, imagery), plus a **Dukes Weekend Settings** section:
+
+* **Refundable Deposit** — in pence. One deposit per member for the whole weekend, however many days or courses they book. Leave blank for no deposit.
+* **Booking Closes** — the cut-off for booking, for changing days, and for switching courses.
+* **Stream the Saturday programme** — off by default. When on, members choose in person or stream as they book Saturday. The stream is free, has no capacity limit, and stream attendees cannot request a room.
+* **Friday / Saturday Night Rooms** — how many rooms the venue has each night. Leave blank for no limit; once full, further requests are refused.
+
+A Dukes Weekend is **members only** — that is built into the event type, not a setting. Non-members still see the event page, but the booking controls are replaced by a members-only notice.
+
+### Courses
+
+Courses run on **Friday** and **Sunday**. Saturday is the main programme and uses the event's own timetable instead.
+
+Save the event first, then open **Courses** from the events list. For each course set:
+
+* Title, description, and start/end times — the times decide which courses clash
+* **Capacity** — a hard limit; bookings are refused once it is reached
+* **Learning objectives** — an ordered list
+* **Course timetable** — time, title, optional description and optional faculty per item
+* **Faculty** — the same picker used elsewhere on the site
+* **Revision course** — a label for the Sunday revision course. It books exactly like any other course; the flag is only for labelling and reporting
+* **Waitlist** — on by default. Members join a queue when a course is full and are promoted automatically, and emailed, when a place frees up
+
+A member may hold only **one course per overlapping time slot**. Overlapping courses are greyed out for them with an explanation. Two courses on the same day at the same time is perfectly normal — it is how a choice is offered.
+
+### Accommodation
+
+Members state whether they need a room for **Friday night** and/or **Saturday night**. They are stating a need, not choosing a room — Dukes allocates the rooms.
+
+* A **Friday** room requires a confirmed place on a Friday course. If a member later drops their last Friday course, the request is cancelled automatically and they are emailed.
+* A **Saturday** room requires attending Saturday **in person**. Stream attendees cannot request one.
+
+Open **Rooms** from the events list to see every request, filter by night or by what is still unallocated, record the allocated room against each member, and export the list as CSV.
+
+### Deposits
+
+The deposit is recorded against the member's booking when they book. Nothing is charged online yet — deposits are collected offline and an admin records them.
+
+Open **Attendees** from the events list to see each member's days, courses, rooms and deposit. From there you can **Mark paid** and **Refund**, one at a time or with **Refund All** once the weekend is over. Every change is written to an audit trail, and members are emailed when their deposit is refunded.
+
+> **Payments:** Stripe is not connected. The site ships with a manual provider, and a Stripe implementation is stubbed behind the `PAYMENT_PROVIDER` environment variable so it can be switched on later without rebuilding the booking flow.
+
+### Sponsors
+
+Add sponsors to a Dukes Weekend from the event form. Sponsors are shared across the site — create and edit the records themselves under **Admin → Sponsors** — and each one can be given a tier just for this event and a sort order. They appear in a dedicated section on the event page, grouped by tier.
+
+### Feedback
+
+A Dukes Weekend has feedback at two levels:
+
+* **Each course** has its own form, reached from the **Feedback** button beside it on the Courses screen.
+* **The weekend overall**, including the Saturday programme, uses the event's own feedback form as normal.
+
+Responses are viewed per course or for the event, in the same builder and response views used everywhere else.

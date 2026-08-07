@@ -35,6 +35,21 @@ Set these in `.env.local` for development and in the Vercel project settings for
 | `INTERNAL_API_SECRET` | Shared secret for internal API calls |
 | `VIMEO_ACCESS_TOKEN` | Vimeo API token for the account hosting the videos |
 | `VIMEO_FOLDER_ID` | *Legacy fallback.* See below |
+| `PAYMENT_PROVIDER` | Which provider handles Dukes Weekend deposits. See below |
+
+### Payments
+
+Dukes Weekend deposits go through a provider abstraction in `lib/payments/`. `PAYMENT_PROVIDER`
+selects the implementation — anything other than `stripe` (including unset) uses `manual`, so a
+missing or misspelled value can never quietly route real money somewhere unexpected.
+
+`manual` is the only live provider today: deposits are recorded against a booking and an admin
+marks them paid and refunded from **Admin → Event → Attendees**. Bookings work end to end with no
+payment processing.
+
+`stripe` is a stub. `lib/payments/stripe.ts` conforms to the same interface and throws until it is
+implemented; the data model already carries the payment intent and charge references it will need,
+so switching over is that file plus `STRIPE_SECRET_KEY`, not a rebuild of the booking flow.
 
 ### Vimeo folders
 

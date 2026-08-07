@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare, Pencil } from 'lucide-react'
+import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare, Pencil, GraduationCap, BedDouble } from 'lucide-react'
 import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
@@ -9,10 +9,10 @@ import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-pi
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 import { ImageField } from '@/components/admin/image-field'
 import { RichTextField } from '@/components/admin/rich-text-field'
-import { isStreamingEvent } from '@/lib/events'
+import { isStreamingEvent, isWeekendEvent, DUKES_WEEKEND_TYPE } from '@/lib/events'
 import { richTextToHtml, htmlToPlainText } from '@/lib/rich-text'
 
-const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
+const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference', DUKES_WEEKEND_TYPE]
 const STATUSES = ['draft', 'published', 'archived']
 const STREAM_TYPES = ['zoom', 'vimeo_live', 'hybrid']
 const ACCESS_LEVELS = ['public', 'registered', 'members_only', 'invite_only']
@@ -38,6 +38,10 @@ function slugify(text: string) {
 }
 
 interface TimetableEntry { time: string; title: string }
+
+interface SponsorOption { id: string; name: string; logo_url: string | null; tier: string | null }
+interface AssignedSponsor { sponsor_id: string; tier_override: string; sort_order: number }
+interface EventSponsorRow { event_id: string; sponsor_id: string; tier_override: string | null; sort_order: number | null }
 interface TimetableDay { day: string; label: string; entries: TimetableEntry[] }
 
 function parseCSV(text: string): TimetableEntry[] {
@@ -104,6 +108,24 @@ export default function EventsAdmin() {
   }, [])
 
   const [eventFacultyMap, setEventFacultyMap] = useState<Record<string, { faculty_id: string; role: string }[]>>({})
+  const [sponsors, setSponsors] = useState<SponsorOption[]>([])
+  const [eventSponsorMap, setEventSponsorMap] = useState<Record<string, AssignedSponsor[]>>({})
+
+  // Sponsors are site-wide records; a Dukes Weekend attaches existing ones
+  // through event_sponsors rather than defining its own.
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('sponsors').select('id, name, logo_url, tier').order('name')
+      .then(({ data }) => setSponsors((data || []) as SponsorOption[]))
+    supabase.from('event_sponsors').select('event_id, sponsor_id, tier_override, sort_order').then(({ data }) => {
+      const map: Record<string, AssignedSponsor[]> = {}
+      ;((data || []) as EventSponsorRow[]).forEach((es) => {
+        if (!map[es.event_id]) map[es.event_id] = []
+        map[es.event_id].push({ sponsor_id: es.sponsor_id, tier_override: es.tier_override || '', sort_order: es.sort_order ?? 0 })
+      })
+      setEventSponsorMap(map)
+    })
+  }, [])
 
   // Load event_faculty ONCE on mount — managed locally after that
   useEffect(() => {
@@ -141,6 +163,13 @@ export default function EventsAdmin() {
     places_available: '' as string | number,
     auto_approve: false,
     confirmation_message: '',
+    // Dukes Weekend fields
+    weekend_deposit_pence: '' as string | number,
+    weekend_stream_enabled: false,
+    weekend_stream_url: '',
+    weekend_friday_room_capacity: '' as string | number,
+    weekend_saturday_room_capacity: '' as string | number,
+    assigned_sponsors: [] as AssignedSponsor[],
   }
   const [form, setForm] = useState(emptyForm)
 
@@ -177,6 +206,12 @@ export default function EventsAdmin() {
       places_available: e.places_available ?? '',
       auto_approve: e.auto_approve || false,
       confirmation_message: e.confirmation_message || '',
+      weekend_deposit_pence: e.weekend_deposit_pence ?? '',
+      weekend_stream_enabled: e.weekend_stream_enabled || false,
+      weekend_stream_url: e.weekend_stream_url || '',
+      weekend_friday_room_capacity: e.weekend_friday_room_capacity ?? '',
+      weekend_saturday_room_capacity: e.weekend_saturday_room_capacity ?? '',
+      assigned_sponsors: eventSponsorMap[e.id] || [],
     })
     setEditing(e.id)
   }
@@ -223,6 +258,26 @@ export default function EventsAdmin() {
         auto_approve: form.auto_approve,
         confirmation_message: form.confirmation_message || null,
       }
+      // Weekend fields are cleared for other event types for the same reason
+      // applications_enabled is above: the section that would let an admin turn
+      // them off is hidden once the type changes, so a stale deposit or room
+      // cap would otherwise stick to the row forever.
+      if (isWeekendEvent(form.event_type)) {
+        payload.weekend_deposit_pence = form.weekend_deposit_pence ? Number(form.weekend_deposit_pence) : null
+        payload.weekend_stream_enabled = form.weekend_stream_enabled
+        payload.weekend_stream_url = form.weekend_stream_url || null
+        payload.weekend_friday_room_capacity = form.weekend_friday_room_capacity ? Number(form.weekend_friday_room_capacity) : null
+        payload.weekend_saturday_room_capacity = form.weekend_saturday_room_capacity ? Number(form.weekend_saturday_room_capacity) : null
+        // Members-only is implicit for this subtype, not an admin choice.
+        payload.access_level = 'members_only'
+      } else {
+        payload.weekend_deposit_pence = null
+        payload.weekend_stream_enabled = false
+        payload.weekend_stream_url = null
+        payload.weekend_friday_room_capacity = null
+        payload.weekend_saturday_room_capacity = null
+      }
+
       if (isStreamingType(form.event_type)) {
         payload.stream_type = form.stream_type
         payload.zoom_url = form.zoom_url || null
@@ -268,8 +323,26 @@ export default function EventsAdmin() {
         if (insErr) console.error('INSERT event_faculty error:', insErr)
       }
 
-      // Update local map
+      // Sync event_sponsors junction — same delete-then-reinsert approach as
+      // event_faculty above.
+      const { error: delSponsorErr } = await supabase.from('event_sponsors').delete().eq('event_id', eventId)
+      if (delSponsorErr) console.error('DELETE event_sponsors error:', delSponsorErr)
+
+      if (form.assigned_sponsors.length > 0) {
+        const { error: insSponsorErr } = await supabase.from('event_sponsors').insert(
+          form.assigned_sponsors.map((s, i) => ({
+            event_id: eventId,
+            sponsor_id: s.sponsor_id,
+            tier_override: s.tier_override || null,
+            sort_order: s.sort_order ?? i,
+          }))
+        )
+        if (insSponsorErr) console.error('INSERT event_sponsors error:', insSponsorErr)
+      }
+
+      // Update local maps
       setEventFacultyMap(prev => ({ ...prev, [eventId]: form.assigned_faculty }))
+      setEventSponsorMap(prev => ({ ...prev, [eventId]: form.assigned_sponsors }))
       setEditing(null)
     } catch (err: any) {
       showToast(err.message, 'error')
@@ -376,7 +449,7 @@ export default function EventsAdmin() {
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
-                      {(e.applications_enabled || isStreamingType(e.event_type)) && (
+                      {(e.applications_enabled || isStreamingType(e.event_type) || isWeekendEvent(e.event_type)) && (
                         <Link href={`/admin/events/${e.id}/applicants`} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
                           borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
@@ -385,6 +458,26 @@ export default function EventsAdmin() {
                         }}>
                           <Users size={12} /> Attendees
                         </Link>
+                      )}
+                      {isWeekendEvent(e.event_type) && (
+                        <>
+                          <Link href={`/admin/events/${e.id}/courses`} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                            borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                            background: '#F3EEFF', color: '#7C3AED', border: '1px solid #DDD0FF',
+                            cursor: 'pointer', whiteSpace: 'nowrap',
+                          }}>
+                            <GraduationCap size={12} /> Courses
+                          </Link>
+                          <Link href={`/admin/events/${e.id}/rooms`} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                            borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                            background: '#ECFDF5', color: '#047857', border: '1px solid #A7F3D0',
+                            cursor: 'pointer', whiteSpace: 'nowrap',
+                          }}>
+                            <BedDouble size={12} /> Rooms
+                          </Link>
+                        </>
                       )}
                       <Link href={`/admin/events/${e.id}/feedback`} style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 12px',
@@ -454,10 +547,20 @@ export default function EventsAdmin() {
                   )}>{e.status}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {(e.applications_enabled || isStreamingType(e.event_type)) && (
+                  {(e.applications_enabled || isStreamingType(e.event_type) || isWeekendEvent(e.event_type)) && (
                     <Link href={`/admin/events/${e.id}/applicants`} className="p-2 rounded-lg bg-blue-50 text-blue-700">
                       <Users size={14} />
                     </Link>
+                  )}
+                  {isWeekendEvent(e.event_type) && (
+                    <>
+                      <Link href={`/admin/events/${e.id}/courses`} className="p-2 rounded-lg bg-violet-50 text-violet-700">
+                        <GraduationCap size={14} />
+                      </Link>
+                      <Link href={`/admin/events/${e.id}/rooms`} className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
+                        <BedDouble size={14} />
+                      </Link>
+                    </>
                   )}
                   <Link href={`/admin/events/${e.id}/feedback`} className="p-2 rounded-lg bg-amber-50 text-amber-800">
                     <MessageSquare size={14} />
@@ -591,6 +694,136 @@ export default function EventsAdmin() {
                   <p style={S.hint}>Search by name, hospital, or role. Can&apos;t find someone? Use the search to add a new faculty member inline.</p>
                 </div>
               </div>
+
+              {/* DUKES WEEKEND SETTINGS — deposit, Saturday streaming, room caps */}
+              {isWeekendEvent(form.event_type) && (
+                <div style={S.section}>
+                  <p style={S.sectionTitle}>DUKES WEEKEND SETTINGS</p>
+
+                  <p style={{ fontSize: 12, color: '#504F58', lineHeight: 1.6, margin: 0 }}>
+                    A Dukes Weekend runs Friday to Sunday and is members only. Courses for Friday and
+                    Sunday are managed separately — save this event, then use the{' '}
+                    <strong>Courses</strong> button on the events list.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                    <div>
+                      <label style={S.label}>Refundable Deposit (pence)</label>
+                      <input style={S.input} type="number" value={form.weekend_deposit_pence}
+                        onChange={(e) => setForm({ ...form, weekend_deposit_pence: e.target.value })} placeholder="e.g. 5000" />
+                      <p style={S.hint}>One deposit per member for the whole weekend, whatever they book. Blank = no deposit.</p>
+                    </div>
+                    <div>
+                      <label style={S.label}>Booking Closes</label>
+                      <input style={S.input} type="datetime-local" value={form.application_deadline}
+                        onChange={(e) => setForm({ ...form, application_deadline: e.target.value })} />
+                      <p style={S.hint}>Also the cutoff for changing days or switching courses.</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 600, color: '#181820', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={form.weekend_stream_enabled}
+                        onChange={(e) => setForm({ ...form, weekend_stream_enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
+                      Stream the Saturday programme
+                    </label>
+                    <p style={S.hint}>Off by default. When on, members choose in person or stream when they book Saturday. The stream is free and has no capacity limit; stream attendees cannot request a room.</p>
+                  </div>
+
+                  {form.weekend_stream_enabled && (
+                    <div>
+                      <label style={S.label}>Stream URL / Embed</label>
+                      <input style={S.input} value={form.weekend_stream_url}
+                        onChange={(e) => setForm({ ...form, weekend_stream_url: e.target.value })} placeholder="https://vimeo.com/event/..." />
+                      <p style={S.hint}>Shown only to members holding a valid Saturday booking.</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                    <div>
+                      <label style={S.label}>Friday Night Rooms</label>
+                      <input style={S.input} type="number" value={form.weekend_friday_room_capacity}
+                        onChange={(e) => setForm({ ...form, weekend_friday_room_capacity: e.target.value })} placeholder="e.g. 20" />
+                      <p style={S.hint}>Blank = no limit. Only members booked onto a Friday course may request one.</p>
+                    </div>
+                    <div>
+                      <label style={S.label}>Saturday Night Rooms</label>
+                      <input style={S.input} type="number" value={form.weekend_saturday_room_capacity}
+                        onChange={(e) => setForm({ ...form, weekend_saturday_room_capacity: e.target.value })} placeholder="e.g. 40" />
+                      <p style={S.hint}>Blank = no limit. In-person Saturday attendance required.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SPONSORS — attach existing sponsor records to this event */}
+              {isWeekendEvent(form.event_type) && (
+                <div style={S.section}>
+                  <p style={S.sectionTitle}>SPONSORS</p>
+
+                  {form.assigned_sponsors.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {form.assigned_sponsors.map((as, i) => {
+                        const s = sponsors.find(x => x.id === as.sponsor_id)
+                        return (
+                          <div key={as.sponsor_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fff', border: '1px solid #E4E4E8', borderRadius: 8 }}>
+                            {s?.logo_url ? (
+                              <img src={s.logo_url} alt="" style={{ width: 32, height: 24, objectFit: 'contain' }} />
+                            ) : (
+                              <div style={{ width: 32, height: 24, borderRadius: 4, background: '#F1F1F3' }} />
+                            )}
+                            <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{s?.name || 'Unknown'}</span>
+                            <select value={as.tier_override}
+                              onChange={(e) => {
+                                const updated = [...form.assigned_sponsors]
+                                updated[i] = { ...updated[i], tier_override: e.target.value }
+                                setForm({ ...form, assigned_sponsors: updated })
+                              }}
+                              style={{ padding: '4px 8px', border: '1px solid #D1D1D6', borderRadius: 6, fontSize: 12, color: '#504F58' }}>
+                              <option value="">{s?.tier ? `${s.tier} (default)` : 'Default tier'}</option>
+                              {['Platinum', 'Gold', 'Silver', 'Bronze', 'Partner'].map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                            <input type="number" value={as.sort_order} title="Sort order"
+                              onChange={(e) => {
+                                const updated = [...form.assigned_sponsors]
+                                updated[i] = { ...updated[i], sort_order: Number(e.target.value) }
+                                setForm({ ...form, assigned_sponsors: updated })
+                              }}
+                              style={{ width: 60, padding: '4px 8px', border: '1px solid #D1D1D6', borderRadius: 6, fontSize: 12 }} />
+                            <button type="button"
+                              onClick={() => setForm({ ...form, assigned_sponsors: form.assigned_sponsors.filter((_, j) => j !== i) })}
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={S.label}>Add Sponsor</label>
+                    <select style={S.select} value=""
+                      onChange={(e) => {
+                        if (!e.target.value) return
+                        if (form.assigned_sponsors.some(s => s.sponsor_id === e.target.value)) { showToast('Already added', 'error'); return }
+                        setForm({
+                          ...form,
+                          assigned_sponsors: [...form.assigned_sponsors, {
+                            sponsor_id: e.target.value, tier_override: '', sort_order: form.assigned_sponsors.length,
+                          }],
+                        })
+                      }}>
+                      <option value="">Select a sponsor…</option>
+                      {sponsors.filter(s => !form.assigned_sponsors.some(a => a.sponsor_id === s.id))
+                        .map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <p style={S.hint}>
+                      Sponsors are shared across the site. Add or edit the records themselves under{' '}
+                      <Link href="/admin/sponsors" style={{ color: '#7C3AED', fontWeight: 600 }}>Admin → Sponsors</Link>.
+                      Lower sort order shows first within a tier.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {isStreamingType(form.event_type) && (
                 <div style={S.section}>

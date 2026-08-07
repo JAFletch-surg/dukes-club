@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Plus, Trash2, Save, Loader, GripVertical, Star, BarChart3,
@@ -87,6 +87,11 @@ function generateId() {
 
 export default function EventFeedbackAdmin() {
   const { eventId } = useParams<{ eventId: string }>()
+  // ?courseId= scopes this screen to a single weekend course's feedback.
+  // Without it, it edits the event-level form exactly as it always has.
+  const searchParams = useSearchParams()
+  const courseId = searchParams.get('courseId')
+  const [course, setCourse] = useState<{ id: string; title: string; day: string } | null>(null)
   const [event, setEvent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -131,12 +136,30 @@ export default function EventFeedbackAdmin() {
         .single()
       if (ev) setEvent(ev)
 
-      // Load existing feedback form
-      const { data: existingForm } = await supabase
+      // Load the feedback form for whichever level we are editing.
+      //
+      // Feedback now has two levels: one form for the event overall
+      // (course_id NULL — every form that existed before Dukes Weekends) and
+      // one form per weekend course. Without the course_id filter this query
+      // would match several rows on a weekend and .single() would fail, so
+      // the filter is required, not cosmetic.
+      let formQuery = supabase
         .from('event_feedback_forms')
         .select('*')
         .eq('event_id', eventId)
-        .single()
+
+      formQuery = courseId ? formQuery.eq('course_id', courseId) : formQuery.is('course_id', null)
+
+      const { data: existingForm } = await formQuery.maybeSingle()
+
+      if (courseId) {
+        const { data: c } = await supabase
+          .from('weekend_courses')
+          .select('id, title, day')
+          .eq('id', courseId)
+          .single()
+        if (c) setCourse(c)
+      }
 
       if (existingForm) {
         setForm({
@@ -149,11 +172,14 @@ export default function EventFeedbackAdmin() {
       }
 
       // Load responses (separate query for profiles to avoid FK join dependency)
-      const { data: resps, error: respsErr } = await supabase
+      let respQuery = supabase
         .from('event_feedback_responses')
         .select('*')
         .eq('event_id', eventId)
-        .order('submitted_at', { ascending: false })
+
+      respQuery = courseId ? respQuery.eq('course_id', courseId) : respQuery.is('course_id', null)
+
+      const { data: resps, error: respsErr } = await respQuery.order('submitted_at', { ascending: false })
       if (respsErr) console.error('[Feedback] Failed to load responses:', respsErr.message)
 
       if (resps && resps.length > 0) {
@@ -190,7 +216,7 @@ export default function EventFeedbackAdmin() {
       setLoading(false)
     }
     load()
-  }, [eventId])
+  }, [eventId, courseId])
 
   // ── Save form ──────────────────────────────────────────────
 
@@ -200,6 +226,7 @@ export default function EventFeedbackAdmin() {
       const supabase = createClient()
       const payload = {
         event_id: eventId,
+        course_id: courseId || null,
         title: form.title,
         description: form.description || null,
         questions: form.questions,
@@ -367,13 +394,27 @@ export default function EventFeedbackAdmin() {
 
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <Link href="/admin/events" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#2563EB', fontSize: 13, fontWeight: 600, textDecoration: 'none', marginBottom: 12 }}>
-          <ArrowLeft size={14} /> Back to Events
+        <Link
+          href={course ? `/admin/events/${eventId}/courses` : '/admin/events'}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#2563EB', fontSize: 13, fontWeight: 600, textDecoration: 'none', marginBottom: 12 }}
+        >
+          <ArrowLeft size={14} /> {course ? 'Back to Courses' : 'Back to Events'}
         </Link>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F1F3D', marginBottom: 4 }}>
-          Feedback &amp; Certificates
+          {course ? 'Course Feedback' : 'Feedback & Certificates'}
         </h1>
-        <p style={{ fontSize: 14, color: '#504F58' }}>{event.title}</p>
+        <p style={{ fontSize: 14, color: '#504F58' }}>
+          {course
+            ? <>{course.title} <span style={{ color: '#999', textTransform: 'capitalize' }}>· {course.day}</span> · {event.title}</>
+            : event.title}
+        </p>
+        {course && (
+          <p style={{ fontSize: 12, color: '#888', marginTop: 6, maxWidth: 620, lineHeight: 1.6 }}>
+            This form is for this course alone. The weekend&apos;s overall feedback — including the
+            Saturday programme — is a separate form on the{' '}
+            <Link href={`/admin/events/${eventId}/feedback`} style={{ color: '#2563EB', fontWeight: 600 }}>event</Link>.
+          </p>
+        )}
       </div>
 
       {/* Summary cards */}

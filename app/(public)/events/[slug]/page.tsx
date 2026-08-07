@@ -14,8 +14,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
-import { isStreamingEvent, registerForEvent } from "@/lib/events";
+import { isStreamingEvent, isWeekendEvent, registerForEvent } from "@/lib/events";
 import { richTextToHtml } from "@/lib/rich-text";
+import { WeekendBooking } from "@/components/events/weekend-booking";
+import { EventSponsors } from "@/components/events/event-sponsors";
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -263,6 +265,10 @@ const EventDetailPage = () => {
 
   const isApplicationEvent = event?.applications_enabled;
   const isOnlineEvent = isStreamingEvent(event?.event_type);
+  // A Dukes Weekend books through its own multi-day flow rather than the
+  // application or single-registration paths, so it takes the sidebar over
+  // from both.
+  const isWeekend = isWeekendEvent(event?.event_type);
   const spotsLeft = event?.capacity ? event.capacity - bookingCount : null;
   const deadlinePassed = event?.application_deadline && new Date(event.application_deadline) < new Date();
   const questions: { question: string; required: boolean }[] = event?.application_questions || [];
@@ -387,6 +393,23 @@ const EventDetailPage = () => {
                   </div>
                 </AnimatedSection>
               )}
+
+              {/* Dukes Weekend — day selection, courses, rooms and deposit.
+                  Lives in the main column rather than the sidebar because the
+                  course lists need the width. */}
+              {isWeekend && (
+                <AnimatedSection delay={100}>
+                  <div id="weekend-booking">
+                    <WeekendBooking event={event} user={user} profile={profile} />
+                  </div>
+                </AnimatedSection>
+              )}
+
+              {isWeekend && (
+                <AnimatedSection delay={150}>
+                  <EventSponsors eventId={event.id} />
+                </AnimatedSection>
+              )}
             </div>
 
             {/* Sidebar */}
@@ -402,7 +425,29 @@ const EventDetailPage = () => {
                     </div>
 
                     {/* Action Button */}
-                    {isApplicationEvent ? (
+                    {isWeekend ? (
+                      /* ── Dukes Weekend: the booking flow itself is in the
+                         main column, so the sidebar just points at it ── */
+                      <div className="mb-6">
+                        <a href="#weekend-booking" className="block">
+                          <Button variant="gold" size="lg" className="w-full">
+                            {existingBooking && existingBooking.status !== 'cancelled'
+                              ? 'View My Booking'
+                              : 'Choose Your Days'}
+                          </Button>
+                        </a>
+                        {event.weekend_deposit_pence > 0 && (
+                          <p className="text-xs text-center text-navy-foreground/50 mt-2">
+                            {formatPrice(event.weekend_deposit_pence)} refundable deposit, once per member
+                          </p>
+                        )}
+                        {!user && (
+                          <p className="text-xs text-center text-navy-foreground/50 mt-2">
+                            Members only — <Link href="/register" className="text-gold underline">join now</Link>
+                          </p>
+                        )}
+                      </div>
+                    ) : isApplicationEvent ? (
                       /* ── Application-based event ── */
                       <div className="mb-6">
                         {existingBooking && existingBooking.status !== 'cancelled' ? (
