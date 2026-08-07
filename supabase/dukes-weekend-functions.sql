@@ -257,6 +257,12 @@ DECLARE
   v_promotions  JSONB := '[]'::jsonb;
   v_cancelled   INTEGER := 0;
   v_fri_cleared BOOLEAN := false;
+  -- %TYPE so this adopts whatever event_bookings.status actually is. Building
+  -- the status inline from bare literals would resolve to `text`, which will
+  -- not assign to an enum column — and this schema uses enums (see
+  -- add-dukes-weekend-event-type.sql). Declaring it this way is correct either
+  -- way, so the function stops depending on which it is.
+  v_new_status  event_bookings.status%TYPE;
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'NOT_AUTHENTICATED';
@@ -324,6 +330,12 @@ BEGIN
     v_room_fri := false;
   END IF;
 
+  IF v_event.auto_approve THEN
+    v_new_status := 'approved';
+  ELSE
+    v_new_status := 'pending';
+  END IF;
+
   SELECT * INTO v_profile FROM profiles WHERE id = v_user;
 
   SELECT * INTO v_booking
@@ -371,8 +383,10 @@ BEGIN
         saturday_mode           = v_mode,
         room_friday_requested   = v_room_fri,
         room_saturday_requested = v_room_sat,
+        -- Reviving a cancelled booking puts it back into the queue; an
+        -- existing booking keeps whatever status it already had.
         status                  = CASE WHEN v_booking.status = 'cancelled'
-                                       THEN CASE WHEN v_event.auto_approve THEN 'approved' ELSE 'pending' END
+                                       THEN v_new_status
                                        ELSE v_booking.status END,
         cancelled_at            = NULL
     WHERE id = v_booking.id
@@ -386,7 +400,7 @@ BEGIN
       room_friday_requested, room_saturday_requested
     ) VALUES (
       p_event_id, v_user,
-      CASE WHEN v_event.auto_approve THEN 'approved' ELSE 'pending' END,
+      v_new_status,
       COALESCE(v_profile.full_name, ''), COALESCE(v_profile.email, ''),
       COALESCE(v_profile.training_stage, ''), '', COALESCE(v_profile.region, ''),
       COALESCE(p_friday, false), COALESCE(p_saturday, false), COALESCE(p_sunday, false), v_mode,

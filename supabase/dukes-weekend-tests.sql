@@ -3,18 +3,24 @@
 -- ═══════════════════════════════════════════════════════════════════
 --
 -- Exercises every server-side rule in §10 of the spec against a throwaway
--- weekend, then rolls everything back. Nothing is left behind, so it is safe
--- to run against a real database — but it does take row locks on the rows it
--- creates, so prefer a staging copy.
+-- weekend, then rolls everything back.
 --
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/dukes-weekend-tests.sql
+-- LOCAL ONLY — do not run this against the real database. It replaces
+-- auth.uid() so it can act as different members, which on Supabase is owned by
+-- supabase_auth_admin and will fail on permissions anyway. Run it against a
+-- throwaway Postgres built from supabase/dukes-weekend-tests-fixture.sql,
+-- which sets up the surrounding schema with the same column types production
+-- uses:
 --
--- Any failure aborts with FAIL [rule n]. Success prints an "ok" line per rule.
+--   createdb dukes_local
+--   psql -d dukes_local -v ON_ERROR_STOP=1 \
+--     -f supabase/dukes-weekend-tests-fixture.sql \
+--     -f supabase/add-dukes-weekend-event-type.sql \
+--     -f supabase/create-dukes-weekend.sql \
+--     -f supabase/dukes-weekend-functions.sql \
+--     -f supabase/dukes-weekend-tests.sql
 --
--- Run supabase/create-dukes-weekend.sql and supabase/dukes-weekend-functions.sql
--- first. These checks call the functions directly, so they assume auth.uid()
--- can be steered — on Supabase that means running as a superuser/postgres
--- role, where the helper below shadows auth.uid() for the transaction.
+-- Any failure aborts with FAIL [...]. Success prints an "ok" line per check.
 --
 
 BEGIN;
@@ -56,6 +62,34 @@ BEGIN
   RAISE NOTICE '  ok   % — allowed', p_label;
 END;
 $$ LANGUAGE plpgsql;
+
+-- ── The event type itself ──────────────────────────────────────────
+-- events.event_type is an enum, so a Dukes Weekend cannot even be saved until
+-- 'Dukes Weekend' is one of its values. This check exists because it once was
+-- not: the migration added the type to the admin dropdown but never to the
+-- database, and creating a weekend failed with "invalid input value for enum
+-- event_type" while every other check here passed. It runs first because
+-- nothing below means anything if this fails.
+
+DO $$
+DECLARE v_enum_type TEXT;
+BEGIN
+  SELECT t.typname INTO v_enum_type
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_type t  ON t.oid = a.atttypid
+  WHERE c.relname = 'events' AND a.attname = 'event_type' AND t.typtype = 'e';
+
+  IF v_enum_type IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = v_enum_type AND e.enumlabel = 'Dukes Weekend'
+  ) THEN
+    RAISE EXCEPTION
+      'FAIL [event type]: the % enum has no ''Dukes Weekend'' value — run supabase/add-dukes-weekend-event-type.sql',
+      v_enum_type;
+  END IF;
+  RAISE NOTICE '  ok   event type  ''Dukes Weekend'' is a valid event_type';
+END $$;
 
 -- ── Fixture ────────────────────────────────────────────────────────
 

@@ -182,7 +182,13 @@ A **Dukes Weekend** is an event type like any other, but it books differently: o
 
 Members may book Friday only, Saturday only, Friday + Saturday, Saturday + Sunday, or all three. Sunday never stands alone.
 
-> **Setup:** Run `supabase/create-dukes-weekend.sql` and then `supabase/dukes-weekend-functions.sql` once against the database. The second file carries the booking rules, so a weekend will not work with only the first applied. To check the rules afterwards, run `supabase/dukes-weekend-tests.sql` — it exercises every rule against a throwaway weekend and rolls back.
+> **Setup:** Run these three files once against the database, **in this order**:
+>
+> 1. `supabase/add-dukes-weekend-event-type.sql` — adds `Dukes Weekend` to the `event_type` enum. Without it, saving a weekend fails with *invalid input value for enum event_type*.
+> 2. `supabase/create-dukes-weekend.sql` — the tables and columns. It refuses to run if step 1 has not been applied.
+> 3. `supabase/dukes-weekend-functions.sql` — the booking rules. A weekend will not work with only the first two applied.
+>
+> Step 1 must be its own run: Postgres will not let a new enum value be used in the same transaction that adds it.
 
 ### Creating one
 
@@ -199,7 +205,7 @@ A Dukes Weekend is **members only** — that is built into the event type, not a
 
 Courses run on **Friday** and **Sunday**. Saturday is the main programme and uses the event's own timetable instead.
 
-Save the event first, then open **Courses** from the events list. For each course set:
+Saving a new Dukes Weekend takes you straight to the **Courses** screen. You can return to it at any time from the **Courses** button on the event's row in the events list, or the link in the event's Dukes Weekend Settings. For each course set:
 
 * Title, description, and start/end times — the times decide which courses clash
 * **Capacity** — a hard limit; bookings are refused once it is reached

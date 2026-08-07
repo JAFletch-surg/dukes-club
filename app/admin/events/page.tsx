@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare, Pencil, GraduationCap, BedDouble } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
@@ -91,6 +92,7 @@ const S = {
 }
 
 export default function EventsAdmin() {
+  const router = useRouter()
   const { data: events, loading, create, update, remove } = useSupabaseTable<any>('events', 'starts_at', false)
   const [faculty, setFaculty] = useState<any[]>([])
   const [editing, setEditing] = useState<string | null>(null)
@@ -343,7 +345,18 @@ export default function EventsAdmin() {
       // Update local maps
       setEventFacultyMap(prev => ({ ...prev, [eventId]: form.assigned_faculty }))
       setEventSponsorMap(prev => ({ ...prev, [eventId]: form.assigned_sponsors }))
+
+      const wasNew = editing === 'new'
       setEditing(null)
+
+      // A weekend is not finished when the event row is saved — it still needs
+      // its Friday and Sunday courses, which live on their own screen because
+      // each carries faculty, a timetable, objectives and capacity. Go straight
+      // there rather than leaving the admin to find the button on the list.
+      if (wasNew && isWeekendEvent(form.event_type)) {
+        router.push(`/admin/events/${eventId}/courses`)
+        return
+      }
     } catch (err: any) {
       showToast(err.message, 'error')
     }
@@ -700,11 +713,20 @@ export default function EventsAdmin() {
                 <div style={S.section}>
                   <p style={S.sectionTitle}>DUKES WEEKEND SETTINGS</p>
 
-                  <p style={{ fontSize: 12, color: '#504F58', lineHeight: 1.6, margin: 0 }}>
-                    A Dukes Weekend runs Friday to Sunday and is members only. Courses for Friday and
-                    Sunday are managed separately — save this event, then use the{' '}
-                    <strong>Courses</strong> button on the events list.
-                  </p>
+                  {editing === 'new' ? (
+                    <p style={{ fontSize: 12, color: '#504F58', lineHeight: 1.6, margin: 0 }}>
+                      A Dukes Weekend runs Friday to Sunday and is members only. Saving this event
+                      takes you straight to <strong>Courses</strong>, where you add the Friday and
+                      Sunday courses.
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: 12, color: '#504F58', lineHeight: 1.6, margin: 0 }}>
+                      A Dukes Weekend runs Friday to Sunday and is members only.{' '}
+                      <Link href={`/admin/events/${editing}/courses`} style={{ color: '#7C3AED', fontWeight: 600 }}>
+                        Manage Friday and Sunday courses →
+                      </Link>
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                     <div>

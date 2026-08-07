@@ -20,6 +20,47 @@
 --
 
 -- ───────────────────────────────────────────────────────────────────
+-- 0. Preflight — the event_type value must exist first
+-- ───────────────────────────────────────────────────────────────────
+-- events.event_type is an enum, so 'Dukes Weekend' has to be added to the type
+-- before anything can be saved with it. That is a separate file because
+-- ALTER TYPE ... ADD VALUE cannot be used in the same transaction that adds
+-- it — a DO block may inspect an enum, but it may not extend one.
+--
+-- Without this guard the rest of the script installs happily and the failure
+-- surfaces much later, as "invalid input value for enum event_type" the first
+-- time an admin tries to create a weekend.
+
+DO $$
+DECLARE
+  v_enum_type TEXT;
+BEGIN
+  SELECT t.typname INTO v_enum_type
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_type t  ON t.oid = a.atttypid
+  WHERE c.relname = 'events'
+    AND a.attname = 'event_type'
+    AND t.typtype = 'e';
+
+  -- Nothing to check when the column is plain text.
+  IF v_enum_type IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = v_enum_type
+      AND e.enumlabel = 'Dukes Weekend'
+  ) THEN
+    RAISE EXCEPTION
+      'Run supabase/add-dukes-weekend-event-type.sql first — the % enum has no ''Dukes Weekend'' value, so no weekend could be created.',
+      v_enum_type;
+  END IF;
+END $$;
+
+-- ───────────────────────────────────────────────────────────────────
 -- 1. Weekend settings on the parent event
 -- ───────────────────────────────────────────────────────────────────
 -- Booking close deliberately reuses the existing application_deadline column
