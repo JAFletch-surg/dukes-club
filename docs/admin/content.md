@@ -49,18 +49,32 @@ Search for an author from the [Executive Team](people.md#executive-team) or [Fac
 
 Manage the video library from the Videos page. Videos are hosted on Vimeo and catalogued in the admin panel.
 
+### Synced Folders
+
+The library is fed by a chosen set of folders on the Vimeo account — not the whole account. Manage them from **Manage Folders** on the Videos page:
+
+* **Synced folders** lists the folders currently feeding the library, each with its video count and when it last synced.
+* **Available on Vimeo** lists every other folder on the account. Click **Add** to start syncing one — you never need to look up a folder ID.
+* **Pause** stops syncing a folder without forgetting it; **Remove** (bin icon) drops it entirely.
+
+> **Important:** A video that is not in a synced folder gets **archived** on the next sync. Pausing or removing a folder therefore archives its videos. Archived videos are hidden from members but not deleted — re-adding the folder and syncing brings them back.
+
 ### Vimeo Sync
 
 The quickest way to populate the library:
 
-1. Click **Sync with Vimeo**.
-2. The system connects to the Vimeo account and:
+1. Click **Sync from Vimeo**.
+2. The system reads every synced folder and:
    * **Creates** records for new videos not yet in the database.
-   * **Updates** existing records with the latest metadata (title, duration, thumbnail, play count).
-   * **Archives** records for videos that have been removed from Vimeo.
-3. A summary toast shows: created, updated, skipped, archived, and total counts.
+   * **Updates** existing records with the latest metadata (duration, thumbnail, play count). Anything you have edited by hand — title, description, category, speakers — is preserved.
+   * **Archives** records for videos no longer in any synced folder.
+3. A summary banner shows: created, updated, skipped, archived, and the total across all folders.
 
-> **Tip:** Run Vimeo Sync regularly to keep the library up to date. New uploads to Vimeo are automatically pulled in.
+If a folder can't be read (deleted on Vimeo, or a temporary Vimeo outage) the banner says so in amber and **archiving is skipped for that run**, so videos in the unreachable folder stay published rather than disappearing from the library.
+
+> **Tip:** Run Vimeo Sync regularly to keep the library up to date. New uploads to a synced folder are pulled in automatically.
+
+> **Note:** Categories are never set by sync. Assign them by hand when editing a video.
 
 ### Manual Video Entry
 

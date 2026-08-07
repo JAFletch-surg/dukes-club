@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// ── Supabase (service role for admin-level DB access) ───────────
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
-// ── Env ─────────────────────────────────────────────────────────
-
-const VIMEO_TOKEN = process.env.VIMEO_ACCESS_TOKEN
-const VIMEO_FOLDER_ID = process.env.VIMEO_FOLDER_ID
-const VIMEO_API = 'https://api.vimeo.com'
-
-const VIMEO_HEADERS = {
-  Authorization: `bearer ${VIMEO_TOKEN}`,
-  Accept: 'application/vnd.vimeo.*+json;version=3.4',
-}
+import { SupabaseClient } from '@supabase/supabase-js'
+import {
+  VIMEO_TOKEN,
+  VIMEO_API,
+  VIMEO_HEADERS,
+  extractIdFromUri,
+  requireAdmin,
+} from '../_shared'
 
 const FIELDS = 'uri,name,description,duration,created_time,pictures.sizes,tags,privacy,embed.html,stats.plays'
 
@@ -46,16 +33,29 @@ interface VimeoApiResponse {
   paging: { next: string | null }
 }
 
+interface SyncFolder {
+  /** vimeo_folders row id — null when falling back to VIMEO_FOLDER_ID */
+  id: string | null
+  folder_id: string
+  name: string
+}
+
+interface FolderFailure {
+  folder_id: string
+  name: string
+  message: string
+}
+
+interface FolderResult {
+  folder_id: string
+  name: string
+  video_count: number
+}
+
 // ── Helpers ─────────────────────────────────────────────────────
 
 function slugify(t: string): string {
   return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-}
-
-function extractVimeoId(uri: string): string {
-  // URI can be /videos/123456 or /videos/123456:hash
-  const last = uri.split('/').pop() || ''
-  return last.split(':')[0]
 }
 
 function extractEmbedHash(video: VimeoVideoData): string | null {
@@ -79,15 +79,46 @@ function getBestThumbnail(
   return (preferred || sorted[0])?.link || null
 }
 
-// ── Fetch all videos from the Vimeo folder (paginated) ─────────
+// ── Which folders to sync ───────────────────────────────────────
 
-async function fetchAllFolderVideos(): Promise<VimeoVideoData[]> {
-  const allVideos: VimeoVideoData[] = []
+/**
+ * Active rows from vimeo_folders, or the legacy VIMEO_FOLDER_ID env var when
+ * no folders have been added in the admin panel yet. The fallback keeps the
+ * site syncing exactly as it did before folders became admin-managed.
+ */
+async function getActiveFolders(supabase: SupabaseClient): Promise<SyncFolder[]> {
+  const { data, error } = await supabase
+    .from('vimeo_folders')
+    .select('id, folder_id, name')
+    .eq('is_active', true)
+    .order('created_at')
+
+  if (error) {
+    // Table missing (migration not run yet) — fall through to the env var
+    console.error('[Vimeo Sync] Could not read vimeo_folders:', error.message)
+  }
+
+  if (data && data.length > 0) {
+    return data as SyncFolder[]
+  }
+
+  const envFolder = process.env.VIMEO_FOLDER_ID
+  if (envFolder) {
+    return [{ id: null, folder_id: envFolder, name: 'VIMEO_FOLDER_ID' }]
+  }
+
+  return []
+}
+
+// ── Fetch all videos across the active folders (paginated) ──────
+
+async function fetchFolderVideos(folderId: string): Promise<VimeoVideoData[]> {
+  const videos: VimeoVideoData[] = []
   let page = 1
   const perPage = 100
 
   while (true) {
-    const url = `${VIMEO_API}/me/projects/${VIMEO_FOLDER_ID}/videos?page=${page}&per_page=${perPage}&fields=${FIELDS}`
+    const url = `${VIMEO_API}/me/projects/${folderId}/videos?page=${page}&per_page=${perPage}&fields=${FIELDS}`
 
     const res = await fetch(url, { headers: VIMEO_HEADERS })
 
@@ -97,13 +128,62 @@ async function fetchAllFolderVideos(): Promise<VimeoVideoData[]> {
     }
 
     const body: VimeoApiResponse = await res.json()
-    allVideos.push(...body.data)
+    videos.push(...body.data)
 
     if (!body.paging.next) break
     page++
   }
 
-  return allVideos
+  return videos
+}
+
+/**
+ * Fetch every active folder. A folder that fails (deleted on Vimeo, transient
+ * error) is recorded rather than thrown, so one bad folder can't abort a sync
+ * of the others — but its videos must not then be treated as stale.
+ */
+async function fetchAllFolderVideos(folders: SyncFolder[]): Promise<{
+  videos: Array<VimeoVideoData & { folderId: string }>
+  results: FolderResult[]
+  failures: FolderFailure[]
+}> {
+  const videos: Array<VimeoVideoData & { folderId: string }> = []
+  const results: FolderResult[] = []
+  const failures: FolderFailure[] = []
+  const seen = new Set<string>()
+
+  for (const folder of folders) {
+    try {
+      const folderVideos = await fetchFolderVideos(folder.folder_id)
+
+      let counted = 0
+      for (const video of folderVideos) {
+        const vimeoId = extractIdFromUri(video.uri)
+        // A video can appear in only one Vimeo folder, but guard anyway —
+        // first folder wins so a duplicate can't be written twice.
+        if (!vimeoId || seen.has(vimeoId)) continue
+        seen.add(vimeoId)
+        videos.push({ ...video, folderId: folder.folder_id })
+        counted++
+      }
+
+      results.push({
+        folder_id: folder.folder_id,
+        name: folder.name,
+        video_count: counted,
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`[Vimeo Sync] Folder ${folder.folder_id} failed:`, message)
+      failures.push({
+        folder_id: folder.folder_id,
+        name: folder.name,
+        message,
+      })
+    }
+  }
+
+  return { videos, results, failures }
 }
 
 // ── POST — full sync ────────────────────────────────────────────
@@ -116,40 +196,32 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-    if (!VIMEO_FOLDER_ID) {
+
+    // Auth check — only admins can trigger sync
+    const auth = await requireAdmin(request)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
+
+    const folders = await getActiveFolders(supabase)
+    if (folders.length === 0) {
       return NextResponse.json(
-        { error: 'VIMEO_FOLDER_ID not configured' },
-        { status: 500 }
+        { error: 'No Vimeo folders configured — add one in Admin → Videos → Manage Folders' },
+        { status: 400 }
       )
     }
 
-    const supabase = getSupabase()
+    // Fetch all videos across the active folders
+    const { videos: vimeoVideos, results, failures } = await fetchAllFolderVideos(folders)
 
-    // Auth check — only admins can trigger sync
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (results.length === 0) {
+      return NextResponse.json(
+        {
+          error: 'Could not read any of the configured Vimeo folders',
+          failures,
+        },
+        { status: 502 }
+      )
     }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 })
-    }
-
-    // Fetch all videos from the Vimeo folder
-    const vimeoVideos = await fetchAllFolderVideos()
 
     // Get existing vimeo_ids from Supabase
     const { data: existingVideos } = await supabase
@@ -165,7 +237,7 @@ export async function POST(request: NextRequest) {
     let skipped = 0
 
     for (const video of vimeoVideos) {
-      const vimeoId = extractVimeoId(video.uri)
+      const vimeoId = extractIdFromUri(video.uri)
       if (!vimeoId) { skipped++; continue }
 
       const thumbnail = getBestThumbnail(video.pictures)
@@ -173,7 +245,8 @@ export async function POST(request: NextRequest) {
       const embedHash = extractEmbedHash(video)
 
       if (existingIds.has(vimeoId)) {
-        // Update existing — only sync Vimeo-owned fields, preserve manual edits
+        // Update existing — only sync Vimeo-owned fields, preserve manual edits.
+        // vimeo_folder_id is refreshed because a video can be moved on Vimeo.
         const { error } = await supabase
           .from('videos')
           .update({
@@ -182,6 +255,7 @@ export async function POST(request: NextRequest) {
             vimeo_plays: video.stats?.plays ?? 0,
             vimeo_privacy: video.privacy?.view || null,
             vimeo_embed_hash: embedHash,
+            vimeo_folder_id: video.folderId,
             synced_at: new Date().toISOString(),
           })
           .eq('vimeo_id', vimeoId)
@@ -205,6 +279,7 @@ export async function POST(request: NextRequest) {
           vimeo_plays: video.stats?.plays ?? 0,
           vimeo_privacy: video.privacy?.view || null,
           vimeo_embed_hash: embedHash,
+          vimeo_folder_id: video.folderId,
           is_members_only: true,
           status: 'published',
           published_at: new Date().toISOString(),
@@ -220,26 +295,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Archive videos no longer in the Vimeo folder (e.g. old account IDs)
-    const folderVimeoIds = new Set(
-      vimeoVideos.map(v => extractVimeoId(v.uri)).filter(Boolean)
-    )
-    const staleIds = (existingVideos || [])
-      .map((v: { vimeo_id: string }) => v.vimeo_id)
-      .filter(id => !folderVimeoIds.has(id))
-
+    // Archive videos no longer in any synced folder.
+    // Skipped entirely when a folder failed to load — otherwise a transient
+    // error on one folder would archive every video that lives in it.
+    const archiveSkipped = failures.length > 0
     let archived = 0
-    if (staleIds.length > 0) {
-      const { error: archiveErr, count } = await supabase
-        .from('videos')
-        .update({ status: 'archived', synced_at: new Date().toISOString() })
-        .in('vimeo_id', staleIds)
-        .eq('status', 'published')
 
-      if (archiveErr) {
-        console.error('[Vimeo Sync] Failed to archive stale videos:', archiveErr.message)
-      } else {
-        archived = count ?? staleIds.length
+    if (!archiveSkipped) {
+      const folderVimeoIds = new Set(
+        vimeoVideos.map(v => extractIdFromUri(v.uri)).filter(Boolean)
+      )
+      const staleIds = (existingVideos || [])
+        .map((v: { vimeo_id: string }) => v.vimeo_id)
+        .filter(id => !folderVimeoIds.has(id))
+
+      if (staleIds.length > 0) {
+        const { error: archiveErr, count } = await supabase
+          .from('videos')
+          .update({ status: 'archived', synced_at: new Date().toISOString() })
+          .in('vimeo_id', staleIds)
+          .eq('status', 'published')
+
+        if (archiveErr) {
+          console.error('[Vimeo Sync] Failed to archive stale videos:', archiveErr.message)
+        } else {
+          archived = count ?? staleIds.length
+        }
+      }
+    }
+
+    // Stamp each folder row that synced cleanly
+    const syncedAt = new Date().toISOString()
+    for (const result of results) {
+      const folder = folders.find(f => f.folder_id === result.folder_id)
+      if (!folder?.id) continue
+      const { error } = await supabase
+        .from('vimeo_folders')
+        .update({ last_synced_at: syncedAt, video_count: result.video_count })
+        .eq('id', folder.id)
+      if (error) {
+        console.error(`[Vimeo Sync] Failed to stamp folder ${folder.folder_id}:`, error.message)
       }
     }
 
@@ -250,6 +345,9 @@ export async function POST(request: NextRequest) {
       updated,
       skipped,
       archived,
+      archive_skipped: archiveSkipped,
+      folders: results,
+      failures,
     })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal error'
@@ -260,34 +358,64 @@ export async function POST(request: NextRequest) {
 
 // ── GET — preview / connection check ────────────────────────────
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     if (!VIMEO_TOKEN) {
       return NextResponse.json({ error: 'VIMEO_ACCESS_TOKEN not configured' }, { status: 500 })
     }
-    if (!VIMEO_FOLDER_ID) {
-      return NextResponse.json({ error: 'VIMEO_FOLDER_ID not configured' }, { status: 500 })
+
+    // Admin-only — this now reports folder names and counts
+    const auth = await requireAdmin(request)
+    if (!auth.ok) return auth.response
+    const { supabase } = auth
+
+    const folders = await getActiveFolders(supabase)
+
+    if (folders.length === 0) {
+      return NextResponse.json({
+        connected: false,
+        error: 'No Vimeo folders configured',
+        folders: [],
+        using_env_fallback: false,
+      })
     }
 
-    const url = `${VIMEO_API}/me/projects/${VIMEO_FOLDER_ID}/videos?page=1&per_page=5&fields=uri,name,duration,pictures.sizes,stats.plays`
+    const usingEnvFallback = folders.length === 1 && folders[0].id === null
 
-    const res = await fetch(url, { headers: VIMEO_HEADERS })
+    const perFolder: Array<{
+      folder_id: string
+      name: string
+      total_videos: number
+      error?: string
+    }> = []
 
-    if (!res.ok) {
-      const err = await res.text()
-      return NextResponse.json({ error: `Vimeo API error: ${err}` }, { status: res.status })
+    for (const folder of folders) {
+      const url = `${VIMEO_API}/me/projects/${folder.folder_id}/videos?page=1&per_page=1&fields=uri`
+      const res = await fetch(url, { headers: VIMEO_HEADERS })
+
+      if (!res.ok) {
+        perFolder.push({
+          folder_id: folder.folder_id,
+          name: folder.name,
+          total_videos: 0,
+          error: `Vimeo API error ${res.status}`,
+        })
+        continue
+      }
+
+      const body: VimeoApiResponse = await res.json()
+      perFolder.push({
+        folder_id: folder.folder_id,
+        name: folder.name,
+        total_videos: body.total || 0,
+      })
     }
-
-    const body: VimeoApiResponse = await res.json()
 
     return NextResponse.json({
-      connected: true,
-      total_videos: body.total || 0,
-      preview: body.data.map(v => ({
-        vimeo_id: extractVimeoId(v.uri),
-        title: v.name,
-        duration: v.duration,
-      })),
+      connected: perFolder.some(f => !f.error),
+      total_videos: perFolder.reduce((sum, f) => sum + f.total_videos, 0),
+      folders: perFolder,
+      using_env_fallback: usingEnvFallback,
     })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Internal error'
