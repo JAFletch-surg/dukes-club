@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw } from 'lucide-react'
+import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw, FolderOpen, AlertTriangle } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
+import { VimeoFolderManager } from '@/components/admin/vimeo-folder-manager'
 
 /* ── Constants ───────────────────────────────────── */
 const VIDEO_CATEGORIES = ['Operative', 'Complications', 'Webinar', 'Education', 'Lecture', 'Endoscopy', 'Conference']
@@ -42,6 +43,17 @@ const S = {
 }
 
 /* ── Types ────────────────────────────────────────── */
+interface SyncResult {
+  created: number
+  updated: number
+  skipped: number
+  archived: number
+  total_on_vimeo: number
+  archive_skipped?: boolean
+  folders?: Array<{ folder_id: string; name: string; video_count: number }>
+  failures?: Array<{ folder_id: string; name: string; message: string }>
+}
+
 interface VideoRecord {
   id: string
   title: string
@@ -74,7 +86,8 @@ export default function AdminVideosPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
   const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number; archived: number; total_on_vimeo: number } | null>(null)
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
+  const [showFolders, setShowFolders] = useState(false)
 
   /* ── Faculty state ──────────────────────────────── */
   const [facultyList, setFacultyList] = useState<FacultyMember[]>([])
@@ -201,7 +214,7 @@ export default function AdminVideosPage() {
   /* ── Sync all videos from Vimeo ─────────────────── */
   const handleSync = async () => {
     if (syncing) return
-    if (!confirm('Sync all videos from your Vimeo account? This will create new records and update existing ones.')) return
+    if (!confirm('Sync videos from your synced Vimeo folders? This will create new records, update existing ones, and archive videos that are no longer in a synced folder.')) return
     setSyncing(true)
     setSyncResult(null)
     try {
@@ -279,6 +292,18 @@ export default function AdminVideosPage() {
         </div>
         <div className="hidden sm:flex" style={{ gap: 10 }}>
           <button
+            onClick={() => setShowFolders(true)}
+            title="Choose which Vimeo folders are synced"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 20px', background: '#fff', color: C.fg,
+              border: `1.5px solid ${C.muted}`, borderRadius: 10, fontSize: 14, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <FolderOpen size={16} /> Manage Folders
+          </button>
+          <button
             onClick={handleSync}
             disabled={syncing}
             style={{
@@ -311,21 +336,40 @@ export default function AdminVideosPage() {
       </button>
 
       {/* Sync result banner */}
-      {syncResult && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 20px', marginBottom: 16, borderRadius: 10,
-          background: '#DCFCE7', color: '#166534', fontSize: 13, fontWeight: 600,
-        }}>
-          <span>
-            Sync complete: {syncResult.created} created, {syncResult.updated} updated, {syncResult.skipped} skipped{syncResult.archived > 0 ? `, ${syncResult.archived} archived` : ''}
-            ({syncResult.total_on_vimeo} total in folder)
-          </span>
-          <button onClick={() => setSyncResult(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#166534', padding: 4 }}>
-            <X size={16} />
-          </button>
-        </div>
-      )}
+      {syncResult && (() => {
+        const failures = syncResult.failures || []
+        const folderCount = syncResult.folders?.length ?? 0
+        const warn = failures.length > 0
+        const fg = warn ? '#92400E' : '#166534'
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+            padding: '12px 20px', marginBottom: 16, borderRadius: 10,
+            background: warn ? '#FEF3C7' : '#DCFCE7', color: fg, fontSize: 13, fontWeight: 600,
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>
+                Sync complete: {syncResult.created} created, {syncResult.updated} updated, {syncResult.skipped} skipped{syncResult.archived > 0 ? `, ${syncResult.archived} archived` : ''}
+                {' '}({syncResult.total_on_vimeo} video{syncResult.total_on_vimeo === 1 ? '' : 's'} across {folderCount} folder{folderCount === 1 ? '' : 's'})
+              </span>
+              {failures.map(f => (
+                <span key={f.folder_id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontWeight: 500 }}>
+                  <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                  Could not read folder &ldquo;{f.name}&rdquo; ({f.folder_id}): {f.message}
+                </span>
+              ))}
+              {syncResult.archive_skipped && (
+                <span style={{ fontWeight: 500 }}>
+                  Archiving was skipped this run so videos in the unreachable folder(s) stay published.
+                </span>
+              )}
+            </div>
+            <button onClick={() => setSyncResult(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: fg, padding: 4, flexShrink: 0 }}>
+              <X size={16} />
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -728,6 +772,11 @@ export default function AdminVideosPage() {
           </div>
         </div>
       )}
+
+      <VimeoFolderManager
+        open={showFolders}
+        onClose={() => setShowFolders(false)}
+      />
 
       <EditFacultyDialog
         open={!!editFacultyId}
