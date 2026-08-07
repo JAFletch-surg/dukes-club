@@ -7,6 +7,7 @@ import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
+import { ImageField } from '@/components/admin/image-field'
 import { isStreamingEvent } from '@/lib/events'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
@@ -22,13 +23,7 @@ const SUBSPECIALTIES = [
   'Open','TAMIS','General',
 ]
 
-const STOCK_IMAGES = [
-  { label: 'Surgical Theatre', url: '/images/events/stock-theatre.jpg' },
-  { label: 'Conference Hall', url: '/images/events/stock-conference.jpg' },
-  { label: 'Laparoscopic', url: '/images/events/stock-laparoscopic.jpg' },
-  { label: 'Robotic Surgery', url: '/images/events/stock-robotic.jpg' },
-  { label: 'Anatomy Lab', url: '/images/events/stock-anatomy.jpg' },
-  { label: 'Webinar / Online', url: '/images/events/stock-webinar.jpg' },
+const BRAND_IMAGES = [
   { label: 'Dukes Gold', url: '/images/events/awr-yellow.png' },
   { label: 'IBD Yellow', url: '/images/events/ibd-yellow.png' },
   { label: 'Robot Blue', url: '/images/events/robot.png' },
@@ -477,28 +472,15 @@ export default function EventsAdmin() {
 
               <div style={S.section}>
                 <p style={S.sectionTitle}>EVENT IMAGE</p>
-                <div>
-                  <label style={S.label}>Image URL</label>
-                  <input style={S.input} value={form.featured_image_url} onChange={(e) => setForm({ ...form, featured_image_url: e.target.value })} placeholder="https://... or select a stock image below" />
-                  <p style={S.hint}>Paste any image URL, or pick from the stock images below</p>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-                  {STOCK_IMAGES.map((img) => (
-                    <button key={img.url} type="button" onClick={() => setForm({ ...form, featured_image_url: img.url })}
-                      style={{ border: form.featured_image_url === img.url ? '2.5px solid #7C3AED' : '1.5px solid #D1D1D6', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: '#f8f8f8', padding: 0, display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F1F1F3' }}>
-                        <img src={img.url} alt={img.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                      </div>
-                      <span style={{ fontSize: 10, padding: '4px 6px', color: form.featured_image_url === img.url ? '#7C3AED' : '#504F58', fontWeight: 600, textAlign: 'center' }}>{img.label}</span>
-                    </button>
-                  ))}
-                </div>
-                {form.featured_image_url && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img src={form.featured_image_url} alt="Preview" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #E4E4E8' }} />
-                    <button type="button" onClick={() => setForm({ ...form, featured_image_url: '' })} style={{ fontSize: 12, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Remove image</button>
-                  </div>
-                )}
+                <ImageField
+                  value={form.featured_image_url}
+                  onChange={(url) => setForm({ ...form, featured_image_url: url })}
+                  folder="events"
+                  label="Featured image"
+                  table="events"
+                  column="featured_image_url"
+                  presets={BRAND_IMAGES}
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
