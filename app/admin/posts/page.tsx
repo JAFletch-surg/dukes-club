@@ -4,13 +4,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Newspaper, Plus, Edit, Trash2, Save, Loader, X, ImageIcon, Search,
   Users, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote,
-  Image as ImageLucide, Video, Link2, Minus, AlignLeft, Eye, Calendar,
-  Type, ChevronDown, Sparkles, FileText, Table2, Upload
+  Image as ImageLucide, Video, Link2, Minus, AlignLeft, Eye, EyeOff, Calendar,
+  Type, ChevronDown, Sparkles, FileText, Table2, Upload, Code2
 } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { useImageUpload } from '@/lib/use-image-upload'
 import { createClient } from '@/lib/supabase/client'
 import { escapeHtml } from '@/lib/utils'
+import { sanitizeHtml, htmlToPlainText } from '@/lib/rich-text'
+import { HTML_SNIPPETS } from '@/components/admin/rich-text-field'
 
 const STATUSES = ['draft', 'published', 'archived']
 const CATEGORIES = ['Announcement', 'Education', 'Careers', 'Research', 'Events', 'Policy', 'Member News', 'General']
@@ -159,7 +161,7 @@ function ImageUploadBox({ value, onChange, folder, label }: { value: string; onC
 
 /* ═══════════════════════════════════════════════════════
    BLOCK EDITOR — structured content blocks
-   Blocks: paragraph, heading, image, video, quote, divider
+   Blocks: paragraph, heading, image, video, quote, divider, html
    Stores as JSON array, renders to HTML on save
    ═══════════════════════════════════════════════════════ */
 type Block =
@@ -171,6 +173,8 @@ type Block =
   | { type: 'quote'; text: string; attribution: string }
   | { type: 'divider' }
   | { type: 'table'; rows: string[][]; hasHeader: boolean; caption: string }
+  | { type: 'html'; html: string }
+
 
 function blocksToHtml(blocks: Block[]): string {
   return blocks.map(b => {
@@ -189,6 +193,9 @@ function blocksToHtml(blocks: Block[]): string {
       case 'quote': return `<blockquote><p>${b.text}</p>${b.attribution ? `<cite>${b.attribution}</cite>` : ''}</blockquote>`
       case 'pdf': return `<div class="pdf-embed"><a href="${b.url}" target="_blank" rel="noopener noreferrer" class="pdf-link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>${b.title || 'Download PDF'}</a></div>`
       case 'divider': return '<hr />'
+      // Raw HTML the author wrote — scrubbed here so nothing unsafe is
+      // ever stored, and wrapped so it round-trips back into an HTML block.
+      case 'html': return b.html.trim() ? `<div class="html-block">${sanitizeHtml(b.html)}</div>` : ''
       case 'table': {
         const dataRows = b.hasHeader ? b.rows.slice(1) : b.rows
         const headRow = b.hasHeader ? b.rows[0] : null
@@ -210,6 +217,7 @@ function blocksToPlain(blocks: Block[]): string {
     }
     if (b.type === 'image' || b.type === 'video') return b.caption || ''
     if (b.type === 'pdf') return b.title || 'PDF attachment'
+    if (b.type === 'html') return htmlToPlainText(b.html)
     if (b.type === 'table') {
       const table = b.rows.map(row => row.join(' | ')).join('\n')
       return b.caption ? `${table}\n${b.caption}` : table
@@ -236,6 +244,9 @@ function htmlToBlocks(html: string): Block[] {
     else if (tag === 'h2') blocks.push({ type: 'heading', level: 2, text: el.textContent || '' })
     else if (tag === 'blockquote') blocks.push({ type: 'quote', text: el.querySelector('p')?.textContent || el.textContent || '', attribution: el.querySelector('cite')?.textContent || '' })
     else if (tag === 'hr') blocks.push({ type: 'divider' })
+    else if (tag === 'div' && el.classList.contains('html-block')) {
+      blocks.push({ type: 'html', html: el.innerHTML.trim() })
+    }
     else if (tag === 'div' && el.classList.contains('pdf-embed')) {
       const a = el.querySelector('a')
       blocks.push({ type: 'pdf', url: a?.href || '', title: a?.textContent || 'PDF' })
@@ -310,6 +321,14 @@ function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange
   const csvRef = useRef<HTMLInputElement>(null)
   const [insertIdx, setInsertIdx] = useState<number>(-1)
   const [csvTargetIdx, setCsvTargetIdx] = useState<number>(-1)
+  const [htmlPreview, setHtmlPreview] = useState<Set<number>>(new Set())
+  const htmlRefs = useRef<Record<number, HTMLTextAreaElement | null>>({})
+
+  const togglePreview = (i: number) => setHtmlPreview(prev => {
+    const next = new Set(prev)
+    if (next.has(i)) next.delete(i); else next.add(i)
+    return next
+  })
 
   const updateBlock = (i: number, updates: Partial<Block>) => {
     const nb = [...blocks]
@@ -331,6 +350,25 @@ function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange
     const nb = [...blocks]
     ;[nb[i], nb[ni]] = [nb[ni], nb[i]]
     onChange(nb)
+  }
+
+  /* Drop a snippet in at the cursor, keeping the caret after what was inserted. */
+  const insertSnippet = (i: number, snippet: string) => {
+    const block = blocks[i]
+    if (block.type !== 'html') return
+    const el = htmlRefs.current[i]
+    const start = el ? el.selectionStart : block.html.length
+    const end = el ? el.selectionEnd : block.html.length
+    const before = block.html.slice(0, start)
+    const after = block.html.slice(end)
+    const lead = before && !before.endsWith('\n') ? '\n' : ''
+    const next = `${before}${lead}${snippet}${after}`
+    updateBlock(i, { html: next })
+    requestAnimationFrame(() => {
+      const caret = before.length + lead.length + snippet.length
+      el?.focus()
+      el?.setSelectionRange(caret, caret)
+    })
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -524,6 +562,47 @@ function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange
                 <div style={{ margin: '16px 0', borderTop: '2px solid #eee' }} />
               )}
 
+              {block.type === 'html' && (
+                <div style={{ margin: '12px 0', border: `1px solid #e3e3e8`, borderRadius: 10, background: '#fafafa', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #eee', background: '#f3f4f6' }}>
+                    <Code2 size={14} color={C.secondary} />
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: C.secondary, textTransform: 'uppercase' }}>HTML</span>
+                    <button type="button" onClick={() => togglePreview(i)}
+                      style={{ ...toolbarBtnStyle(htmlPreview.has(i)), marginLeft: 'auto', fontSize: 11, gap: 5, padding: '4px 10px' }}>
+                      {htmlPreview.has(i) ? <><EyeOff size={12} /> Edit</> : <><Eye size={12} /> Preview</>}
+                    </button>
+                  </div>
+
+                  {htmlPreview.has(i) ? (
+                    <div className="html-preview" style={{ padding: '14px 16px', background: '#fff', minHeight: 60 }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(block.html) || '<p style="color:#bbb;font-style:italic">Nothing to preview yet</p>' }} />
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px', borderBottom: '1px solid #eee' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#aaa', alignSelf: 'center', marginRight: 2 }}>INSERT:</span>
+                        {HTML_SNIPPETS.map(s => (
+                          <button key={s.label} type="button" onClick={() => insertSnippet(i, s.snippet)}
+                            style={{ padding: '3px 9px', borderRadius: 14, border: `1px solid ${C.muted}`, background: '#fff', color: C.secondary, fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'Montserrat, sans-serif' }}>
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        ref={(el) => { htmlRefs.current[i] = el }}
+                        value={block.html}
+                        onChange={(e) => updateBlock(i, { html: e.target.value })}
+                        placeholder={'<p>Write any HTML here — <strong>bold</strong>, lists, tables, embeds…</p>'}
+                        spellCheck={false}
+                        style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', minHeight: 120, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.6, fontFamily: 'IBM Plex Mono, Menlo, monospace', color: '#333', background: '#fff' }}
+                      />
+                    </>
+                  )}
+                  <p style={{ fontSize: 10.5, color: '#999', padding: '6px 12px', borderTop: '1px solid #eee', margin: 0 }}>
+                    Scripts, event handlers and unknown embeds are stripped on save. Allowed: headings, lists, tables, links, images, YouTube/Vimeo iframes.
+                  </p>
+                </div>
+              )}
+
               {block.type === 'table' && (
                 <div style={{ margin: '12px 0', padding: 14, border: `1px solid #eee`, borderRadius: 10, background: '#fafafa' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -623,6 +702,7 @@ function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange
           <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'quote', text: '', attribution: '' })} style={toolbarBtnStyle()} title="Quote"><Quote size={14} /></button>
           <button type="button" onClick={() => { setInsertIdx(blocks.length - 1); pdfRef.current?.click() }} style={toolbarBtnStyle()} title="PDF"><FileText size={14} /></button>
           <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'table', rows: [['', '', ''], ['', '', '']], hasHeader: true, caption: '' })} style={toolbarBtnStyle()} title="Table"><Table2 size={14} /></button>
+          <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'html', html: '' })} style={toolbarBtnStyle()} title="HTML block"><Code2 size={14} /></button>
           <button type="button" onClick={() => addBlockAfter(blocks.length - 1, { type: 'divider' })} style={toolbarBtnStyle()} title="Divider"><Minus size={14} /></button>
         </div>
 
@@ -630,8 +710,22 @@ function BlockEditor({ blocks, onChange, onNotice }: { blocks: Block[]; onChange
         <input ref={pdfRef} type="file" accept=".pdf,application/pdf" style={{ display: 'none' }} onChange={handlePdfUpload} />
         <input ref={csvRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleCsvUpload} />
       </div>
-      <p style={S.hint}>Click a text block to see formatting options · <b>Ctrl+B</b> bold · <b>Ctrl+I</b> italic · <b>Ctrl+K</b> link · Enter for new paragraph</p>
+      <p style={S.hint}>Click a text block to see formatting options · <b>Ctrl+B</b> bold · <b>Ctrl+I</b> italic · <b>Ctrl+K</b> link · Enter for new paragraph · add an <b>HTML</b> block for anything the toolbar cannot do</p>
       <style dangerouslySetInnerHTML={{ __html: `
+        .html-preview { font-family: Montserrat, sans-serif; font-size: 14px; line-height: 1.7; color: #333; }
+        .html-preview p { margin: 0 0 0.9em; }
+        .html-preview h1, .html-preview h2, .html-preview h3, .html-preview h4 { font-weight: 700; color: ${C.navy}; margin: 0.8em 0 0.4em; line-height: 1.3; }
+        .html-preview h1 { font-size: 1.6em } .html-preview h2 { font-size: 1.35em }
+        .html-preview h3 { font-size: 1.15em } .html-preview h4 { font-size: 1em }
+        .html-preview ul, .html-preview ol { margin: 0.6em 0; padding-left: 22px; }
+        .html-preview ul li { list-style: disc } .html-preview ol li { list-style: decimal }
+        .html-preview a { color: ${C.primary}; text-decoration: underline; }
+        .html-preview img, .html-preview iframe { max-width: 100%; border-radius: 8px; }
+        .html-preview table { border-collapse: collapse; width: 100%; font-size: 0.92em; }
+        .html-preview th, .html-preview td { border: 1px solid #e3e3e8; padding: 6px 10px; text-align: left; }
+        .html-preview th { background: ${C.navy}; color: #fff; }
+        .html-preview blockquote { border-left: 3px solid ${C.gold}; background: #FFFBF0; margin: 0.8em 0; padding: 10px 16px; font-style: italic; }
+        .html-preview hr { border: none; border-top: 1px solid #e3e3e8; margin: 1.2em 0; }
         [contenteditable]:empty:before {
           content: attr(data-placeholder);
           color: #bbb;

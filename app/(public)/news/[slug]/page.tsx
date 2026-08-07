@@ -16,6 +16,7 @@ import {
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeHtml } from "@/lib/rich-text";
 
 const formatDate = (dateStr: string) => {
   const d = new Date(dateStr);
@@ -219,7 +220,7 @@ const PostDetailPage = () => {
             {post.content_html ? (
               <article
                 className="article-content"
-                dangerouslySetInnerHTML={{ __html: post.content_html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content_html) }}
               />
             ) : (
               <article className="article-content">
@@ -268,6 +269,51 @@ const PostDetailPage = () => {
               margin: 1.75em 0 0.5em;
               line-height: 1.3;
               letter-spacing: -0.005em;
+            }
+            .article-content h3, .article-content h4 {
+              font-family: var(--font-sans, 'Montserrat', sans-serif);
+              font-weight: 700;
+              color: hsl(220 60% 15%);
+              margin: 1.5em 0 0.4em;
+              line-height: 1.35;
+            }
+            .article-content h3 { font-size: 1.15em; }
+            .article-content h4 { font-size: 1em; letter-spacing: 0.01em; }
+
+            /* ── HTML block — free-form markup written in the admin ── */
+            .article-content .html-block {
+              clear: both;
+              margin: 1.5em 0;
+            }
+            .article-content .callout {
+              border-left: 4px solid hsl(42 87% 55%);
+              background: hsl(42 87% 97%);
+              border-radius: 0 10px 10px 0;
+              padding: 16px 20px;
+              margin: 1.75em 0;
+            }
+            .article-content .callout > *:last-child { margin-bottom: 0; }
+            .article-content .html-block > *:first-child { margin-top: 0; }
+            .article-content .html-block > *:last-child { margin-bottom: 0; }
+            .article-content .html-block iframe {
+              max-width: 100%;
+              border: none;
+              border-radius: 10px;
+            }
+            .article-content .html-block table {
+              display: block;
+              overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
+            }
+            .article-content dl { margin: 1.25em 0; }
+            .article-content dt { font-weight: 700; color: hsl(220 60% 15%); }
+            .article-content dd { margin: 0 0 0.75em 1.25em; }
+            .article-content code {
+              font-family: 'IBM Plex Mono', Menlo, monospace;
+              font-size: 0.9em;
+              background: hsl(42 87% 96%);
+              padding: 1px 5px;
+              border-radius: 4px;
             }
 
             /* ── Inline formatting ── */

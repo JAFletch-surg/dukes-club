@@ -33,6 +33,21 @@ The content editor includes a toolbar with:
 
 > **Note:** Use the **preview** button (eye icon) to see how the post will look before publishing.
 
+### HTML Blocks
+
+When the toolbar cannot do what you need — a two-column layout, a definition list, a callout box, an embedded map — add an **HTML block** (the `<>` button on the *ADD* row) and write the markup yourself.
+
+* **Insert bar** — One-click snippets for headings, bold, italic, links, bulleted and numbered lists, tables, callouts and dividers. Snippets drop in at the cursor; if you have text selected, wrapping snippets wrap it.
+* **Preview** — Toggle between the markup and how it will render on the published page.
+* **Placement** — HTML blocks sit alongside the other blocks and can be reordered with the ↑ / ↓ controls.
+
+Markup is scrubbed against an allow-list when the post is saved:
+
+* **Kept** — Headings, paragraphs, lists, tables, blockquotes, links, images, figures, dividers, `<span>`/`<div>` wrappers, inline `style`, and iframes pointing at YouTube, Vimeo, Google Maps, Spotify or SoundCloud.
+* **Removed** — `<script>`, `<style>`, forms, event handlers such as `onclick`, `javascript:` links, and iframes pointing anywhere else.
+
+Unclosed tags are closed for you, so a stray `<div>` cannot break the page layout. A block's text still counts towards the auto-generated excerpt and the reading-time estimate.
+
 ### Author
 
 Search for an author from the [Executive Team](people.md#executive-team) or [Faculty](people.md#faculty) database. The author's photo, name, and role are displayed on the published post.

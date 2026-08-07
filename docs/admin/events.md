@@ -21,9 +21,23 @@ Click **Add Event** to open the event form. Fill in the following sections:
 * **Start / End Date** — When the event runs.
 * **Location** — Venue name (e.g. "Royal College of Surgeons").
 * **Address** — Full address for in-person events.
-* **Description** — Plain-text summary shown on the event listing.
+* **Description** — The event write-up shown on the event page. See [Formatting free text](#formatting-free-text).
 * **Status** — Draft, Published, or Archived.
 * **Featured** — Toggle to highlight the event on the homepage.
+
+### Formatting free text
+
+**Description**, **Eligibility Criteria** and **Confirmation Message** all accept HTML segments, marked with an `HTML OK` badge.
+
+* Write normally — a blank line starts a new paragraph, a single line break stays a line break.
+* Drop HTML in wherever you want formatting, either by hand or from the **INSERT** bar (headings, bold, italic, links, bulleted and numbered lists, tables, callouts, dividers). Snippets drop in at the cursor and wrap any text you have selected.
+* **Preview** shows exactly how the field will render on the public page.
+
+Markup is scrubbed against an allow-list on save: headings, lists, tables, links, images, dividers and YouTube/Vimeo/Google Maps embeds are kept; `<script>`, forms, event handlers such as `onclick`, `javascript:` links and other embeds are removed. Unclosed tags are closed for you.
+
+A tag-free copy of the description is stored separately and is what the event cards, the webinar list and search use — so the listing previews stay clean however the description is formatted.
+
+> **Setup:** Descriptions need the `description_html` column. Run `supabase/add-event-description-html.sql` once against the database; it also backfills existing descriptions. Until it is run, events still save but formatting is dropped and the admin warns you.
 
 ### Event Types
 
