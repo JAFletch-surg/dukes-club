@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/use-auth";
 import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
 import { isStreamingEvent, registerForEvent } from "@/lib/events";
+import { richTextToHtml } from "@/lib/rich-text";
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -345,11 +346,12 @@ const EventDetailPage = () => {
             <div className="lg:col-span-2">
               <AnimatedSection>
                 <h2 className="text-2xl font-sans font-bold text-navy-foreground mb-6">About This Event</h2>
-                <div className="prose prose-invert max-w-none">
-                  {event.description_plain?.split("\n").map((paragraph: string, i: number) => (
-                    <p key={i} className="text-navy-foreground/80 leading-relaxed mb-4">{paragraph}</p>
-                  ))}
-                </div>
+                {/* description_html carries the admin's HTML; older events fall
+                    back to their plain text, which converts to the same shape. */}
+                <div
+                  className="event-content"
+                  dangerouslySetInnerHTML={{ __html: richTextToHtml(event.description_html || event.description_plain) }}
+                />
               </AnimatedSection>
 
               {/* Timetable */}
@@ -421,7 +423,10 @@ const EventDetailPage = () => {
                               {existingBooking.status === 'waitlisted' && <><Clock size={14} /> On Waitlist</>}
                             </div>
                             {existingBooking.status === 'approved' && event.confirmation_message && (
-                              <p className="text-xs text-navy-foreground/60 mt-3 text-left">{event.confirmation_message}</p>
+                              <div
+                                className="event-content event-content-sm text-navy-foreground/60 mt-3 text-left"
+                                dangerouslySetInnerHTML={{ __html: richTextToHtml(event.confirmation_message) }}
+                              />
                             )}
 
                             {/* Zoom/Meeting link — shown to approved attendees */}
@@ -527,7 +532,10 @@ const EventDetailPage = () => {
                         {event.eligibility_criteria && (!existingBooking || existingBooking.status === 'cancelled') && (
                           <div className="mt-4 p-3 rounded-lg bg-navy-foreground/5 border border-navy-foreground/10">
                             <p className="text-xs font-semibold text-navy-foreground/50 uppercase tracking-wider mb-1">Eligibility</p>
-                            <p className="text-xs text-navy-foreground/70 leading-relaxed">{event.eligibility_criteria}</p>
+                            <div
+                              className="event-content event-content-sm text-navy-foreground/70"
+                              dangerouslySetInnerHTML={{ __html: richTextToHtml(event.eligibility_criteria) }}
+                            />
                           </div>
                         )}
 
@@ -742,6 +750,121 @@ const EventDetailPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Styles for admin-authored HTML in the description, eligibility
+            and confirmation fields — light type on the navy background. */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          .event-content {
+            color: hsl(210 40% 98% / 0.8);
+            font-size: 16px;
+            line-height: 1.75;
+          }
+          .event-content > *:first-child { margin-top: 0; }
+          .event-content > *:last-child { margin-bottom: 0; }
+          .event-content p { margin-bottom: 1em; }
+          .event-content h1, .event-content h2, .event-content h3, .event-content h4 {
+            font-family: var(--font-sans, 'Montserrat', sans-serif);
+            font-weight: 700;
+            color: hsl(210 40% 98%);
+            margin: 1.5em 0 0.5em;
+            line-height: 1.3;
+          }
+          .event-content h1 { font-size: 1.55em; }
+          .event-content h2 { font-size: 1.3em; }
+          .event-content h3 { font-size: 1.12em; }
+          .event-content h4 { font-size: 1em; letter-spacing: 0.01em; }
+          .event-content strong, .event-content b { color: hsl(210 40% 98%); font-weight: 700; }
+          .event-content em, .event-content i { font-style: italic; }
+          .event-content a {
+            color: hsl(42 87% 55%);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+          }
+          .event-content a:hover { color: hsl(42 87% 68%); }
+          .event-content ul, .event-content ol { margin: 1em 0; padding-left: 1.4em; }
+          .event-content li { margin-bottom: 0.4em; }
+          .event-content ul li { list-style-type: disc; }
+          .event-content ol li { list-style-type: decimal; }
+          .event-content li::marker { color: hsl(42 87% 55%); }
+          .event-content blockquote,
+          .event-content .callout {
+            border-left: 3px solid hsl(42 87% 55%);
+            background: hsl(210 40% 98% / 0.06);
+            border-radius: 0 10px 10px 0;
+            padding: 14px 18px;
+            margin: 1.5em 0;
+          }
+          .event-content blockquote { font-style: italic; }
+          .event-content blockquote p:last-child, .event-content .callout p:last-child { margin-bottom: 0; }
+          .event-content blockquote cite {
+            display: block;
+            margin-top: 8px;
+            font-style: normal;
+            font-size: 0.85em;
+            font-weight: 700;
+            color: hsl(42 87% 55%);
+          }
+          .event-content hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, hsl(42 87% 55% / 0.6), transparent);
+            margin: 2em 0;
+          }
+          .event-content img, .event-content iframe, .event-content video {
+            max-width: 100%;
+            border: none;
+            border-radius: 10px;
+          }
+          .event-content figure { margin: 1.5em 0; }
+          .event-content figcaption {
+            font-size: 0.8em;
+            font-style: italic;
+            color: hsl(210 40% 98% / 0.55);
+            margin-top: 6px;
+            text-align: center;
+          }
+          .event-content table {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            font-size: 0.95em;
+          }
+          .event-content th, .event-content td {
+            border: 1px solid hsl(210 40% 98% / 0.15);
+            padding: 8px 14px;
+            text-align: left;
+            vertical-align: top;
+          }
+          .event-content th {
+            background: hsl(210 40% 98% / 0.08);
+            color: hsl(210 40% 98%);
+            font-family: var(--font-sans, 'Montserrat', sans-serif);
+            font-weight: 700;
+          }
+          .event-content code {
+            font-family: 'IBM Plex Mono', Menlo, monospace;
+            font-size: 0.9em;
+            background: hsl(210 40% 98% / 0.1);
+            padding: 1px 5px;
+            border-radius: 4px;
+          }
+
+          /* Sidebar variant — same markup, smaller type */
+          .event-content-sm { font-size: 12px; line-height: 1.65; color: inherit; }
+          .event-content-sm p { margin-bottom: 0.6em; }
+          .event-content-sm ul, .event-content-sm ol { margin: 0.5em 0; padding-left: 1.2em; }
+          .event-content-sm li { margin-bottom: 0.2em; }
+          .event-content-sm h1, .event-content-sm h2, .event-content-sm h3, .event-content-sm h4 {
+            font-size: 1.05em;
+            margin: 0.8em 0 0.3em;
+          }
+          .event-content-sm blockquote, .event-content-sm .callout { padding: 8px 12px; margin: 0.8em 0; }
+          .event-content-sm table { font-size: 0.95em; margin: 0.8em 0; }
+          .event-content-sm th, .event-content-sm td { padding: 4px 8px; }
+        `}} />
       </section>
     </div>
   );

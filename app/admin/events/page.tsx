@@ -8,7 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 import { ImageField } from '@/components/admin/image-field'
+import { RichTextField } from '@/components/admin/rich-text-field'
 import { isStreamingEvent } from '@/lib/events'
+import { richTextToHtml, htmlToPlainText } from '@/lib/rich-text'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
@@ -120,7 +122,7 @@ export default function EventsAdmin() {
 
   const emptyForm = {
     title: '', slug: '', starts_at: '', ends_at: '', location: '', address: '',
-    description_plain: '', event_type: 'In Person Course', capacity: 30,
+    description: '', event_type: 'In Person Course', capacity: 30,
     price_pence: 0, member_price_pence: '', status: 'draft',
     is_featured: false, booking_url: '', access_level: 'public',
     featured_image_url: '',
@@ -149,7 +151,9 @@ export default function EventsAdmin() {
       starts_at: e.starts_at?.slice(0, 16) || '',
       ends_at: e.ends_at?.slice(0, 16) || '',
       location: e.location || '', address: e.address || '',
-      description_plain: e.description_plain || '',
+      // Prefer the HTML source so formatting survives a round-trip; fall
+      // back to the plain text for events written before HTML was allowed.
+      description: e.description_html || e.description_plain || '',
       event_type: e.event_type || 'In Person Course',
       capacity: e.capacity || 30, price_pence: e.price_pence || 0,
       member_price_pence: e.member_price_pence ?? '',
@@ -182,6 +186,7 @@ export default function EventsAdmin() {
     setSaving(true)
     try {
       const supabase = createClient()
+      const descriptionHtml = richTextToHtml(form.description)
       const payload: any = {
         title: form.title,
         slug: form.slug || slugify(form.title),
@@ -189,7 +194,10 @@ export default function EventsAdmin() {
         ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
         location: form.location || null,
         address: form.address || null,
-        description_plain: form.description_plain || null,
+        // description_html drives the event page; description_plain stays in
+        // step for listing cards, search and the webinar previews.
+        description_html: descriptionHtml || null,
+        description_plain: htmlToPlainText(descriptionHtml) || null,
         event_type: form.event_type,
         capacity: form.capacity || null,
         price_pence: form.price_pence || 0,
@@ -224,15 +232,25 @@ export default function EventsAdmin() {
         payload.vimeo_live_embed_url = form.vimeo_live_embed_url || null
       }
 
+      const persist = async (body: any): Promise<string> => {
+        if (editing === 'new') return (await create(body)).id
+        await update(editing!, body)
+        return editing!
+      }
+
       let eventId: string
-      if (editing === 'new') {
-        const created = await create(payload)
-        eventId = created.id
-        showToast('Event created')
-      } else {
-        await update(editing!, payload)
-        eventId = editing!
-        showToast('Event updated')
+      try {
+        eventId = await persist(payload)
+        showToast(editing === 'new' ? 'Event created' : 'Event updated')
+      } catch (err: any) {
+        // description_html arrives with supabase/add-event-description-html.sql.
+        // Until that has been applied, fall back to saving the plain copy so
+        // admins are not locked out of editing events entirely.
+        if (!/description_html/.test(err?.message || '')) throw err
+        const withoutHtml = { ...payload }
+        delete withoutHtml.description_html
+        eventId = await persist(withoutHtml)
+        showToast('Saved, but formatting was dropped — run supabase/add-event-description-html.sql', 'error')
       }
 
       // Sync event_faculty junction table
@@ -493,7 +511,13 @@ export default function EventsAdmin() {
                 <div><label style={S.label}>Address</label><input style={S.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" /></div>
               </div>
 
-              <div><label style={S.label}>Description</label><textarea style={S.textarea} value={form.description_plain} onChange={(e) => setForm({ ...form, description_plain: e.target.value })} placeholder="Event description..." /></div>
+              <RichTextField
+                label="Description"
+                value={form.description}
+                onChange={(v) => setForm({ ...form, description: v })}
+                placeholder={'What is this event about, who is it for, what will delegates take away?\n\nLeave a blank line for a new paragraph, or drop in HTML:\n<ul>\n  <li>Hands-on cadaveric stations</li>\n  <li>Faculty-led case discussion</li>\n</ul>'}
+                minHeight={180}
+              />
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
                 <div>
@@ -626,11 +650,14 @@ export default function EventsAdmin() {
                         </div>
                       </div>
 
-                      <div>
-                        <label style={S.label}>Eligibility Criteria</label>
-                        <textarea style={{ ...S.input, minHeight: 80 }} value={form.eligibility_criteria} onChange={(e) => setForm({ ...form, eligibility_criteria: e.target.value })} placeholder="Describe who is eligible to apply, e.g. 'Open to ST3+ colorectal trainees registered with ISCP'" />
-                        <p style={S.hint}>Displayed to applicants on the event page</p>
-                      </div>
+                      <RichTextField
+                        label="Eligibility Criteria"
+                        value={form.eligibility_criteria}
+                        onChange={(v) => setForm({ ...form, eligibility_criteria: v })}
+                        placeholder={"Describe who is eligible to apply, e.g. 'Open to ST3+ colorectal trainees registered with ISCP'"}
+                        hint="Displayed to applicants on the event page. Blank line for a new paragraph; HTML welcome."
+                        minHeight={90}
+                      />
 
                       <div>
                         <label style={S.label}>Required Training Level(s)</label>
@@ -678,10 +705,15 @@ export default function EventsAdmin() {
                         Auto-approve applications (skip manual review)
                       </label>
 
-                      <div>
-                        <label style={S.label}>Confirmation Message <span style={{ fontWeight: 400, color: '#999' }}>(optional)</span></label>
-                        <textarea style={{ ...S.input, minHeight: 60 }} value={form.confirmation_message} onChange={(e) => setForm({ ...form, confirmation_message: e.target.value })} placeholder="Shown to applicants after approval, e.g. venue directions, what to bring" />
-                      </div>
+                      <RichTextField
+                        label="Confirmation Message"
+                        optional
+                        value={form.confirmation_message}
+                        onChange={(v) => setForm({ ...form, confirmation_message: v })}
+                        placeholder="Shown to applicants after approval, e.g. venue directions, what to bring"
+                        hint="Shown once an application is approved. Blank line for a new paragraph; HTML welcome."
+                        minHeight={70}
+                      />
                     </div>
                   )}
                 </div>
