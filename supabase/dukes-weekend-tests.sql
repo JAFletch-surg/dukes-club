@@ -93,11 +93,15 @@ END $$;
 
 -- ── Fixture ────────────────────────────────────────────────────────
 
-INSERT INTO profiles (id, full_name, email, role, approval_status) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'Member One',  'm1@test',      'member',  'approved'),
-  ('22222222-2222-2222-2222-222222222222', 'Member Two',  'm2@test',      'member',  'approved'),
-  ('33333333-3333-3333-3333-333333333333', 'Trainee',     'trainee@test', 'trainee', 'approved'),
-  ('44444444-4444-4444-4444-444444444444', 'Admin',       'admin@test',   'admin',   'approved');
+-- Members one and two leave region and training_stage NULL, which is the
+-- common case and the one that broke; member five has both set. See the
+-- "profile columns" check below.
+INSERT INTO profiles (id, full_name, email, role, approval_status, region, training_stage) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'Member One',  'm1@test',      'member',  'approved', NULL,     NULL),
+  ('22222222-2222-2222-2222-222222222222', 'Member Two',  'm2@test',      'member',  'approved', NULL,     NULL),
+  ('33333333-3333-3333-3333-333333333333', 'Trainee',     'trainee@test', 'trainee', 'approved', NULL,     NULL),
+  ('44444444-4444-4444-4444-444444444444', 'Admin',       'admin@test',   'admin',   'approved', NULL,     NULL),
+  ('55555555-5555-5555-5555-555555555555', 'Member Five', 'm5@test',      'member',  'approved', 'London', 'ST5');
 
 INSERT INTO events (id, title, slug, event_type, status, starts_at, ends_at,
                     weekend_deposit_pence, weekend_stream_enabled,
@@ -119,6 +123,44 @@ INSERT INTO weekend_courses (id, event_id, day, title, starts_at, ends_at, capac
    '2099-06-07 09:00+00', '2099-06-07 12:00+00', 5, true);
 
 DO $$ BEGIN RAISE NOTICE 'Dukes Weekend rule checks'; END $$;
+
+-- ── Profile columns — the booking copies them onto event_bookings ──
+-- save_weekend_booking() fills the applicant_* fields from the member's
+-- profile. region and training_stage are enums, so COALESCE(col, '') resolves
+-- to the enum and coerces '' to it at plan time — which failed for every
+-- member on every booking, set or not, until the values were cast to TEXT.
+-- These two run before the rules because none of them can pass if a booking
+-- cannot be created at all.
+
+SELECT t_as('11111111-1111-1111-1111-111111111111');
+SELECT t_expect_ok(
+  $$ SELECT save_weekend_booking('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', true, false, false, NULL, false, false) $$,
+  'profile  member with no training stage or region can book');
+
+SELECT t_as('55555555-5555-5555-5555-555555555555');
+SELECT t_expect_ok(
+  $$ SELECT save_weekend_booking('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', true, false, false, NULL, false, false) $$,
+  'profile  member with both set can book');
+
+-- ...and the values land on the booking as text, not lost.
+DO $$
+DECLARE v_level TEXT; v_deanery TEXT;
+BEGIN
+  SELECT applicant_training_level, applicant_deanery INTO v_level, v_deanery
+  FROM event_bookings
+  WHERE event_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    AND user_id  = '55555555-5555-5555-5555-555555555555';
+  IF v_level <> 'ST5' OR v_deanery <> 'London' THEN
+    RAISE EXCEPTION 'FAIL [profile]: expected ST5/London on the booking, got %/%', v_level, v_deanery;
+  END IF;
+  RAISE NOTICE '  ok   profile  training stage and region copied onto the booking';
+END $$;
+
+-- Clean up so the rule checks below start from no bookings.
+DELETE FROM event_bookings
+WHERE event_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  AND user_id IN ('11111111-1111-1111-1111-111111111111',
+                  '55555555-5555-5555-5555-555555555555');
 
 -- ── Rule 1 — only members may book ─────────────────────────────────
 

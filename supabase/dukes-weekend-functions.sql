@@ -401,8 +401,16 @@ BEGIN
     ) VALUES (
       p_event_id, v_user,
       v_new_status,
-      COALESCE(v_profile.full_name, ''), COALESCE(v_profile.email, ''),
-      COALESCE(v_profile.training_stage, ''), '', COALESCE(v_profile.region, ''),
+      -- ::TEXT on every profile-derived value, not just the ones that have
+      -- bitten. training_stage and region are ENUMS in production: in
+      -- COALESCE(enum, '') Postgres resolves the result to that enum and
+      -- coerces the '' literal to it at plan time, which fails for every
+      -- member whether or not the column is set. The cast is a no-op on a text
+      -- column and the right conversion on an enum, so this no longer depends
+      -- on which they are. The applicant_* targets are plain text and already
+      -- take '' — registerForEvent() in lib/events.ts writes exactly that.
+      COALESCE(v_profile.full_name::TEXT, ''), COALESCE(v_profile.email::TEXT, ''),
+      COALESCE(v_profile.training_stage::TEXT, ''), '', COALESCE(v_profile.region::TEXT, ''),
       COALESCE(p_friday, false), COALESCE(p_saturday, false), COALESCE(p_sunday, false), v_mode,
       v_room_fri, v_room_sat
     )

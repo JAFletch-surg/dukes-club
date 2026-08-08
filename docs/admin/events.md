@@ -190,7 +190,7 @@ Members may book Friday only, Saturday only, Friday + Saturday, Saturday + Sunda
 >
 > Step 1 must be its own run: Postgres will not let a new enum value be used in the same transaction that adds it.
 >
-> **If anything misbehaves, run `supabase/dukes-weekend-healthcheck.sql` first.** It is read-only, safe on the live database, and reports exactly which pieces are installed and which file to run for anything missing. Most weekend problems are a migration that has not been applied rather than a bug, and this tells the two apart in one go.
+> **If anything misbehaves, run `supabase/dukes-weekend-healthcheck.sql` first.** It is read-only and safe on the live database. It returns a table of one row per check — read the top: anything marked `MISSING` names the file to run in the **fix** column, and the rows are ordered so running them top to bottom is the right order. `TYPE` rows at the bottom are information rather than a problem. Most weekend problems are a migration that has not been applied rather than a bug, and this tells the two apart in one go.
 >
 > Admins and editors also see the underlying database error on the booking page itself when something fails; members only ever see the plain-English message.
 

@@ -20,15 +20,20 @@
 --
 -- WHY THE COLUMN TYPES MATTER
 --
--- event_type, and the two status columns, are ENUMS in production — the same
--- way exec_role is (see add-egs-lead-exec-role.sql). An earlier version of
--- this fixture declared them as TEXT, and every rule check passed against a
--- schema that did not match the real one: the migration had never added
--- 'Dukes Weekend' to the enum, so creating a weekend failed in the admin UI
--- with "invalid input value for enum event_type" while the tests stayed green.
+-- event_type, the two status columns, and the profile's region and training
+-- stage are all ENUMS in production — the same way exec_role is (see
+-- add-egs-lead-exec-role.sql). An earlier version of this fixture declared
+-- them as TEXT, and every rule check passed against a schema that did not
+-- match the real one: the migration had never added 'Dukes Weekend' to the
+-- enum, so creating a weekend failed in the admin UI with "invalid input value
+-- for enum event_type" while the tests stayed green. It happened a second time
+-- with profiles.training_stage, which the fixture still called TEXT: booking
+-- failed for every member with "invalid input value for enum training_stage"
+-- and the suite was green throughout.
 --
--- Keep these as enums. A fixture that is looser than production does not test
--- anything, it only agrees with you.
+-- Keep every one of these as an enum. A fixture that is looser than production
+-- does not test anything, it only agrees with you. If you add a column here,
+-- check its real type first — \d+ profiles on the live database, not a guess.
 --
 
 DO $$ BEGIN CREATE ROLE anon;          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -63,6 +68,21 @@ CREATE TYPE user_role AS ENUM ('trainee', 'member', 'editor', 'admin', 'super_ad
 
 CREATE TYPE approval_status AS ENUM ('pending', 'approved', 'rejected');
 
+-- The member's own attributes. Labels taken from the pickers on
+-- app/members/profile/page.tsx, which is what production is populated from.
+CREATE TYPE training_stage AS ENUM (
+  'FY1', 'FY2', 'CT1', 'CT2', 'ST3', 'ST4', 'ST5', 'ST6', 'ST7', 'ST8',
+  'Post-CCT', 'Consultant', 'SAS', 'Academic', 'Other'
+);
+
+CREATE TYPE region AS ENUM (
+  'North East', 'North West (Mersey)', 'North West (North Western)',
+  'Yorkshire and the Humber', 'East Midlands', 'West Midlands',
+  'East of England', 'London', 'Kent, Surrey and Sussex', 'Thames Valley',
+  'Wessex', 'South West (Peninsula)', 'South West (Severn)',
+  'Scotland', 'Wales', 'Northern Ireland', 'Republic of Ireland'
+);
+
 -- ── Tables ─────────────────────────────────────────────────────────
 
 CREATE TABLE profiles (
@@ -71,8 +91,8 @@ CREATE TABLE profiles (
   email           TEXT,
   role            user_role,
   approval_status approval_status,
-  region          TEXT,
-  training_stage  TEXT,
+  region          region,
+  training_stage  training_stage,
   avatar_url      TEXT,
   acpgbi_number   TEXT,
   created_at      TIMESTAMPTZ DEFAULT now()
