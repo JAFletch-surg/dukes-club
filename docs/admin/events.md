@@ -27,11 +27,21 @@ Click **Add Event** to open the event form. Fill in the following sections:
 
 ### Formatting free text
 
-**Description**, **Eligibility Criteria** and **Confirmation Message** all accept HTML segments, marked with an `HTML OK` badge.
+**Description**, **Eligibility Criteria** and **Confirmation Message** each have two modes, switched with the **Visual** and **HTML** buttons above the box. Both edit the same text, so one person can lay a page out visually and another can drop an embed into it afterwards.
 
-* Write normally — a blank line starts a new paragraph, a single line break stays a line break.
-* Drop HTML in wherever you want formatting, either by hand or from the **INSERT** bar (headings, bold, italic, links, bulleted and numbered lists, tables, callouts, dividers). Snippets drop in at the cursor and wrap any text you have selected.
-* **Preview** shows exactly how the field will render on the public page.
+**Visual** — the default, and the one to use if you would rather not see any markup. Select some text and click a button:
+
+* **B** / *I* / <u>U</u> for bold, italic and underline
+* **H1 H2 H3** for headings
+* Bulleted and numbered lists, and a **link** button that asks for the address
+* A quote, a **highlighted box** (the cream callout), a **table**, and a divider
+* Undo and redo on the right
+
+Buttons light up when the cursor is inside text they apply to, so you can always see what is bold and what is a heading.
+
+**HTML** — the raw markup, with the **INSERT** bar and a **Preview** button. Use it to paste a YouTube or Google Maps embed, an image, or anything else the visual buttons do not cover. Here a blank line starts a new paragraph and a single line break stays a line break, and INSERT snippets drop in at the cursor, wrapping any text you have selected.
+
+> Switching **HTML → Visual** asks first if the field contains something the visual editor cannot show, such as an `<iframe>` or an `<img>`, and names it. Say no and you stay in HTML with the markup intact. Say yes and that markup is removed — the field tells you afterwards what went. Switching the other way, Visual → HTML, never loses anything.
 
 Markup is scrubbed against an allow-list on save: headings, lists, tables, links, images, dividers and YouTube/Vimeo/Google Maps embeds are kept; `<script>`, forms, event handlers such as `onclick`, `javascript:` links and other embeds are removed. Unclosed tags are closed for you.
 

@@ -12,7 +12,7 @@ import { useImageUpload } from '@/lib/use-image-upload'
 import { createClient } from '@/lib/supabase/client'
 import { escapeHtml } from '@/lib/utils'
 import { sanitizeHtml, htmlToPlainText } from '@/lib/rich-text'
-import { HTML_SNIPPETS } from '@/components/admin/rich-text-field'
+import { HTML_SNIPPETS } from '@/components/admin/html-snippets'
 
 const STATUSES = ['draft', 'published', 'archived']
 const CATEGORIES = ['Announcement', 'Education', 'Careers', 'Research', 'Events', 'Policy', 'Member News', 'General']
