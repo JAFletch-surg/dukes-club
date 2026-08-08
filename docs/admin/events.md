@@ -182,13 +182,19 @@ A **Dukes Weekend** is an event type like any other, but it books differently: o
 
 Members may book Friday only, Saturday only, Friday + Saturday, Saturday + Sunday, or all three. Sunday never stands alone.
 
-> **Setup:** Run these three files once against the database, **in this order**:
+> **Setup:** Run these three files once against the database, **in this order**. All three are required — a weekend cannot be booked until every one has been applied.
 >
 > 1. `supabase/add-dukes-weekend-event-type.sql` — adds `Dukes Weekend` to the `event_type` enum. Without it, saving a weekend fails with *invalid input value for enum event_type*.
 > 2. `supabase/create-dukes-weekend.sql` — the tables and columns. It refuses to run if step 1 has not been applied.
-> 3. `supabase/dukes-weekend-functions.sql` — the booking rules. A weekend will not work with only the first two applied.
+> 3. `supabase/dukes-weekend-functions.sql` — the booking rules and the place-counting used on the event page. **Without this, members get *"Something went wrong"* when they try to book**, and courses show their full capacity rather than real numbers.
 >
 > Step 1 must be its own run: Postgres will not let a new enum value be used in the same transaction that adds it.
+>
+> **If anything misbehaves, run `supabase/dukes-weekend-healthcheck.sql` first.** It is read-only, safe on the live database, and reports exactly which pieces are installed and which file to run for anything missing. Most weekend problems are a migration that has not been applied rather than a bug, and this tells the two apart in one go.
+>
+> Admins and editors also see the underlying database error on the booking page itself when something fails; members only ever see the plain-English message.
+
+> **Separately:** if event descriptions lose their formatting when you save, `supabase/add-event-description-html.sql` has not been run. That is unrelated to the weekend and affects all events.
 
 ### Creating one
 

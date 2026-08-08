@@ -781,3 +781,8 @@ BEGIN
   RAISE NOTICE '✓ cancel_weekend_course_booking() — waitlist promotion, room invalidation';
   RAISE NOTICE '✓ transition_event_payments() — admin deposit actions with audit trail';
 END $$;
+
+-- Same reason as the schema file: without a reload, PostgREST answers a call
+-- to these functions with "Could not find the function ... in the schema
+-- cache" even though they are installed.
+NOTIFY pgrst, 'reload schema';

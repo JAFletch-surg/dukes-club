@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   Loader2, Check, Lock, Clock, Users, Info, BedDouble, Radio,
@@ -79,6 +79,9 @@ export function WeekendBooking({ event, user, profile }: Props) {
   const [courses, setCourses] = useState<WeekendCourse[]>([])
   const [facultyByCourse, setFacultyByCourse] = useState<Record<string, { name: string; photo_url: string }[]>>({})
   const [availability, setAvailability] = useState<Record<string, Availability>>({})
+  // True when the availability lookup failed, so places-left is unknown rather
+  // than "nobody has booked".
+  const [availabilityBroken, setAvailabilityBroken] = useState(false)
   const [rooms, setRooms] = useState<RoomAvailability | null>(null)
   const [booking, setBooking] = useState<Booking | null>(null)
   const [myCourses, setMyCourses] = useState<CourseBooking[]>([])
@@ -94,15 +97,35 @@ export function WeekendBooking({ event, user, profile }: Props) {
   const [saving, setSaving] = useState(false)
   const [busyCourse, setBusyCourse] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The underlying database error, shown to admins and editors only. Members
+  // get the friendly line by itself; without this a setup problem and a real
+  // bug look identical from the page.
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const bookingsClosed = !!event.application_deadline && new Date(event.application_deadline) < new Date()
   const eligible = !!user && canBookEvent(profile, 'Dukes Weekend')
+  const canSeeDetail = !!profile && ['admin', 'super_admin', 'editor'].includes(profile.role)
+
+  // Clearing both together keeps a stale detail from outliving its message.
+  const fail = useCallback((message: string, detail?: string | null) => {
+    setError(message)
+    setErrorDetail(detail ?? null)
+  }, [])
+
+  const clearMessages = useCallback(() => {
+    setError(null)
+    setErrorDetail(null)
+    setNotice(null)
+  }, [])
+
+  // The courses section, so a successful day save can bring it into view.
+  const coursesRef = useRef<HTMLDivElement | null>(null)
 
   // ── Load ─────────────────────────────────────────────────────────
 
   const loadShared = useCallback(async () => {
-    const [{ data: courseRows }, { data: avail }, { data: roomRows }] = await Promise.all([
+    const [{ data: courseRows }, { data: avail, error: availErr }, { data: roomRows }] = await Promise.all([
       supabase.from('weekend_courses').select('*').eq('event_id', event.id).order('sort_order'),
       supabase.rpc('weekend_course_availability', { p_event_id: event.id }),
       supabase.rpc('weekend_room_availability', { p_event_id: event.id }),
@@ -110,6 +133,17 @@ export function WeekendBooking({ event, user, profile }: Props) {
 
     const list = (courseRows || []) as WeekendCourse[]
     setCourses(list)
+
+    // If this lookup fails the places-left numbers are unknown, not zero-booked.
+    // Saying nothing would make a broken function look like an empty course —
+    // which is exactly what happened, and is why it took three screenshots to
+    // spot that the functions migration had not been applied.
+    if (availErr) {
+      setAvailabilityBroken(true)
+      if (canSeeDetail) fail('Course availability could not be loaded.', availErr.message)
+    } else {
+      setAvailabilityBroken(false)
+    }
 
     const map: Record<string, Availability> = {}
     for (const a of (avail || []) as Availability[]) map[a.course_id] = a
@@ -141,7 +175,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
         setFacultyByCourse(byCourse)
       }
     }
-  }, [supabase, event.id])
+  }, [supabase, event.id, canSeeDetail, fail])
 
   const loadMine = useCallback(async () => {
     if (!user) return
@@ -240,8 +274,8 @@ export function WeekendBooking({ event, user, profile }: Props) {
     }
   }, [supabase])
 
-  const saveBooking = async () => {
-    setSaving(true); setError(null); setNotice(null)
+  const saveBooking = async ({ thenShowCourses = false } = {}) => {
+    setSaving(true); clearMessages()
     try {
       const res = await fetch('/api/weekend/booking', {
         method: 'POST',
@@ -258,7 +292,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
       })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || 'Could not save your booking')
+        fail(json.error || 'Could not save your booking', json.detail)
       } else {
         setNotice(
           json.courses_cancelled > 0
@@ -266,15 +300,24 @@ export function WeekendBooking({ event, user, profile }: Props) {
             : 'Your booking has been saved.'
         )
         await Promise.all([loadMine(), loadShared()])
+
+        // After the first save the course lists have just become usable, so
+        // put them in front of the member rather than leaving them to scroll
+        // back up and find out.
+        if (thenShowCourses) {
+          requestAnimationFrame(() => {
+            coursesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          })
+        }
       }
     } catch {
-      setError('Could not reach the server. Please try again.')
+      fail('Could not reach the server. Please try again.')
     }
     setSaving(false)
   }
 
   const bookCourse = async (courseId: string, joinWaitlist: boolean) => {
-    setBusyCourse(courseId); setError(null); setNotice(null)
+    setBusyCourse(courseId); clearMessages()
     try {
       const res = await fetch('/api/weekend/courses', {
         method: 'POST',
@@ -283,7 +326,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
       })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || 'Could not book that course')
+        fail(json.error || 'Could not book that course', json.detail)
       } else {
         setNotice(
           json.status === 'waitlisted'
@@ -293,13 +336,13 @@ export function WeekendBooking({ event, user, profile }: Props) {
         await Promise.all([loadMine(), loadShared()])
       }
     } catch {
-      setError('Could not reach the server. Please try again.')
+      fail('Could not reach the server. Please try again.')
     }
     setBusyCourse(null)
   }
 
   const releaseCourse = async (courseBookingId: string, courseId: string) => {
-    setBusyCourse(courseId); setError(null); setNotice(null)
+    setBusyCourse(courseId); clearMessages()
     try {
       const res = await fetch(`/api/weekend/courses?courseBookingId=${courseBookingId}`, {
         method: 'DELETE',
@@ -307,7 +350,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
       })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || 'Could not release that place')
+        fail(json.error || 'Could not release that place', json.detail)
       } else {
         setNotice(
           json.friday_room_cleared
@@ -317,7 +360,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
         await Promise.all([loadMine(), loadShared()])
       }
     } catch {
-      setError('Could not reach the server. Please try again.')
+      fail('Could not reach the server. Please try again.')
     }
     setBusyCourse(null)
   }
@@ -386,7 +429,17 @@ export function WeekendBooking({ event, user, profile }: Props) {
       {error && (
         <div className="mb-5 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 flex items-start gap-2">
           <X size={15} className="text-red-400 mt-0.5 shrink-0" />
-          <p className="text-sm text-red-300">{error}</p>
+          <div className="min-w-0">
+            <p className="text-sm text-red-300">{error}</p>
+            {/* Admins and editors also get the database's own words, so a
+                missing migration is distinguishable from a real bug without
+                digging through server logs. */}
+            {canSeeDetail && errorDetail && (
+              <p className="mt-1.5 text-[11px] font-mono text-red-300/60 break-words">
+                {errorDetail}
+              </p>
+            )}
+          </div>
         </div>
       )}
       {notice && (
@@ -467,9 +520,25 @@ export function WeekendBooking({ event, user, profile }: Props) {
         </div>
       )}
 
+      {/* Courses need a saved booking behind them (the server rejects a course
+          without one), so when there is none the action to create it belongs
+          right here — not at the bottom of the page past the very lists it
+          unlocks. Nothing is written until this is pressed, so a mistaken day
+          tap does not create a booking, a deposit and a confirmation email. */}
+      {!booking && (days.friday || days.saturday) && (
+        <button
+          onClick={() => saveBooking({ thenShowCourses: true })}
+          disabled={saving || bookingsClosed}
+          className="w-full mt-2 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {saving && <Loader2 size={15} className="animate-spin" />}
+          {days.friday || days.sunday ? 'Save Days & Choose Courses' : 'Save My Days'}
+        </button>
+      )}
+
       {/* ── 2. Courses ── */}
       {(days.friday || days.sunday) && (
-        <>
+        <div ref={coursesRef}>
           <h3 className="text-sm font-semibold text-navy-foreground uppercase tracking-wider mb-1 mt-8">
             2. Choose your courses
           </h3>
@@ -481,7 +550,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
             <div className="mb-4 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 flex items-start gap-2">
               <Info size={15} className="text-gold mt-0.5 shrink-0" />
               <p className="text-sm text-navy-foreground/80">
-                Save your days below first, then come back to pick courses.
+                Save your days first — the button just above — and these unlock.
               </p>
             </div>
           )}
@@ -490,7 +559,7 @@ export function WeekendBooking({ event, user, profile }: Props) {
             <CourseList
               heading="Friday"
               courses={fridayCourses}
-              {...{ availability, facultyByCourse, bookedCourses, myCourseFor, expanded, setExpanded, busyCourse, bookCourse, releaseCourse }}
+              {...{ availability, availabilityBroken, facultyByCourse, bookedCourses, myCourseFor, expanded, setExpanded, busyCourse, bookCourse, releaseCourse }}
               disabled={!booking || bookingsClosed}
             />
           )}
@@ -498,11 +567,11 @@ export function WeekendBooking({ event, user, profile }: Props) {
             <CourseList
               heading="Sunday"
               courses={sundayCourses}
-              {...{ availability, facultyByCourse, bookedCourses, myCourseFor, expanded, setExpanded, busyCourse, bookCourse, releaseCourse }}
+              {...{ availability, availabilityBroken, facultyByCourse, bookedCourses, myCourseFor, expanded, setExpanded, busyCourse, bookCourse, releaseCourse }}
               disabled={!booking || bookingsClosed}
             />
           )}
-        </>
+        </div>
       )}
 
       {/* ── 3. Accommodation ── */}
@@ -544,8 +613,10 @@ export function WeekendBooking({ event, user, profile }: Props) {
         </div>
       )}
 
+      {/* The first save now happens up beside the day cards, so this one only
+          handles later edits — rooms, a changed day, switching to the stream. */}
       <button
-        onClick={saveBooking}
+        onClick={() => saveBooking({ thenShowCourses: !booking })}
         disabled={saving || bookingsClosed || (!days.friday && !days.saturday) || (!!booking && !daysDirty)}
         className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
@@ -659,12 +730,14 @@ function CourseList(props: {
   expanded: string | null
   setExpanded: (id: string | null) => void
   busyCourse: string | null
+  availabilityBroken: boolean
   bookCourse: (id: string, waitlist: boolean) => void
   releaseCourse: (bookingId: string, courseId: string) => void
 }) {
   const {
     heading, courses, disabled, availability, facultyByCourse, bookedCourses,
-    myCourseFor, expanded, setExpanded, busyCourse, bookCourse, releaseCourse,
+    myCourseFor, expanded, setExpanded, busyCourse, availabilityBroken,
+    bookCourse, releaseCourse,
   } = props
 
   if (courses.length === 0) {
@@ -683,6 +756,10 @@ function CourseList(props: {
         {courses.map(course => {
           const mine = myCourseFor(course.id)
           const avail = availability[course.id]
+          // Without a successful availability lookup we do not know how many
+          // places remain. Assuming the course is empty would quietly turn a
+          // broken function into a healthy-looking course.
+          const placesKnown = !availabilityBroken && !!avail
           const placesLeft = avail?.places_left ?? course.capacity
           const isMine = mine?.status === 'booked'
           const isWaiting = mine?.status === 'waitlisted'
@@ -693,7 +770,7 @@ function CourseList(props: {
             ? bookedCourses.find(b => b.id !== course.id && coursesOverlap(course, b))
             : undefined
 
-          const full = placesLeft <= 0
+          const full = placesKnown && placesLeft <= 0
           const busy = busyCourse === course.id
           const isOpen = expanded === course.id
           const faculty = facultyByCourse[course.id] || []
@@ -732,8 +809,12 @@ function CourseList(props: {
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <Users size={11} className="text-gold" />
-                        {full ? 'Full' : `${placesLeft} of ${course.capacity} left`}
-                        {avail?.waitlisted ? ` · ${avail.waitlisted} waiting` : ''}
+                        {!placesKnown
+                          ? `${course.capacity} places`
+                          : full
+                            ? 'Full'
+                            : `${placesLeft} of ${course.capacity} left`}
+                        {placesKnown && avail?.waitlisted ? ` · ${avail.waitlisted} waiting` : ''}
                       </span>
                     </p>
                   </div>

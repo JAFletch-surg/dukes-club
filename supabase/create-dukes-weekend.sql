@@ -474,3 +474,8 @@ BEGIN
   RAISE NOTICE '✓ RLS enabled on all new tables';
   RAISE NOTICE '→ Now run supabase/dukes-weekend-functions.sql';
 END $$;
+
+-- PostgREST caches the schema, so the new tables and columns are invisible to
+-- the API until it reloads. Without this the admin form and booking flow can
+-- keep failing on columns that plainly exist in the database.
+NOTIFY pgrst, 'reload schema';

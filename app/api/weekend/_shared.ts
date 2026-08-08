@@ -88,8 +88,18 @@ const CLIENT_ERROR_CODES = new Set([
 
 /**
  * Turn a Postgres error from the weekend functions into an HTTP response.
- * The raw code travels in `code` so the UI can react to specifics (offering a
- * waitlist on COURSE_FULL, say) without parsing prose.
+ *
+ * Three things travel back:
+ *   error  — wording a member can act on
+ *   code   — the raw machine code, so the UI can react to specifics (offering
+ *            a waitlist on COURSE_FULL, say) without parsing prose
+ *   detail — the underlying Postgres/PostgREST text, verbatim
+ *
+ * `detail` exists because the first version of this returned only the friendly
+ * message and logged the rest to the server. A missing migration then looked
+ * exactly like a bug, and diagnosing it took several screenshots and a guess.
+ * The UI shows `detail` to admins and editors only — members still see the
+ * friendly line alone.
  */
 export function rpcErrorResponse(message: string | undefined): NextResponse {
   const raw = (message || '').trim()
@@ -98,7 +108,14 @@ export function rpcErrorResponse(message: string | undefined): NextResponse {
 
   if (!known) {
     console.error('Weekend RPC error:', raw)
-    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Something went wrong. Please try again.',
+        // No `code`: this is not one of ours, so nothing should branch on it.
+        detail: raw || 'The database returned an error with no message.',
+      },
+      { status: 500 }
+    )
   }
 
   const status = code === 'NOT_AUTHENTICATED' ? 401
@@ -106,7 +123,7 @@ export function rpcErrorResponse(message: string | undefined): NextResponse {
     : code === 'EVENT_NOT_FOUND' || code === 'COURSE_NOT_FOUND' || code === 'COURSE_BOOKING_NOT_FOUND' ? 404
     : 422
 
-  return NextResponse.json({ error: weekendErrorMessage(raw), code }, { status })
+  return NextResponse.json({ error: weekendErrorMessage(raw), code, detail: raw }, { status })
 }
 
 export interface PromotionRow {
