@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { passwordResetEmail } from '@/lib/emails/templates'
@@ -14,6 +14,74 @@ function getSupabase() {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 const TOKEN_EXPIRY_HOURS = 1
 
+// listUsers() is paginated — the default page size only covers the first
+// handful of members, so it must never be called without paging through
+// every page (see findUserByEmail below).
+const USERS_PER_PAGE = 1000
+const MAX_USER_PAGES = 50
+
+type FoundUser = { id: string; fullName: string | null }
+
+/** Escape LIKE/ILIKE wildcards so an address containing `_` or `%` matches literally. */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+/**
+ * Resolve an email address to a user.
+ *
+ * Prefers a direct, case-insensitive lookup against `profiles` (one indexed
+ * query, no pagination). Falls back to paging through auth.users for accounts
+ * that have no profile row yet, or whose auth email differs from their profile
+ * email.
+ */
+async function findUserByEmail(
+  supabase: SupabaseClient,
+  normalizedEmail: string
+): Promise<FoundUser | null> {
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .ilike('email', escapeLikePattern(normalizedEmail))
+    .limit(1)
+
+  if (profileError) {
+    console.error('Error looking up profile by email:', profileError)
+  } else if (profiles && profiles.length > 0) {
+    return { id: profiles[0].id, fullName: profiles[0].full_name ?? null }
+  }
+
+  // Fallback: page through auth.users rather than relying on the first page.
+  for (let page = 1; page <= MAX_USER_PAGES; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: USERS_PER_PAGE,
+    })
+
+    if (error) {
+      console.error('Error listing users:', error)
+      return null
+    }
+
+    const users = data?.users ?? []
+    const match = users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+
+    if (match) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', match.id)
+        .maybeSingle()
+
+      return { id: match.id, fullName: profile?.full_name ?? null }
+    }
+
+    if (users.length < USERS_PER_PAGE) break
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabase()
@@ -25,28 +93,13 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim()
 
-    // Look up user by email in auth.users via admin API
-    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
-
-    if (listError) {
-      console.error('Error listing users:', listError)
-      // Don't reveal whether the user exists
-      return NextResponse.json({ success: true })
-    }
-
-    const user = users.find(u => u.email?.toLowerCase() === normalizedEmail)
+    const user = await findUserByEmail(supabase, normalizedEmail)
 
     if (!user) {
       // Don't reveal whether the user exists — always return success
+      console.warn('Password reset requested for unknown email')
       return NextResponse.json({ success: true })
     }
-
-    // Get the user's profile for their name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', user.id)
-      .single()
 
     // Generate a secure token
     const token = crypto.randomBytes(32).toString('hex')
@@ -77,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     // Send the branded email via Resend
     const emailContent = passwordResetEmail({
-      name: profile?.full_name || 'Member',
+      name: user.fullName || 'Member',
       resetUrl,
     })
 
@@ -94,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Forgot password error:', error)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
