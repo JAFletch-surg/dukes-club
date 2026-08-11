@@ -20,6 +20,7 @@ nav_order: 3
 * [FRCS Exam Preparation](user-guide/frcs-exam-prep.md)
 * [Certificates & Fellowships](user-guide/certificates-and-fellowships.md)
 * [Directory & Messages](user-guide/directory-and-messages.md)
+* [Email Preferences](user-guide/email-preferences.md)
 
 ## Admin Guide
 
@@ -29,3 +30,4 @@ nav_order: 3
 * [Education](admin/education.md)
 * [People](admin/people.md)
 * [Organisation](admin/organisation.md)
+* [Round-Up Email](admin/digest.md)

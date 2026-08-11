@@ -33,6 +33,7 @@ Set these in `.env.local` for development and in the Vercel project settings for
 | `ADMIN_EMAIL` | Where admin notifications are sent |
 | `CONTACT_TO_EMAIL` | Where contact form submissions are sent |
 | `INTERNAL_API_SECRET` | Shared secret for internal API calls |
+| `CRON_SECRET` | Bearer token Vercel Cron presents to `/api/digest/cron`. Falls back to `INTERNAL_API_SECRET` if unset |
 | `VIMEO_ACCESS_TOKEN` | Vimeo API token for the account hosting the videos |
 | `VIMEO_FOLDER_ID` | *Legacy fallback.* See below |
 
@@ -46,6 +47,30 @@ Which Vimeo folders feed the members' video library is managed in the admin pane
 single folder, which is how the site worked before folders became admin-managed. The first time an
 admin opens Manage Folders, that folder is added to the table automatically so nothing is lost.
 Once folders are managed in the UI the variable is ignored and can be removed.
+
+### Round-up digest email
+
+A recurring digest of upcoming events and newly published posts, sent to members at the frequency
+each of them chooses. Managed in the admin panel (**Admin → Round-Up Email**) — see
+[docs/admin/digest.md](docs/admin/digest.md) for how it behaves and
+[docs/user-guide/email-preferences.md](docs/user-guide/email-preferences.md) for the member-facing
+side.
+
+To enable it on a new environment:
+
+1. Run `supabase/create-digest-preferences.sql` in the Supabase SQL editor. This creates
+   `digest_preferences` and `digest_sends`, subscribes existing members at the default weekly
+   cadence, and adds a trigger so new registrations are subscribed automatically.
+2. Set `CRON_SECRET` in the Vercel project settings.
+
+The schedule lives in `vercel.json`. It is currently weekly (`0 8 * * 4`), which sets the *fastest*
+cadence any member can receive — each run emails only the members who are due, so fortnightly and
+monthly subscribers are skipped in between. A daily schedule works equally well if you want new
+posts to reach weekly subscribers sooner; the due-date logic is drift-free either way. Note that
+Vercel's Hobby plan only permits daily cron schedules.
+
+Preview the template without a database at
+`/api/email/preview?template=digest` (development only).
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

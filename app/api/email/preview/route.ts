@@ -7,6 +7,7 @@ import {
   bookingStatusEmail,
   passwordResetEmail,
 } from '@/lib/emails/templates'
+import { digestEmail } from '@/lib/emails/digest-template'
 
 // GET /api/email/preview?template=welcome
 // Dev-only route to preview email templates in the browser
@@ -61,6 +62,75 @@ export async function GET(request: NextRequest) {
     password_reset: passwordResetEmail({
       name: 'Jordan Fletcher',
       resetUrl: `${siteUrl}/reset-password?token=xyz789`,
+    }),
+    // Fixture-backed so the layout can be worked on without a populated
+    // database. /admin/digest previews the same template against live content.
+    digest: digestEmail({
+      name: 'Jordan Fletcher',
+      frequency: 'weekly',
+      siteUrl,
+      manageUrl: `${siteUrl}/email-preferences?token=sample`,
+      unsubscribeUrl: `${siteUrl}/email-preferences?token=sample&unsubscribe=1`,
+      events: [
+        {
+          id: '1',
+          title: 'Laparoscopic Skills Masterclass',
+          slug: 'laparoscopic-skills-masterclass',
+          startsAt: '2026-03-20T09:00:00Z',
+          endsAt: '2026-03-20T17:00:00Z',
+          location: 'Queen Elizabeth Hospital, Birmingham',
+          eventType: 'Practical Workshop',
+          imageUrl: null,
+          summary: 'A full day of hands-on box and simulator work with consultant faculty.',
+          isNew: true,
+        },
+        {
+          id: '2',
+          title: 'Rectal Cancer MDT: the difficult cases',
+          slug: 'rectal-cancer-mdt-webinar',
+          startsAt: '2026-04-08T18:30:00Z',
+          endsAt: null,
+          location: 'Online',
+          eventType: 'Webinar',
+          imageUrl: null,
+          summary: null,
+          isNew: false,
+        },
+        {
+          id: '3',
+          title: 'Dukes\' Club Annual Weekend 2026',
+          slug: 'annual-weekend-2026',
+          startsAt: '2026-05-15T09:00:00Z',
+          endsAt: '2026-05-17T16:00:00Z',
+          location: 'Edinburgh',
+          eventType: 'Conference',
+          imageUrl: null,
+          summary: 'Three days of teaching, research presentations and the annual dinner.',
+          isNew: false,
+        },
+      ],
+      posts: [
+        {
+          id: '1',
+          title: 'Applying for a colorectal fellowship: what selectors actually look for',
+          slug: 'applying-for-a-colorectal-fellowship',
+          category: 'Careers',
+          publishedAt: '2026-03-02T10:00:00Z',
+          excerpt: 'Five recent fellows on what made the difference to their applications, from logbook presentation to picking referees who will actually write something.',
+          imageUrl: null,
+          authorName: 'Miss Amelia Hart',
+        },
+        {
+          id: '2',
+          title: 'New national audit data on emergency laparotomy outcomes',
+          slug: 'nela-2026-data',
+          category: 'Research',
+          publishedAt: '2026-02-27T10:00:00Z',
+          excerpt: 'The latest NELA report shows a continued fall in 30-day mortality. We asked two trainees what it means for on-call practice.',
+          imageUrl: null,
+          authorName: null,
+        },
+      ],
     }),
   }
 

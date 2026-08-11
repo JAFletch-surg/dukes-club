@@ -17,11 +17,9 @@ import {
 } from "@/components/ui/collapsible";
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronDown, Newspaper, Star, User, Loader } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { NEWS_CATEGORIES } from "@/lib/constants/news-categories";
 
-const categories = [
-  "Announcement", "Education", "Careers", "Research",
-  "Events", "Policy", "Member News", "General",
-] as const;
+const categories = NEWS_CATEGORIES;
 
 type NewsItem = {
   id: string;

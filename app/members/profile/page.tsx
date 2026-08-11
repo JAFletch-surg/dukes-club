@@ -12,6 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Camera, Shield, Trash2, Bell, AlertTriangle, Check, Loader2, ShieldCheck, Clock } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
 import { createClient } from "@/lib/supabase/client";
+import {
+  DigestPreferenceFields,
+  DEFAULT_DIGEST_PREFERENCES,
+  type DigestPreferenceValue,
+} from "@/components/digest/digest-preference-fields";
 
 const regions = [
   "North East", "North West (Mersey)", "North West (North Western)",
@@ -60,6 +65,15 @@ const MemberProfile = () => {
     allow_messages: true,
   });
 
+  // Round-up email preferences. Held separately from the profile row because
+  // they live in digest_preferences, and are saved by their own button so a
+  // half-finished profile edit can't clobber them.
+  const [digestPrefs, setDigestPrefs] = useState<DigestPreferenceValue>(DEFAULT_DIGEST_PREFERENCES);
+  const [digestLoading, setDigestLoading] = useState(true);
+  const [savingDigest, setSavingDigest] = useState(false);
+  const [savedDigest, setSavedDigest] = useState(false);
+  const [digestError, setDigestError] = useState<string | null>(null);
+
   // Load profile data
   useEffect(() => {
     if (profile) {
@@ -76,6 +90,63 @@ const MemberProfile = () => {
       }
     }
   }, [profile]);
+
+  // Load round-up preferences
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    const loadDigestPrefs = async () => {
+      const { data } = await supabase
+        .from('digest_preferences')
+        .select('frequency, include_events, include_news, news_categories')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      // A row is created by trigger at registration; falling back to the
+      // defaults keeps the tab usable for anyone who predates that.
+      if (data) {
+        setDigestPrefs({
+          frequency: data.frequency,
+          includeEvents: data.include_events,
+          includeNews: data.include_news,
+          newsCategories: data.news_categories || [],
+        });
+      }
+      setDigestLoading(false);
+    };
+
+    loadDigestPrefs();
+    return () => { cancelled = true };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const handleSaveDigestPrefs = async () => {
+    if (!user) return;
+    setSavingDigest(true);
+    setSavedDigest(false);
+    setDigestError(null);
+
+    const { error } = await supabase
+      .from('digest_preferences')
+      .upsert({
+        user_id: user.id,
+        frequency: digestPrefs.frequency,
+        include_events: digestPrefs.includeEvents,
+        include_news: digestPrefs.includeNews,
+        news_categories: digestPrefs.newsCategories,
+      }, { onConflict: 'user_id' });
+
+    setSavingDigest(false);
+    if (error) {
+      setDigestError('We couldn\'t save your email preferences. Please try again.');
+      return;
+    }
+    setSavedDigest(true);
+    setTimeout(() => setSavedDigest(false), 3000);
+  };
 
   const toggleSubspecialty = (s: string) => {
     setSubspecialties((prev) =>
@@ -190,6 +261,7 @@ const MemberProfile = () => {
         <TabsList className="w-full justify-start">
           <TabsTrigger value="personal">Personal Info</TabsTrigger>
           <TabsTrigger value="privacy">Privacy Settings</TabsTrigger>
+          <TabsTrigger value="notifications">Email Updates</TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
@@ -423,6 +495,57 @@ const MemberProfile = () => {
                   'Save Settings'
                 )}
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Email Updates */}
+        <TabsContent value="notifications" className="space-y-6 mt-6">
+          <Card className="border">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Bell size={18} className="text-muted-foreground" />
+                <h2 className="text-lg font-semibold text-foreground">The Round-Up</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                A digest of upcoming events and new posts, delivered to {profile.email}.
+              </p>
+
+              {digestLoading ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 size={14} className="animate-spin" /> Loading your preferences...
+                </div>
+              ) : (
+                <>
+                  <DigestPreferenceFields
+                    value={digestPrefs}
+                    onChange={(next) => { setDigestPrefs(next); setSavedDigest(false); }}
+                    disabled={savingDigest}
+                  />
+
+                  {digestError && <p className="text-sm text-destructive mt-4">{digestError}</p>}
+
+                  <Button size="sm" className="mt-6" onClick={handleSaveDigestPrefs} disabled={savingDigest}>
+                    {savingDigest ? (
+                      <><Loader2 size={14} className="mr-2 animate-spin" /> Saving...</>
+                    ) : savedDigest ? (
+                      <><Check size={14} className="mr-2" /> Saved</>
+                    ) : (
+                      'Save Preferences'
+                    )}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border">
+            <CardContent className="p-6">
+              <h3 className="text-sm font-semibold text-foreground mb-1">Account emails</h3>
+              <p className="text-sm text-muted-foreground">
+                Booking confirmations, certificates, password resets and admin notices are always
+                sent &mdash; they&rsquo;re part of running your account and can&rsquo;t be turned off here.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
