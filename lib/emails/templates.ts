@@ -1,9 +1,9 @@
 // Email templates for The Dukes' Club
 // Brand: Navy #0F1F3D, Gold #E5A718
 
-const LOGO_URL = 'https://wdajcvoqpcxtqpfmzndj.supabase.co/storage/v1/object/public/media/Dukes%20club%20modern%20title%20white.png'
+export const LOGO_URL = 'https://wdajcvoqpcxtqpfmzndj.supabase.co/storage/v1/object/public/media/Dukes%20club%20modern%20title%20white.png'
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
