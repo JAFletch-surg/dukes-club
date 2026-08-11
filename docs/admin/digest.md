@@ -25,6 +25,10 @@ round, so fortnightly and monthly subscribers are simply skipped on the runs in 
 | Monthly | Every fourth run (28 days) |
 | Never | Not at all |
 
+Digests go out on **Thursday mornings at 08:00 UTC** — 9am during British Summer Time, 8am in
+winter. The exact minute varies: on Vercel's Hobby plan the job may be triggered at any point
+within that hour, so a digest arriving at 08:47 is normal and not a fault.
+
 Two rules keep the email from becoming noise:
 
 * **Nobody is sent an empty digest.** If a member has no upcoming events and nothing published

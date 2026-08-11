@@ -24,11 +24,12 @@ export const FREQUENCY_LABELS: Record<DigestFrequency, string> = {
   never: 'Never',
 }
 
-// A run that fires a few minutes late shouldn't push a member's digest out to
-// the next run, so a member counts as due slightly before the exact interval
-// elapses. Deliberately well under half a day: with a larger window a *daily*
-// cron would send a "weekly" digest a day earlier each time until it drifted
-// into a different cadence entirely.
+// A run that fires late shouldn't push a member's digest out to the next run,
+// so a member counts as due slightly before the exact interval elapses. This
+// also absorbs Vercel's Hobby-plan behaviour of invoking a cron at any point
+// within its scheduled hour. Deliberately well under half a day: with a larger
+// window a *daily* cron would send a "weekly" digest a day earlier each time
+// until it drifted into a different cadence entirely.
 const DUE_GRACE_HOURS = 12
 
 // A member who has never been sent a digest (or who has been dormant) should

@@ -63,11 +63,20 @@ To enable it on a new environment:
    cadence, and adds a trigger so new registrations are subscribed automatically.
 2. Set `CRON_SECRET` in the Vercel project settings.
 
-The schedule lives in `vercel.json`. It is currently weekly (`0 8 * * 4`), which sets the *fastest*
-cadence any member can receive — each run emails only the members who are due, so fortnightly and
-monthly subscribers are skipped in between. A daily schedule works equally well if you want new
-posts to reach weekly subscribers sooner; the due-date logic is drift-free either way. Note that
-Vercel's Hobby plan only permits daily cron schedules.
+The schedule lives in `vercel.json` — currently `0 8 * * 4`, Thursday mornings at 08:00 UTC (9am
+during British Summer Time, 8am in winter). It sets the *fastest* cadence any member can receive:
+each run emails only the members who are due, so fortnightly and monthly subscribers are skipped in
+between. Changing the day or time is a one-line edit and nothing else needs to change, because each
+member's cadence is measured from when they last received a digest rather than from the cron
+schedule.
+
+Two things to know about running this on Vercel's Hobby plan, neither of them a problem here:
+
+* Hobby rejects schedules that fire **more** than once a day (`0 * * * *`, `*/30 * * * *`).
+  Anything daily or less frequent — including this weekly schedule — deploys fine.
+* Hobby may invoke the job at any point **within** the scheduled hour, so `0 8 * * 4` can run at
+  08:47 rather than 08:00. Harmless: the due-date check allows a 12-hour grace window, so no
+  member's cadence drifts because of it.
 
 Preview the template without a database at
 `/api/email/preview?template=digest` (development only).
