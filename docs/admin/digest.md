@@ -44,23 +44,48 @@ A member who has never received a digest (or who has been dormant for months) ge
 
 ## The admin page
 
-### Running order
+### What goes in the next round-up
 
-By default each section is ordered by date, which can bury the item that matters most. **Running
-order** lists everything that could appear in the next issue and lets you **Pin** the items that
-should lead their section, arranging pinned items with the ↑/↓ buttons. Anything unpinned follows
-underneath, newest first.
+By default each section fills itself: upcoming events by date, and news and videos by whatever has
+been published since each member last heard from you. That is fine most weeks, but it makes the
+choice arbitrary when a batch of content lands at once — syncing twenty videos means the "newest
+three" are whichever three happen to be newest, not the three worth watching.
 
-Pinning affects the email only — the public events and news pages stay chronological, so promoting
-something for one issue never reorders the website.
+The **What goes in the next round-up** panel gives you the final say. Each section has two parts:
 
-Each section shows a limited number of items (4 events, 5 posts, 3 videos) and the panel marks
-where that cut-off falls. Treat the line as a guide rather than a guarantee: because news and videos
-are windowed per member, someone who last heard from you a while ago may see further down the list
-than someone who read last week's issue.
+**In the next round-up** — the items you have chosen, in the order you want them. Use **Add** to
+pick one (with a search box for when the library is large), the arrows to order them, and **✕** to
+remove one. Leave it empty and the section behaves exactly as it always has.
 
-Unpin an item once it has had its moment — a pinned item keeps leading its section until you remove
-it or it drops out of the section entirely (an event that has happened, or a post older than 60 days).
+**Fill the remaining slots automatically** — whether the leftover slots top up by date beneath your
+choices.
+
+Between them these cover the three cases you will actually want:
+
+| Chosen | Auto-fill | What is sent |
+| --- | --- | --- |
+| Nothing | On | Fully automatic — the default |
+| A few items | On | Your items lead, the rest fills by date |
+| A few items | Off | Exactly your items, nothing else |
+
+That last row is the override: choose three videos, switch auto-fill off, and those three are what
+goes out.
+
+#### Two things worth knowing
+
+**Chosen items ignore the "already seen" rule.** Normally a member is only sent news and videos
+published since their last round-up, so nobody receives the same thing twice. An item you choose is
+sent to *every* member of that section regardless — that is what makes it an override rather than a
+hint. It also means a choice you forget to remove keeps going out in every issue, so clear the list
+once an item has had its moment. The panel shows a reminder whenever a section has chosen items.
+
+**A member's own preferences still win.** Someone who has switched a section off will not receive
+it, however you have curated it, and a member who has narrowed news to particular categories will
+only see chosen posts in those categories. Overriding those would break a promise made to the
+member.
+
+Choosing an item also lifts it out of the usual date limits — you can feature a video from six
+months ago, or an event further ahead than the section would normally reach.
 
 ### Preview and sending
 
@@ -103,7 +128,9 @@ Run these in the Supabase SQL editor, in order:
    tables, subscribes every existing member at the default weekly cadence, and adds a trigger so new
    registrations are subscribed automatically.
 2. `supabase/add-digest-videos-and-ranking.sql` — adds the videos section and the `digest_rank`
-   column behind the running order.
+   column that records which items you have chosen.
+3. `supabase/add-digest-curation.sql` — adds `digest_settings`, which holds the per-section
+   auto-fill switches.
 
 The schedule itself lives in `vercel.json` (`0 8 * * 4` — Thursdays at 08:00 UTC). Changing that
 line changes the send day; you do not need to touch anything else, because each member's cadence is
