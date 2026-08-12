@@ -6,9 +6,9 @@ nav_order: 7
 
 # Round-Up Email
 
-The round-up is a recurring digest sent to members, highlighting **upcoming events** and
-**newly published news and blog posts**, with links straight to each item. It is managed from
-**Admin → Round-Up Email**.
+The round-up is a recurring digest sent to members, highlighting **upcoming events**, **newly
+published news and blog posts** and **new videos**, with links straight to each item. It is managed
+from **Admin → Round-Up Email**.
 
 Members choose their own frequency and what the email covers, so a single run sends different
 content to different people.
@@ -34,7 +34,8 @@ Two rules keep the email from becoming noise:
 * **Nobody is sent an empty digest.** If a member has no upcoming events and nothing published
   since their last round-up, the run skips them and their window stays open, so that content still
   reaches them next time rather than being lost.
-* **News is windowed, events are forward-looking.** The news section only contains posts published
+* **News and videos are windowed, events are forward-looking.** The news and video sections only
+  contain items published
   since that member's last digest. The events section shows the next few events coming up — further
   ahead for less frequent subscribers, so a monthly reader still sees things in time to book.
 
@@ -42,6 +43,26 @@ A member who has never received a digest (or who has been dormant for months) ge
 60 days of news, not the whole archive.
 
 ## The admin page
+
+### Running order
+
+By default each section is ordered by date, which can bury the item that matters most. **Running
+order** lists everything that could appear in the next issue and lets you **Pin** the items that
+should lead their section, arranging pinned items with the ↑/↓ buttons. Anything unpinned follows
+underneath, newest first.
+
+Pinning affects the email only — the public events and news pages stay chronological, so promoting
+something for one issue never reorders the website.
+
+Each section shows a limited number of items (4 events, 5 posts, 3 videos) and the panel marks
+where that cut-off falls. Treat the line as a guide rather than a guarantee: because news and videos
+are windowed per member, someone who last heard from you a while ago may see further down the list
+than someone who read last week's issue.
+
+Unpin an item once it has had its moment — a pinned item keeps leading its section until you remove
+it or it drops out of the section entirely (an event that has happened, or a post older than 60 days).
+
+### Preview and sending
 
 **Preview** renders the email exactly as it would go out right now, against live content. Switch
 between the weekly, fortnightly and monthly views to see what each group would receive. If there is
@@ -67,7 +88,7 @@ Members set their own preferences in two places, both of which write to the same
 * The **Choose what you hear about** link in the footer of every round-up, which works without
   signing in
 
-They can pick a frequency (including *Never*), switch the events and news sections on or off
+They can pick a frequency (including *Never*), switch the events, news and video sections on or off
 individually, and narrow the news section to particular categories. Every email also carries a
 one-click unsubscribe that Gmail and Outlook surface as a native button.
 
@@ -76,9 +97,13 @@ these settings and are always sent.
 
 ## Setup
 
-Run `supabase/create-digest-preferences.sql` in the Supabase SQL editor. It creates the
-`digest_preferences` and `digest_sends` tables, subscribes every existing member at the default
-weekly cadence, and adds a trigger so new registrations are subscribed automatically.
+Run these in the Supabase SQL editor, in order:
+
+1. `supabase/create-digest-preferences.sql` — creates the `digest_preferences` and `digest_sends`
+   tables, subscribes every existing member at the default weekly cadence, and adds a trigger so new
+   registrations are subscribed automatically.
+2. `supabase/add-digest-videos-and-ranking.sql` — adds the videos section and the `digest_rank`
+   column behind the running order.
 
 The schedule itself lives in `vercel.json` (`0 8 * * 4` — Thursdays at 08:00 UTC). Changing that
 line changes the send day; you do not need to touch anything else, because each member's cadence is

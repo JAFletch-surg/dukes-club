@@ -131,6 +131,28 @@ export async function GET(request: NextRequest) {
           authorName: null,
         },
       ],
+      videos: [
+        {
+          id: '1',
+          title: 'Transanal total mesorectal excision: technique and pitfalls',
+          slug: 'tatme-technique-and-pitfalls',
+          category: 'Rectal Cancer',
+          publishedAt: '2026-03-01T10:00:00Z',
+          thumbnailUrl: null,
+          durationSeconds: 4520,
+          speaker: 'Mr David Okonkwo',
+        },
+        {
+          id: '2',
+          title: 'Managing the difficult stoma: a practical masterclass',
+          slug: 'managing-the-difficult-stoma',
+          category: 'Proctology',
+          publishedAt: '2026-02-26T10:00:00Z',
+          thumbnailUrl: null,
+          durationSeconds: 1520,
+          speaker: 'Miss Priya Raman',
+        },
+      ],
     }),
   }
 

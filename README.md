@@ -50,8 +50,9 @@ Once folders are managed in the UI the variable is ignored and can be removed.
 
 ### Round-up digest email
 
-A recurring digest of upcoming events and newly published posts, sent to members at the frequency
-each of them chooses. Managed in the admin panel (**Admin → Round-Up Email**) — see
+A recurring digest of upcoming events, newly published posts and new videos, sent to members at the
+frequency each of them chooses. Admins control which items lead each section from the running-order
+panel in the admin page. Managed in the admin panel (**Admin → Round-Up Email**) — see
 [docs/admin/digest.md](docs/admin/digest.md) for how it behaves and
 [docs/user-guide/email-preferences.md](docs/user-guide/email-preferences.md) for the member-facing
 side.
@@ -61,7 +62,9 @@ To enable it on a new environment:
 1. Run `supabase/create-digest-preferences.sql` in the Supabase SQL editor. This creates
    `digest_preferences` and `digest_sends`, subscribes existing members at the default weekly
    cadence, and adds a trigger so new registrations are subscribed automatically.
-2. Set `CRON_SECRET` in the Vercel project settings.
+2. Run `supabase/add-digest-videos-and-ranking.sql`. This adds the videos section and the
+   `digest_rank` column that backs the admin running order.
+3. Set `CRON_SECRET` in the Vercel project settings.
 
 The schedule lives in `vercel.json` — currently `0 8 * * 4`, Thursday mornings at 08:00 UTC (9am
 during British Summer Time, 8am in winter). It sets the *fastest* cadence any member can receive:

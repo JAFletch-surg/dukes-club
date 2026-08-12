@@ -70,6 +70,7 @@ function PreferenceCentre() {
           frequency: data.frequency,
           includeEvents: data.includeEvents,
           includeNews: data.includeNews,
+          includeVideos: data.includeVideos,
           newsCategories: data.newsCategories || [],
         })
       } catch {
@@ -102,6 +103,7 @@ function PreferenceCentre() {
           frequency: value.frequency,
           includeEvents: value.includeEvents,
           includeNews: value.includeNews,
+          includeVideos: value.includeVideos,
           newsCategories: value.newsCategories,
         }),
       })

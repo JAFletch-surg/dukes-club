@@ -11,7 +11,7 @@
 // background images, and nothing that breaks when images are blocked.
 
 import { escapeHtml, LOGO_URL } from './templates'
-import type { DigestEvent, DigestFrequency, DigestPost } from './digest'
+import type { DigestEvent, DigestFrequency, DigestPost, DigestVideo } from './digest'
 
 const NAVY = '#0F1F3D'
 const GOLD = '#E5A718'
@@ -174,12 +174,72 @@ function postCard(post: DigestPost, siteUrl: string): string {
     </tr>`
 }
 
+/** "42 min", or "1h 12m" once an hour is in play. */
+function fmtDuration(seconds: number | null): string | null {
+  if (!seconds || seconds < 1) return null
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.round((seconds % 3600) / 60)
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  return `${Math.max(1, minutes)} min`
+}
+
+/**
+ * Video card. Thumbnail-led like the news cards, since a still frame sells a
+ * lecture better than its title does. The duration sits in a pill under the
+ * title rather than overlaid on the thumbnail — absolute positioning doesn't
+ * survive Outlook, and a half-placed badge looks broken.
+ */
+function videoCard(video: DigestVideo, siteUrl: string): string {
+  const url = video.slug
+    ? `${siteUrl}/members/videos?v=${encodeURIComponent(video.slug)}`
+    : `${siteUrl}/members/videos`
+  const duration = fmtDuration(video.durationSeconds)
+
+  return `
+    <tr>
+      <td style="padding-bottom:12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF;border:1px solid ${CARD_BORDER};border-radius:12px;overflow:hidden;">
+          ${video.thumbnailUrl ? `
+          <tr>
+            <td style="padding:0;line-height:0;">
+              <a href="${url}" target="_blank" style="display:block;">
+                <img src="${escapeHtml(video.thumbnailUrl)}" alt="" width="558" style="display:block;width:100%;max-width:558px;height:auto;border:0;outline:none;text-decoration:none;" />
+              </a>
+            </td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding:20px;font-family:${FONT};">
+              <a href="${url}" target="_blank" style="display:block;font-size:17px;font-weight:700;color:${NAVY};text-decoration:none;line-height:1.35;margin-bottom:8px;">
+                ${escapeHtml(video.title)}
+              </a>
+              ${video.speaker ? `
+                <p style="margin:0 0 10px;font-size:13px;color:${BODY_TEXT};line-height:1.6;">${escapeHtml(video.speaker)}</p>
+              ` : ''}
+              <div style="margin-bottom:12px;">
+                ${duration ? pill(duration, '#F3F4F6', '#4B5563') : ''}
+                ${video.category ? `${duration ? '&nbsp;' : ''}${pill(video.category, '#FDF3DC', '#8A6100')}` : ''}
+              </div>
+              <a href="${url}" target="_blank" style="display:inline-block;font-size:13px;font-weight:700;color:${NAVY};text-decoration:none;border-bottom:2px solid ${GOLD};padding-bottom:1px;">
+                Watch&nbsp;now&nbsp;&rarr;
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`
+}
+
 /** Human summary of what's inside — used for the intro line and the subject. */
-function summarise(events: DigestEvent[], posts: DigestPost[]): string {
+function summarise(events: DigestEvent[], posts: DigestPost[], videos: DigestVideo[]): string {
   const parts: string[] = []
   if (events.length) parts.push(`${events.length} upcoming ${events.length === 1 ? 'event' : 'events'}`)
   if (posts.length) parts.push(`${posts.length} new ${posts.length === 1 ? 'post' : 'posts'}`)
-  return parts.join(' and ')
+  if (videos.length) parts.push(`${videos.length} new ${videos.length === 1 ? 'video' : 'videos'}`)
+
+  // "a, b and c" rather than "a and b and c" once there are three sections.
+  if (parts.length <= 1) return parts.join('')
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
 
 export interface DigestEmailParams {
@@ -187,6 +247,7 @@ export interface DigestEmailParams {
   frequency: DigestFrequency
   events: DigestEvent[]
   posts: DigestPost[]
+  videos: DigestVideo[]
   siteUrl: string
   /** Preference centre link, token-scoped so it works without a login. */
   manageUrl: string
@@ -197,15 +258,16 @@ export interface DigestEmailParams {
 }
 
 export function digestEmail(params: DigestEmailParams): { subject: string; html: string; text: string } {
-  const { name, frequency, events, posts, siteUrl, manageUrl, unsubscribeUrl } = params
+  const { name, frequency, events, posts, videos, siteUrl, manageUrl, unsubscribeUrl } = params
   const issueDate = params.issueDate || new Date()
   const firstName = escapeHtml((name || '').trim().split(' ')[0] || 'there')
 
-  const summary = summarise(events, posts)
-  const lead = events[0]?.title || posts[0]?.title || ''
+  const summary = summarise(events, posts, videos)
+  const lead = events[0]?.title || posts[0]?.title || videos[0]?.title || ''
+  const itemCount = events.length + posts.length + videos.length
 
   const subject = lead
-    ? `${lead}${events.length + posts.length > 1 ? ` + ${events.length + posts.length - 1} more` : ''} — Dukes' Club round-up`
+    ? `${lead}${itemCount > 1 ? ` + ${itemCount - 1} more` : ''} — Dukes' Club round-up`
     : `Your Dukes' Club round-up`
 
   // Shown in the inbox list next to the subject. The zero-height div after it
@@ -307,6 +369,18 @@ export function digestEmail(params: DigestEmailParams): { subject: string; html:
                     </td>
                   </tr>
                 ` : ''}
+
+                ${videos.length ? `
+                  ${sectionHeading('New in the video library', videos.length)}
+                  ${videos.map((v) => videoCard(v, siteUrl)).join('')}
+                  <tr>
+                    <td style="padding:4px 0 0;">
+                      <a href="${siteUrl}/members/videos" target="_blank" style="font-family:${FONT};font-size:13px;font-weight:600;color:${MUTED};text-decoration:none;">
+                        Browse the video archive &rarr;
+                      </a>
+                    </td>
+                  </tr>
+                ` : ''}
               </table>
             </td>
           </tr>
@@ -370,7 +444,7 @@ export function digestEmail(params: DigestEmailParams): { subject: string; html:
  * the version screen-reader and text-only clients actually get.
  */
 function digestText(params: DigestEmailParams, issueLine: string): string {
-  const { name, frequency, events, posts, siteUrl, manageUrl, unsubscribeUrl } = params
+  const { name, frequency, events, posts, videos, siteUrl, manageUrl, unsubscribeUrl } = params
   const firstName = (name || '').trim().split(' ')[0] || 'there'
   const lines: string[] = []
 
@@ -398,6 +472,18 @@ function digestText(params: DigestEmailParams, issueLine: string): string {
       lines.push(`* ${post.title}`)
       if (post.excerpt) lines.push(`  ${post.excerpt}`)
       lines.push(`  ${post.slug ? `${siteUrl}/news/${encodeURIComponent(post.slug)}` : `${siteUrl}/news`}`)
+      lines.push('')
+    }
+  }
+
+  if (videos.length) {
+    lines.push('NEW IN THE VIDEO LIBRARY')
+    lines.push('------------------------')
+    for (const video of videos) {
+      const duration = fmtDuration(video.durationSeconds)
+      lines.push(`* ${video.title}${duration ? ` (${duration})` : ''}`)
+      if (video.speaker) lines.push(`  ${video.speaker}`)
+      lines.push(`  ${video.slug ? `${siteUrl}/members/videos?v=${encodeURIComponent(video.slug)}` : `${siteUrl}/members/videos`}`)
       lines.push('')
     }
   }

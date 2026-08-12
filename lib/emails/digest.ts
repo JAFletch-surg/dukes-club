@@ -45,6 +45,7 @@ const EVENT_HORIZON_DAYS: Record<Exclude<DigestFrequency, 'never'>, number> = {
 
 const MAX_EVENTS = 4
 const MAX_POSTS = 5
+const MAX_VIDEOS = 3
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -53,6 +54,7 @@ export interface DigestPreferences {
   frequency: DigestFrequency
   include_events: boolean
   include_news: boolean
+  include_videos: boolean
   news_categories: string[]
   unsubscribe_token: string
   last_sent_at: string | null
@@ -83,17 +85,46 @@ export interface DigestPost {
   authorName: string | null
 }
 
+export interface DigestVideo {
+  id: string
+  title: string
+  slug: string | null
+  category: string | null
+  publishedAt: string
+  thumbnailUrl: string | null
+  durationSeconds: number | null
+  speaker: string | null
+}
+
+/** Pool entries carry the admin's running order; the selection drops back to
+ *  the plain types, since the extra property is harmless to the template. */
+type Ranked<T> = T & { digestRank: number | null }
+
 export interface DigestPool {
-  events: Array<Omit<DigestEvent, 'isNew'> & { createdAt: string | null }>
-  posts: DigestPost[]
+  events: Array<Ranked<Omit<DigestEvent, 'isNew'>> & { createdAt: string | null }>
+  posts: Array<Ranked<DigestPost>>
+  videos: Array<Ranked<DigestVideo>>
 }
 
 export interface DigestSelection {
   events: DigestEvent[]
   posts: DigestPost[]
+  videos: DigestVideo[]
   /** Start of the "what's new" window this digest covers. */
   windowStart: Date
   isEmpty: boolean
+}
+
+/**
+ * Order a section for the email: items an admin has pinned lead it, in the
+ * order they set, and everything else keeps the order it arrived in (by date).
+ *
+ * Relies on Array.prototype.sort being stable, which it is in every engine we
+ * run on — that is what preserves the date ordering among unpinned items
+ * without having to re-sort by date here.
+ */
+function byRankThenDate<T extends { digestRank: number | null }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (a.digestRank ?? Infinity) - (b.digestRank ?? Infinity))
 }
 
 function toPlainSummary(value: string | null | undefined, maxLength = 180): string | null {
@@ -123,23 +154,29 @@ export function isDue(prefs: Pick<DigestPreferences, 'frequency' | 'last_sent_at
 }
 
 /** A member with no content types enabled has effectively opted out. */
-export function isSubscribed(prefs: Pick<DigestPreferences, 'frequency' | 'include_events' | 'include_news'>): boolean {
-  return prefs.frequency !== 'never' && (prefs.include_events || prefs.include_news)
+export function isSubscribed(
+  prefs: Pick<DigestPreferences, 'frequency' | 'include_events' | 'include_news' | 'include_videos'>
+): boolean {
+  return prefs.frequency !== 'never' && (prefs.include_events || prefs.include_news || prefs.include_videos)
 }
 
 /**
  * Fetch the shared pool of candidate content for a digest run: every upcoming
- * published event, and every post published inside the longest window any
- * member could be owed. Narrowed per member by `selectForMember`.
+ * published event, and every post and video published inside the longest window
+ * any member could be owed. Narrowed per member by `selectForMember`.
+ *
+ * Each section is put into its final running order here — once per run rather
+ * than once per member — so the admin's pinned items lead and everything else
+ * stays in date order beneath them.
  */
 export async function fetchDigestPool(supabase: SupabaseClient, now = new Date()): Promise<DigestPool> {
   const horizon = new Date(now.getTime() + Math.max(...Object.values(EVENT_HORIZON_DAYS)) * DAY_MS)
   const lookback = new Date(now.getTime() - MAX_LOOKBACK_DAYS * DAY_MS)
 
-  const [eventsResult, postsResult] = await Promise.all([
+  const [eventsResult, postsResult, videosResult] = await Promise.all([
     supabase
       .from('events')
-      .select('id, title, slug, starts_at, ends_at, location, event_type, featured_image_url, description_plain, created_at')
+      .select('id, title, slug, starts_at, ends_at, location, event_type, featured_image_url, description_plain, created_at, digest_rank')
       .eq('status', 'published')
       .gte('starts_at', now.toISOString())
       .lte('starts_at', horizon.toISOString())
@@ -147,19 +184,28 @@ export async function fetchDigestPool(supabase: SupabaseClient, now = new Date()
       .limit(30),
     supabase
       .from('posts')
-      .select('id, title, slug, category, published_at, excerpt, content_plain, featured_image_url, author_name')
+      .select('id, title, slug, category, published_at, excerpt, content_plain, featured_image_url, author_name, digest_rank')
       .eq('status', 'published')
       .gte('published_at', lookback.toISOString())
       .lte('published_at', now.toISOString())
       .order('published_at', { ascending: false })
       .limit(50),
+    supabase
+      .from('videos')
+      .select('id, title, slug, category, published_at, thumbnail_url, duration_seconds, speaker, digest_rank')
+      .eq('status', 'published')
+      .gte('published_at', lookback.toISOString())
+      .lte('published_at', now.toISOString())
+      .order('published_at', { ascending: false })
+      .limit(30),
   ])
 
   if (eventsResult.error) throw new Error(`Failed to load events: ${eventsResult.error.message}`)
   if (postsResult.error) throw new Error(`Failed to load posts: ${postsResult.error.message}`)
+  if (videosResult.error) throw new Error(`Failed to load videos: ${videosResult.error.message}`)
 
   return {
-    events: (eventsResult.data || []).map((e) => ({
+    events: byRankThenDate((eventsResult.data || []).map((e) => ({
       id: e.id,
       title: e.title,
       slug: e.slug,
@@ -170,8 +216,9 @@ export async function fetchDigestPool(supabase: SupabaseClient, now = new Date()
       imageUrl: e.featured_image_url,
       summary: toPlainSummary(e.description_plain, 140),
       createdAt: e.created_at,
-    })),
-    posts: (postsResult.data || []).map((p) => ({
+      digestRank: e.digest_rank,
+    }))),
+    posts: byRankThenDate((postsResult.data || []).map((p) => ({
       id: p.id,
       title: p.title,
       slug: p.slug,
@@ -180,7 +227,19 @@ export async function fetchDigestPool(supabase: SupabaseClient, now = new Date()
       excerpt: toPlainSummary(p.excerpt || p.content_plain),
       imageUrl: p.featured_image_url,
       authorName: p.author_name,
-    })),
+      digestRank: p.digest_rank,
+    }))),
+    videos: byRankThenDate((videosResult.data || []).map((v) => ({
+      id: v.id,
+      title: v.title,
+      slug: v.slug,
+      category: v.category,
+      publishedAt: v.published_at,
+      thumbnailUrl: v.thumbnail_url,
+      durationSeconds: v.duration_seconds,
+      speaker: v.speaker,
+      digestRank: v.digest_rank,
+    }))),
   }
 }
 
@@ -214,6 +273,14 @@ export function selectForMember(pool: DigestPool, prefs: DigestPreferences, now 
         .slice(0, MAX_POSTS)
     : []
 
+  // Videos are windowed like news rather than shown as a standing "recent"
+  // list, so nobody is sent the same video twice.
+  const videos = prefs.include_videos
+    ? pool.videos
+        .filter((v) => !!v.publishedAt && new Date(v.publishedAt) > windowStart)
+        .slice(0, MAX_VIDEOS)
+    : []
+
   const eventHorizon = new Date(now.getTime() + EVENT_HORIZON_DAYS[frequency] * DAY_MS)
 
   const events = prefs.include_events
@@ -229,7 +296,8 @@ export function selectForMember(pool: DigestPool, prefs: DigestPreferences, now 
   return {
     events,
     posts,
+    videos,
     windowStart,
-    isEmpty: events.length === 0 && posts.length === 0,
+    isEmpty: events.length === 0 && posts.length === 0 && videos.length === 0,
   }
 }
