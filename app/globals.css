@@ -78,3 +78,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Step transition for the site feedback wizard (/members/feedback). Keyed on
+   the step id, so each section fades up as it replaces the last one.
+   tailwindcss-animate is a dependency but is not wired into Tailwind v4 here,
+   so `animate-in` does not exist — hence the hand-rolled keyframes. */
+@keyframes sf-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sf-step-enter {
+  animation: sf-step-in 0.25s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-step-enter {
+    animation: none;
+  }
+}

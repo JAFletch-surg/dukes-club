@@ -31,3 +31,4 @@ nav_order: 3
 * [People](admin/people.md)
 * [Organisation](admin/organisation.md)
 * [Round-Up Email](admin/digest.md)
+* [Site Feedback](admin/site-feedback.md)

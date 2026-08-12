@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3, Calendar, Newspaper, Video, Globe, UserCheck, Mic,
-  GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark, LogOut, Layout, FileText, X, Mail
+  GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark, LogOut, Layout, FileText, X, Mail,
+  MessageSquare
 } from 'lucide-react'
 import { useAuth } from '@/lib/use-auth'
 
@@ -29,6 +30,7 @@ const navSections = [
       { href: '/admin/team', label: 'Executive Team', icon: UserCheck },
       { href: '/admin/faculty', label: 'Faculty', icon: GraduationCap },
       { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
+      { href: '/admin/feedback', label: 'Site Feedback', icon: MessageSquare },
     ],
   },
   {
