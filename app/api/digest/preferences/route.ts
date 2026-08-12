@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('digest_preferences')
-    .select('user_id, frequency, include_events, include_news, news_categories')
+    .select('user_id, frequency, include_events, include_news, include_videos, news_categories')
     .eq('unsubscribe_token', token)
     .maybeSingle()
 
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     frequency: data.frequency,
     includeEvents: data.include_events,
     includeNews: data.include_news,
+    includeVideos: data.include_videos,
     newsCategories: data.news_categories || [],
     email: profile?.email || null,
     name: profile?.full_name || null,
@@ -67,11 +68,12 @@ export async function GET(request: NextRequest) {
 /** POST /api/digest/preferences — update the settings behind a token. */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
-  const { token, frequency, includeEvents, includeNews, newsCategories } = body as {
+  const { token, frequency, includeEvents, includeNews, includeVideos, newsCategories } = body as {
     token?: string
     frequency?: string
     includeEvents?: boolean
     includeNews?: boolean
+    includeVideos?: boolean
     newsCategories?: string[]
   }
 
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
 
   if (includeEvents !== undefined) update.include_events = !!includeEvents
   if (includeNews !== undefined) update.include_news = !!includeNews
+  if (includeVideos !== undefined) update.include_videos = !!includeVideos
 
   if (newsCategories !== undefined) {
     if (!Array.isArray(newsCategories)) {
@@ -110,7 +113,7 @@ export async function POST(request: NextRequest) {
     .from('digest_preferences')
     .update(update)
     .eq('unsubscribe_token', token)
-    .select('frequency, include_events, include_news, news_categories')
+    .select('frequency, include_events, include_news, include_videos, news_categories')
     .maybeSingle()
 
   if (error) {
@@ -126,6 +129,7 @@ export async function POST(request: NextRequest) {
     frequency: data.frequency,
     includeEvents: data.include_events,
     includeNews: data.include_news,
+    includeVideos: data.include_videos,
     newsCategories: data.news_categories || [],
   })
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Calendar, Newspaper, Check } from 'lucide-react'
+import { Calendar, Newspaper, Video, Check } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -11,6 +11,7 @@ export interface DigestPreferenceValue {
   frequency: DigestFrequency
   includeEvents: boolean
   includeNews: boolean
+  includeVideos: boolean
   /** Empty means every category. */
   newsCategories: string[]
 }
@@ -19,6 +20,7 @@ export const DEFAULT_DIGEST_PREFERENCES: DigestPreferenceValue = {
   frequency: 'weekly',
   includeEvents: true,
   includeNews: true,
+  includeVideos: true,
   newsCategories: [],
 }
 
@@ -60,7 +62,7 @@ export function DigestPreferenceFields({
         <div>
           <Label className="text-sm font-medium">How often would you like the round-up?</Label>
           <p className="text-xs text-muted-foreground mt-1">
-            A summary of upcoming events and new posts, with links straight to them.
+            A summary of upcoming events, new posts and new videos, with links straight to them.
           </p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -184,10 +186,27 @@ export function DigestPreferenceFields({
               </div>
             )}
 
-            {!value.includeEvents && !value.includeNews && (
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <Video size={18} className="text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">New videos</p>
+                  <p className="text-xs text-muted-foreground">
+                    Lectures and webinars added to the members&rsquo; video library
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={value.includeVideos}
+                disabled={disabled}
+                onCheckedChange={(checked) => onChange({ ...value, includeVideos: checked })}
+              />
+            </div>
+
+            {!value.includeEvents && !value.includeNews && !value.includeVideos && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                With both switched off there&rsquo;s nothing left to send, so you won&rsquo;t
-                receive the round-up at all.
+                With all three switched off there&rsquo;s nothing left to send, so you
+                won&rsquo;t receive the round-up at all.
               </p>
             )}
           </div>

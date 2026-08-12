@@ -6,9 +6,9 @@ nav_order: 7
 
 # Round-Up Email
 
-The round-up is a recurring digest sent to members, highlighting **upcoming events** and
-**newly published news and blog posts**, with links straight to each item. It is managed from
-**Admin → Round-Up Email**.
+The round-up is a recurring digest sent to members, highlighting **upcoming events**, **newly
+published news and blog posts** and **new videos**, with links straight to each item. It is managed
+from **Admin → Round-Up Email**.
 
 Members choose their own frequency and what the email covers, so a single run sends different
 content to different people.
@@ -34,7 +34,8 @@ Two rules keep the email from becoming noise:
 * **Nobody is sent an empty digest.** If a member has no upcoming events and nothing published
   since their last round-up, the run skips them and their window stays open, so that content still
   reaches them next time rather than being lost.
-* **News is windowed, events are forward-looking.** The news section only contains posts published
+* **News and videos are windowed, events are forward-looking.** The news and video sections only
+  contain items published
   since that member's last digest. The events section shows the next few events coming up — further
   ahead for less frequent subscribers, so a monthly reader still sees things in time to book.
 
@@ -42,6 +43,51 @@ A member who has never received a digest (or who has been dormant for months) ge
 60 days of news, not the whole archive.
 
 ## The admin page
+
+### What goes in the next round-up
+
+By default each section fills itself: upcoming events by date, and news and videos by whatever has
+been published since each member last heard from you. That is fine most weeks, but it makes the
+choice arbitrary when a batch of content lands at once — syncing twenty videos means the "newest
+three" are whichever three happen to be newest, not the three worth watching.
+
+The **What goes in the next round-up** panel gives you the final say. Each section has two parts:
+
+**In the next round-up** — the items you have chosen, in the order you want them. Use **Add** to
+pick one (with a search box for when the library is large), the arrows to order them, and **✕** to
+remove one. Leave it empty and the section behaves exactly as it always has.
+
+**Fill the remaining slots automatically** — whether the leftover slots top up by date beneath your
+choices.
+
+Between them these cover the three cases you will actually want:
+
+| Chosen | Auto-fill | What is sent |
+| --- | --- | --- |
+| Nothing | On | Fully automatic — the default |
+| A few items | On | Your items lead, the rest fills by date |
+| A few items | Off | Exactly your items, nothing else |
+
+That last row is the override: choose three videos, switch auto-fill off, and those three are what
+goes out.
+
+#### Two things worth knowing
+
+**Chosen items ignore the "already seen" rule.** Normally a member is only sent news and videos
+published since their last round-up, so nobody receives the same thing twice. An item you choose is
+sent to *every* member of that section regardless — that is what makes it an override rather than a
+hint. It also means a choice you forget to remove keeps going out in every issue, so clear the list
+once an item has had its moment. The panel shows a reminder whenever a section has chosen items.
+
+**A member's own preferences still win.** Someone who has switched a section off will not receive
+it, however you have curated it, and a member who has narrowed news to particular categories will
+only see chosen posts in those categories. Overriding those would break a promise made to the
+member.
+
+Choosing an item also lifts it out of the usual date limits — you can feature a video from six
+months ago, or an event further ahead than the section would normally reach.
+
+### Preview and sending
 
 **Preview** renders the email exactly as it would go out right now, against live content. Switch
 between the weekly, fortnightly and monthly views to see what each group would receive. If there is
@@ -67,7 +113,7 @@ Members set their own preferences in two places, both of which write to the same
 * The **Choose what you hear about** link in the footer of every round-up, which works without
   signing in
 
-They can pick a frequency (including *Never*), switch the events and news sections on or off
+They can pick a frequency (including *Never*), switch the events, news and video sections on or off
 individually, and narrow the news section to particular categories. Every email also carries a
 one-click unsubscribe that Gmail and Outlook surface as a native button.
 
@@ -76,9 +122,15 @@ these settings and are always sent.
 
 ## Setup
 
-Run `supabase/create-digest-preferences.sql` in the Supabase SQL editor. It creates the
-`digest_preferences` and `digest_sends` tables, subscribes every existing member at the default
-weekly cadence, and adds a trigger so new registrations are subscribed automatically.
+Run these in the Supabase SQL editor, in order:
+
+1. `supabase/create-digest-preferences.sql` — creates the `digest_preferences` and `digest_sends`
+   tables, subscribes every existing member at the default weekly cadence, and adds a trigger so new
+   registrations are subscribed automatically.
+2. `supabase/add-digest-videos-and-ranking.sql` — adds the videos section and the `digest_rank`
+   column that records which items you have chosen.
+3. `supabase/add-digest-curation.sql` — adds `digest_settings`, which holds the per-section
+   auto-fill switches.
 
 The schedule itself lives in `vercel.json` (`0 8 * * 4` — Thursdays at 08:00 UTC). Changing that
 line changes the send day; you do not need to touch anything else, because each member's cadence is

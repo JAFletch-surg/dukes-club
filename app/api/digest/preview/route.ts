@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
       frequency,
       include_events: true,
       include_news: true,
+      include_videos: true,
       news_categories: [],
       unsubscribe_token: 'preview-token',
       last_sent_at: null,
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
       frequency,
       events: selection.events,
       posts: selection.posts,
+      videos: selection.videos,
       siteUrl: SITE_URL,
       manageUrl: manageUrl(prefs.unsubscribe_token),
       unsubscribeUrl: unsubscribeUrl(prefs.unsubscribe_token),
@@ -71,6 +73,7 @@ export async function GET(request: NextRequest) {
       text: email.text,
       eventCount: selection.events.length,
       postCount: selection.posts.length,
+      videoCount: selection.videos.length,
       isEmpty: selection.isEmpty,
       windowStart: selection.windowStart.toISOString(),
     })

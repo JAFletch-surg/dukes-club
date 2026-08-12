@@ -99,7 +99,7 @@ const MemberProfile = () => {
     const loadDigestPrefs = async () => {
       const { data } = await supabase
         .from('digest_preferences')
-        .select('frequency, include_events, include_news, news_categories')
+        .select('frequency, include_events, include_news, include_videos, news_categories')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -112,6 +112,7 @@ const MemberProfile = () => {
           frequency: data.frequency,
           includeEvents: data.include_events,
           includeNews: data.include_news,
+          includeVideos: data.include_videos,
           newsCategories: data.news_categories || [],
         });
       }
@@ -136,6 +137,7 @@ const MemberProfile = () => {
         frequency: digestPrefs.frequency,
         include_events: digestPrefs.includeEvents,
         include_news: digestPrefs.includeNews,
+        include_videos: digestPrefs.includeVideos,
         news_categories: digestPrefs.newsCategories,
       }, { onConflict: 'user_id' });
 
@@ -508,7 +510,7 @@ const MemberProfile = () => {
                 <h2 className="text-lg font-semibold text-foreground">The Round-Up</h2>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                A digest of upcoming events and new posts, delivered to {profile.email}.
+                A digest of upcoming events, new posts and new videos, delivered to {profile.email}.
               </p>
 
               {digestLoading ? (

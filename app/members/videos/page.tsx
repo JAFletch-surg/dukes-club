@@ -471,6 +471,22 @@ const VideoArchive = () => {
       .catch(() => {});
   }, []);
 
+  // Deep link: /members/videos?v=<slug> opens that video straight away, which
+  // is what the round-up email and any shared link point at. Read from
+  // window.location rather than useSearchParams so this page doesn't need a
+  // Suspense boundary wrapped around it.
+  useEffect(() => {
+    if (!videos.length) return;
+    const slug = new URLSearchParams(window.location.search).get("v");
+    if (!slug) return;
+
+    const match = videos.find((v) => v.slug === slug);
+    if (match) {
+      setActiveVideo(match);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [videos]);
+
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };

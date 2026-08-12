@@ -68,14 +68,14 @@ export interface RunDigestResult {
   dryRun?: boolean
   /** Dry runs only: how many members would have been emailed. */
   wouldSend?: number
-  recipients?: Array<{ email: string; frequency: string; eventCount: number; postCount: number }>
+  recipients?: Array<{ email: string; frequency: string; eventCount: number; postCount: number; videoCount: number }>
 }
 
 /** Load every subscriber's preferences alongside the profile fields we need. */
 async function loadRecipients(supabase: SupabaseClient, userIds?: string[]): Promise<Recipient[]> {
   let query = supabase
     .from('digest_preferences')
-    .select('user_id, frequency, include_events, include_news, news_categories, unsubscribe_token, last_sent_at')
+    .select('user_id, frequency, include_events, include_news, include_videos, news_categories, unsubscribe_token, last_sent_at')
     .neq('frequency', 'never')
 
   if (userIds?.length) query = query.in('user_id', userIds)
@@ -172,13 +172,14 @@ export async function sendTestDigest(
   supabase: SupabaseClient,
   to: string,
   now = new Date()
-): Promise<{ id: string | null; eventCount: number; postCount: number }> {
+): Promise<{ id: string | null; eventCount: number; postCount: number; videoCount: number }> {
   const pool = await fetchDigestPool(supabase, now)
   const samplePrefs: DigestPreferences = {
     user_id: 'preview',
     frequency: 'weekly',
     include_events: true,
     include_news: true,
+    include_videos: true,
     news_categories: [],
     unsubscribe_token: 'preview-token',
     last_sent_at: null,
@@ -190,6 +191,7 @@ export async function sendTestDigest(
     frequency: 'weekly',
     events: selection.events,
     posts: selection.posts,
+    videos: selection.videos,
     siteUrl: SITE_URL,
     manageUrl: manageUrl(samplePrefs.unsubscribe_token),
     unsubscribeUrl: unsubscribeUrl(samplePrefs.unsubscribe_token),
@@ -205,7 +207,12 @@ export async function sendTestDigest(
   })
 
   if (error) throw new Error(error.message)
-  return { id: data?.id ?? null, eventCount: selection.events.length, postCount: selection.posts.length }
+  return {
+    id: data?.id ?? null,
+    eventCount: selection.events.length,
+    postCount: selection.posts.length,
+    videoCount: selection.videos.length,
+  }
 }
 
 export async function runDigest(
@@ -222,7 +229,7 @@ export async function runDigest(
   const guard = dryRun ? new Set<string>() : await recentlySent(supabase, due.map((r) => r.prefs.user_id), now)
 
   const outgoing: OutgoingEmail[] = []
-  const queued: Array<{ recipient: Recipient; eventCount: number; postCount: number }> = []
+  const queued: Array<{ recipient: Recipient; eventCount: number; postCount: number; videoCount: number }> = []
   const skippedEmpty: string[] = []
   let skippedRecent = 0
 
@@ -246,6 +253,7 @@ export async function runDigest(
       frequency: recipient.prefs.frequency,
       events: selection.events,
       posts: selection.posts,
+      videos: selection.videos,
       siteUrl: SITE_URL,
       manageUrl: manageUrl(recipient.prefs.unsubscribe_token),
       unsubscribeUrl: unsubscribeUrl(recipient.prefs.unsubscribe_token),
@@ -265,7 +273,12 @@ export async function runDigest(
         'List-Unsubscribe-Post': 'List=One-Click',
       },
     })
-    queued.push({ recipient, eventCount: selection.events.length, postCount: selection.posts.length })
+    queued.push({
+      recipient,
+      eventCount: selection.events.length,
+      postCount: selection.posts.length,
+      videoCount: selection.videos.length,
+    })
   }
 
   if (dryRun) {
@@ -283,6 +296,7 @@ export async function runDigest(
         frequency: q.recipient.prefs.frequency,
         eventCount: q.eventCount,
         postCount: q.postCount,
+        videoCount: q.videoCount,
       })),
     }
   }
@@ -297,7 +311,7 @@ export async function runDigest(
     const results = await sendChunk(chunk)
 
     results.forEach((result, index) => {
-      const { recipient, eventCount, postCount } = queued[i + index]
+      const { recipient, eventCount, postCount, videoCount } = queued[i + index]
       const ok = !result.error
 
       if (ok) {
@@ -313,6 +327,7 @@ export async function runDigest(
         frequency: recipient.prefs.frequency,
         event_count: eventCount,
         post_count: postCount,
+        video_count: videoCount,
         status: ok ? 'sent' : 'failed',
         provider_message_id: result.id,
         error: result.error,
@@ -321,7 +336,7 @@ export async function runDigest(
   }
 
   for (const userId of skippedEmpty) {
-    logRows.push({ user_id: userId, status: 'skipped_empty', event_count: 0, post_count: 0 })
+    logRows.push({ user_id: userId, status: 'skipped_empty', event_count: 0, post_count: 0, video_count: 0 })
   }
 
   if (logRows.length) {

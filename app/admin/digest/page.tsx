@@ -8,6 +8,7 @@ import {
   AlertTriangle, RefreshCw, Inbox,
 } from 'lucide-react'
 import type { DigestFrequency } from '@/lib/emails/digest'
+import DigestRunningOrder from '@/components/admin/digest-running-order'
 
 const badgeStyle = (bg: string, fg: string) => ({
   display: 'inline-flex', padding: '2px 10px', borderRadius: 20,
@@ -33,6 +34,7 @@ interface SendRow {
   frequency: string | null
   event_count: number
   post_count: number
+  video_count: number | null
   status: string
   error: string | null
 }
@@ -42,6 +44,7 @@ interface Preview {
   html: string
   eventCount: number
   postCount: number
+  videoCount: number
   isEmpty: boolean
 }
 
@@ -53,7 +56,7 @@ interface RunResult {
   failed: number
   skippedEmpty: number
   skippedRecent?: number
-  recipients?: Array<{ email: string; frequency: string; eventCount: number; postCount: number }>
+  recipients?: Array<{ email: string; frequency: string; eventCount: number; postCount: number; videoCount: number }>
 }
 
 export default function AdminDigestPage() {
@@ -97,7 +100,7 @@ export default function AdminDigestPage() {
 
     const { data } = await supabase
       .from('digest_sends')
-      .select('id, sent_at, frequency, event_count, post_count, status, error')
+      .select('id, sent_at, frequency, event_count, post_count, video_count, status, error')
       .order('sent_at', { ascending: false })
       .limit(15)
 
@@ -196,7 +199,7 @@ export default function AdminDigestPage() {
         <div>
           <h1 className="text-2xl md:text-[28px] font-bold text-[#0F1F3D]">Round-Up Email</h1>
           <p className="text-sm text-[#504F58] mt-1">
-            The recurring digest of upcoming events and new posts sent to members
+            The recurring digest of upcoming events, new posts and new videos sent to members
           </p>
         </div>
         <button
@@ -275,6 +278,7 @@ export default function AdminDigestPage() {
                 <div className="flex gap-2 mt-2">
                   <span style={badgeStyle('#EFF6FF', '#2563EB')}>{preview.eventCount} events</span>
                   <span style={badgeStyle('#FFF7ED', '#C2410C')}>{preview.postCount} posts</span>
+                  <span style={badgeStyle('#F5F3FF', '#7C3AED')}>{preview.videoCount} videos</span>
                 </div>
               </div>
               {preview.isEmpty ? (
@@ -282,8 +286,8 @@ export default function AdminDigestPage() {
                   <Inbox size={36} color="#D1D1D6" className="mx-auto mb-3" />
                   <p className="text-[15px] font-semibold text-[#181820]">Nothing to send right now</p>
                   <p className="text-sm text-[#504F58] mt-1 max-w-sm mx-auto">
-                    There are no upcoming events or recent posts for this cadence, so the run would
-                    skip everyone rather than send an empty email.
+                    There are no upcoming events, recent posts or new videos for this cadence, so
+                    the run would skip everyone rather than send an empty email.
                   </p>
                 </div>
               ) : (
@@ -376,6 +380,11 @@ export default function AdminDigestPage() {
         </div>
       </div>
 
+      {/* Running order */}
+      <div className="mt-8">
+        <DigestRunningOrder />
+      </div>
+
       {/* Recent activity */}
       <div className="mt-8">
         <h2 className="text-lg md:text-xl font-bold text-[#0F1F3D] mb-4">Recent Sends</h2>
@@ -406,7 +415,7 @@ export default function AdminDigestPage() {
                       </td>
                       <td className="px-4 py-3 text-[#504F58] capitalize">{row.frequency || '—'}</td>
                       <td className="px-4 py-3 text-[#504F58]">
-                        {row.event_count} events · {row.post_count} posts
+                        {row.event_count} events · {row.post_count} posts · {row.video_count ?? 0} videos
                       </td>
                       <td className="px-4 py-3">
                         <span style={statusBadge(row.status)}>
