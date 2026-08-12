@@ -6,7 +6,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: "The Dukes' Club | Colorectal Surgery Trainee Network",
   description: "The Dukes' Club is a UK-based network for colorectal surgery trainees.",
-  icons: { icon: '/favicon.ico' },
+  // Icons are deliberately NOT declared here. Next.js only merges the
+  // file-convention icons (app/icon.png, app/apple-icon.png) when metadata.icons
+  // is unset — setting it makes them silently disappear from the output.
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
