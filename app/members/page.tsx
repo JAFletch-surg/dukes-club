@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/use-auth";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import EventsCalendar from "@/components/EventsCalendar";
+import FeedbackCtaCard from "@/components/members/feedback/FeedbackCtaCard";
+import { SITE_FEEDBACK_VERSION } from "@/lib/site-feedback-questions";
 
 const VIDEO_BADGE_THRESHOLDS = [
   { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', icon: '🥇' },
@@ -29,6 +31,9 @@ const MembersDashboard = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [videoStats, setVideoStats] = useState<{ completedCount: number; minutesWatched: number } | null>(null);
   const [latestNews, setLatestNews] = useState<any[]>([]);
+  // null while unknown, so the feedback card can't flash for someone who has
+  // already answered.
+  const [hasSiteFeedback, setHasSiteFeedback] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Don't fetch until auth has resolved on the client
@@ -111,6 +116,17 @@ const MembersDashboard = () => {
             .maybeSingle();
           if (qStatsErr) console.error('[Dashboard] Question stats error:', qStatsErr.message);
           if (qStats) setQuestionStats(qStats);
+
+          // Has this member answered the current round of the site feedback
+          // questionnaire? head:true returns no rows over the wire and hits the
+          // (user_id, questionnaire_version) unique index.
+          const { count: feedbackCount, error: feedbackErr } = await supabase
+            .from('site_feedback_responses')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('questionnaire_version', SITE_FEEDBACK_VERSION);
+          if (feedbackErr) console.error('[Dashboard] Site feedback error:', feedbackErr.message);
+          setHasSiteFeedback((feedbackCount ?? 0) > 0);
 
           // Fetch video watch progress for stats and badges
           const { data: watchProgress, error: watchErr } = await supabase
@@ -261,6 +277,9 @@ const MembersDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Site feedback questionnaire — hidden once they've answered this round */}
+      {hasSiteFeedback === false && <FeedbackCtaCard />}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

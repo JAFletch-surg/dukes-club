@@ -1215,6 +1215,33 @@ CREATE POLICY "podcasts_delete_admin" ON podcasts
   FOR DELETE TO authenticated
   USING (is_admin());
 
+-- ═══════════════════════════════════════════════════════════════════
+-- TABLE: site_feedback_responses
+-- ═══════════════════════════════════════════════════════════════════
+-- Write-once, like event_feedback_responses: no UPDATE, no DELETE policy.
+--
+-- There is intentionally NO admin SELECT policy. Admins read through the
+-- site_feedback_admin view (a security-definer view guarded by is_admin()),
+-- which never projects user_id and nulls the name/email of members who asked
+-- not to be identified. Adding an admin SELECT policy here would defeat that.
+-- The table, the view and the reasoning all live in
+-- supabase/create-site-feedback.sql.
+
+ALTER TABLE site_feedback_responses ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "site_feedback_responses_select_own" ON site_feedback_responses;
+DROP POLICY IF EXISTS "site_feedback_responses_insert_own" ON site_feedback_responses;
+
+CREATE POLICY "site_feedback_responses_select_own"
+  ON site_feedback_responses FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "site_feedback_responses_insert_own"
+  ON site_feedback_responses FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid() AND is_approved_member());
+
 -- =============================================================================
 -- END OF RLS POLICIES
 -- =============================================================================
