@@ -74,6 +74,15 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 type AutofillState = Record<SectionKey, boolean>
 
+const MIGRATION_HINT =
+  "The auto-fill settings table hasn't been created yet. Run supabase/add-digest-curation.sql in the Supabase SQL editor, then reload this page."
+
+/** PostgREST reports an un-migrated table as PGRST205 / "Could not find the table". */
+function isMissingTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return error.code === 'PGRST205' || /could not find the table/i.test(error.message || '')
+}
+
 export default function DigestRunningOrder() {
   const supabase = createClient()
   const [sections, setSections] = useState<Record<SectionKey, OrderItem[]>>({ events: [], posts: [], videos: [] })
@@ -82,6 +91,8 @@ export default function DigestRunningOrder() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The rest of the panel works without digest_settings; only the switches need it.
+  const [settingsMissing, setSettingsMissing] = useState(false)
 
   const load = useCallback(async () => {
     const now = new Date()
@@ -139,7 +150,14 @@ export default function DigestRunningOrder() {
       videos: shape(videos.data, 'published_at'),
     })
 
-    if (settings.data) {
+    // Report a missing settings table up front rather than letting the first
+    // switch fail mysteriously. Everything else on the panel still works.
+    if (isMissingTable(settings.error)) {
+      setSettingsMissing(true)
+    } else if (settings.error) {
+      setError(`Could not load the auto-fill settings: ${settings.error.message}`)
+    } else if (settings.data) {
+      setSettingsMissing(false)
       setAutofill({
         events: settings.data.events_autofill,
         posts: settings.data.posts_autofill,
@@ -254,6 +272,7 @@ export default function DigestRunningOrder() {
   }
 
   const handleAutofill = async (config: SectionConfig, enabled: boolean) => {
+    const previous = autofill[config.key]
     setAutofill((prev) => ({ ...prev, [config.key]: enabled }))
     setSaving(true)
     setError(null)
@@ -264,9 +283,17 @@ export default function DigestRunningOrder() {
       .eq('id', true)
 
     setSaving(false)
-    if (updateError) {
+    if (!updateError) return
+
+    // Put the switch back where it was. Reloading can't do this when the table
+    // is missing — there is nothing to read the true value from — and leaving
+    // it flipped would claim a section is curated when it is still filling
+    // itself, which is worse than the error itself.
+    setAutofill((prev) => ({ ...prev, [config.key]: previous }))
+    if (isMissingTable(updateError)) {
+      setSettingsMissing(true)
+    } else {
       setError(`Could not save: ${updateError.message}`)
-      load()
     }
   }
 
@@ -294,6 +321,20 @@ export default function DigestRunningOrder() {
           itself, exactly as it does now.
         </p>
       </div>
+
+      {settingsMissing && (
+        <div className="mx-5 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2">
+          <AlertTriangle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-[13px] text-amber-900">
+            <p className="font-semibold">Auto-fill can&rsquo;t be changed yet</p>
+            <p className="mt-0.5">{MIGRATION_HINT}</p>
+            <p className="mt-1 text-amber-800">
+              Choosing and ordering items still works, and every section fills automatically in the
+              meantime.
+            </p>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 flex items-start gap-2">
@@ -391,7 +432,7 @@ export default function DigestRunningOrder() {
                 </div>
                 <Switch
                   checked={fills}
-                  disabled={saving}
+                  disabled={saving || settingsMissing}
                   onCheckedChange={(checked) => handleAutofill(config, checked)}
                 />
               </div>
