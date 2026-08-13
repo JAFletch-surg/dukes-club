@@ -74,7 +74,7 @@ const jumpCards = [
   { label: "JAG Colonoscopy", sub: "Certification pathway", href: "#endoscopy", icon: Search },
   { label: "Robotic Surgery", sub: "Skills & credentialling", href: "#robotic", icon: Settings },
   { label: "Exam Tips", sub: "Advice from consultants", href: "#tips", icon: Info },
-  { label: "Fellowship Directory", sub: "Find & filter programmes", href: "/members/fellowship-directory", icon: Search },
+  { label: "Fellowship Directory", sub: "Find & filter programmes", href: "/members/fellowships", icon: Search },
   { label: "Member Network", sub: "Consultants & trainees", href: "#community", icon: Users },
 ]
 
@@ -548,7 +548,7 @@ export default function ExamsPage() {
                     <p><strong className="text-navy-foreground/90">Paper 2:</strong> 120 Single Best Answer (SBA) questions · 2 hrs 15 min</p>
                     <p className="mt-3">Questions span the full General Surgery curriculum — colorectal, upper GI, breast, vascular, endocrine, HPB, emergency, critical care, and basic sciences.</p>
                   </div>
-                  <Link href="/members/question-bank" className="inline-block bg-gold text-navy font-sans font-bold text-[0.8rem] px-5 py-2.5 rounded-md hover:opacity-85 transition-opacity">
+                  <Link href="/members/questions" className="inline-block bg-gold text-navy font-sans font-bold text-[0.8rem] px-5 py-2.5 rounded-md hover:opacity-85 transition-opacity">
                     Access Question Bank →
                   </Link>
                 </div>
@@ -577,7 +577,7 @@ export default function ExamsPage() {
                     <p className="mt-3"><strong className="text-navy-foreground/90">Day 2 — Oral Vivas:</strong></p>
                     <p>General Surgery, Emergency &amp; Critical Care, Academic &amp; Research station (with pre-read paper, 30 min review).</p>
                   </div>
-                  <Link href="/members/viva-resources" className="inline-block bg-gold text-navy font-sans font-bold text-[0.8rem] px-5 py-2.5 rounded-md hover:opacity-85 transition-opacity">
+                  <Link href="/members/frcs/resources" className="inline-block bg-gold text-navy font-sans font-bold text-[0.8rem] px-5 py-2.5 rounded-md hover:opacity-85 transition-opacity">
                     Access Viva Resources →
                   </Link>
                 </div>
@@ -1025,7 +1025,7 @@ export default function ExamsPage() {
                         ))}
                       </ul>
                       {l.active && (
-                        <Link href="/members/fellowship-directory"
+                        <Link href="/members/fellowships"
                           className="inline-flex items-center gap-1.5 mt-3 font-sans text-[0.75rem] font-bold text-gold border border-gold/30 rounded px-3 py-1.5 hover:bg-gold/10 transition-colors">
                           <Search size={14} /> Browse the Fellowship Directory
                         </Link>
@@ -1175,7 +1175,7 @@ export default function ExamsPage() {
               <Link href="/register" className="inline-block bg-gold text-navy font-sans font-bold text-[0.9rem] px-7 py-3 rounded-md hover:opacity-85 transition-opacity">
                 Join to access the network
               </Link>
-              <Link href="/members/fellowship-directory" className="inline-block bg-transparent text-navy-foreground border border-navy-foreground/25 font-sans font-bold text-[0.9rem] px-7 py-3 rounded-md hover:border-navy-foreground/50 transition-colors">
+              <Link href="/members/fellowships" className="inline-block bg-transparent text-navy-foreground border border-navy-foreground/25 font-sans font-bold text-[0.9rem] px-7 py-3 rounded-md hover:border-navy-foreground/50 transition-colors">
                 Browse member directory
               </Link>
             </div>
