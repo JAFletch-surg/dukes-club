@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/lib/auth-provider'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import './globals.css'
@@ -43,6 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AuthProvider initialUser={user} initialProfile={profile}>
           {children}
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   )
