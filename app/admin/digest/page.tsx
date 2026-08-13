@@ -9,6 +9,9 @@ import {
 } from 'lucide-react'
 import type { DigestFrequency } from '@/lib/emails/digest'
 import DigestRunningOrder from '@/components/admin/digest-running-order'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
 
 const badgeStyle = (bg: string, fg: string) => ({
   display: 'inline-flex', padding: '2px 10px', borderRadius: 20,
@@ -72,6 +75,7 @@ export default function AdminDigestPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
 
   const [busy, setBusy] = useState<null | 'test' | 'dry' | 'send'>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [result, setResult] = useState<RunResult | null>(null)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -169,12 +173,14 @@ export default function AdminDigestPage() {
     }
   }
 
-  const handleSendNow = () => {
-    const confirmed = window.confirm(
-      'Send the round-up now to every member whose cadence is due?\n\n' +
-      'Members who are not due, or who have nothing new to read, are skipped automatically.'
-    )
-    if (confirmed) callSend({}, 'send')
+  // Deliberately not window.confirm: browsers can suppress native dialogs (and
+  // Chrome offers the user a "prevent additional dialogs" checkbox), in which
+  // case confirm() returns false and the button silently does nothing at all.
+  const handleSendNow = () => setConfirmOpen(true)
+
+  const confirmSendNow = () => {
+    setConfirmOpen(false)
+    callSend({}, 'send')
   }
 
   const totalSubscribed = counts.weekly + counts.fortnightly + counts.monthly
@@ -379,6 +385,41 @@ export default function AdminDigestPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send the round-up now?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-1">
+                <p>
+                  This emails every member whose cadence is due
+                  {result?.due ? ` — ${result.due} right now` : ''}. Members who are not due, or who
+                  have nothing new to read, are skipped automatically.
+                </p>
+                <p className="text-[#8A6100] bg-[#FFFBEB] border border-[#F3E4BF] rounded-lg px-3 py-2">
+                  Emails cannot be recalled once sent. If you have not run a test yet, cancel and use
+                  &ldquo;Send a test to me&rdquo; first.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setConfirmOpen(false)}
+              className="px-4 py-2 rounded-lg border border-[#E4E4E8] bg-white text-sm font-semibold text-[#504F58] hover:bg-[#FAFAFA]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmSendNow}
+              className="px-4 py-2 rounded-lg bg-[#0F1F3D] text-sm font-semibold text-white hover:bg-[#16294f]"
+            >
+              Send now
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Running order */}
       <div className="mt-8">
