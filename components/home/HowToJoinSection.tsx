@@ -1,14 +1,24 @@
 'use client'
 import Link from "next/link";
-import { UserPlus, CreditCard, ShieldCheck, ArrowRight } from "lucide-react";
+import { UserPlus, CreditCard, ShieldCheck, ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
-const steps = [
+type Step = {
+  number: number;
+  icon: typeof CreditCard;
+  title: string;
+  description: string;
+  link?: { href: string; label: string };
+};
+
+const steps: Step[] = [
   {
     number: 1,
     icon: CreditCard,
     title: "Join ACPGBI",
     description: "Apply for ACPGBI trainee membership (£95/year). Dukes' Club access is included with your membership.",
+    link: { href: ACPGBI_MEMBERSHIP_URL, label: "About ACPGBI membership" },
   },
   {
     number: 2,
@@ -48,6 +58,16 @@ const HowToJoinSection = () => {
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">{step.title}</h3>
               <p className="text-sm text-muted-foreground">{step.description}</p>
+              {step.link && (
+                <a
+                  href={step.link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-gold hover:text-gold/80 underline"
+                >
+                  {step.link.label} <ExternalLink size={12} />
+                </a>
+              )}
             </div>
           ))}
         </div>

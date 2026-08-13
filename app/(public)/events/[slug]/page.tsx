@@ -16,6 +16,7 @@ import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
 import { isStreamingEvent, registerForEvent } from "@/lib/events";
 import { richTextToHtml } from "@/lib/rich-text";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -471,6 +472,14 @@ const EventDetailPage = () => {
                                 Add Membership Number
                               </Button>
                             </Link>
+                            <a
+                              href={ACPGBI_MEMBERSHIP_URL}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-xs text-navy-foreground/60 hover:text-navy-foreground underline transition-colors"
+                            >
+                              Learn about ACPGBI membership
+                            </a>
                           </div>
                         ) : !showApplyForm ? (
                           <Button variant="gold" size="lg" className="w-full" onClick={() => setShowApplyForm(true)}>

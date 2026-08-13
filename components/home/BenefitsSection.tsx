@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { BookOpen, Users, GraduationCap, Video, Globe, Award, Lock, Play, Map, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
 
 const benefits = [
@@ -104,7 +105,16 @@ const BenefitsSection = () => {
             </table>
           </div>
           <p className="text-xs text-white/50 text-center mt-3">
-            Full membership requires a valid ACPGBI membership (£95/year)
+            Full membership requires a valid{' '}
+            <a
+              href={ACPGBI_MEMBERSHIP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gold hover:text-gold/80 underline"
+            >
+              ACPGBI membership
+            </a>{' '}
+            (£95/year)
           </p>
         </div>
 

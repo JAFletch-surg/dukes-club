@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { isQuestionBankTrialExpired, getTrialDaysRemaining } from "@/lib/membership-gates";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
 type Mode = "study" | "exam";
 type Screen = "setup" | "session" | "results";
@@ -613,7 +614,7 @@ const QuestionBank = () => {
             </button>
           </a>
           <a
-            href="https://www.acpgbi.org.uk/membership/"
+            href={ACPGBI_MEMBERSHIP_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"

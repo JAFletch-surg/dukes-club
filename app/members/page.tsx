@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import EventsCalendar from "@/components/EventsCalendar";
 import FeedbackCtaCard from "@/components/members/feedback/FeedbackCtaCard";
 import { SITE_FEEDBACK_VERSION } from "@/lib/site-feedback-questions";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
 const VIDEO_BADGE_THRESHOLDS = [
   { min: 50, label: 'Gold', bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', icon: '🥇' },
@@ -256,7 +257,7 @@ const MembersDashboard = () => {
                       </Button>
                     </Link>
                     <a
-                      href="https://www.acpgbi.org.uk/membership/"
+                      href={ACPGBI_MEMBERSHIP_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"

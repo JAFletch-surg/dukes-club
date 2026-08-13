@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Eye, EyeOff, ArrowRight, CheckCircle, Clock, ShieldCheck } from "lucide-react"
 import AuthLayout from "@/components/auth/AuthLayout"
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links"
 
 const APPROVED_DOMAINS = ["nhs.net", "nhs.uk", "doctors.org.uk"]
 const APPROVED_SUFFIX = ".ac.uk"
@@ -270,7 +271,16 @@ const RegisterPage = () => {
               <div>
                 <p className="text-xs text-foreground font-medium">ACPGBI members get full access</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  In-person courses, unlimited question bank, and more. Don&apos;t have a number yet? You can add it later from your profile.
+                  In-person courses, unlimited question bank, and more. Don&apos;t have a number yet? You can add it later from your profile, or{' '}
+                  <a
+                    href={ACPGBI_MEMBERSHIP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gold hover:text-gold/80 underline"
+                  >
+                    find out about ACPGBI membership
+                  </a>
+                  .
                 </p>
               </div>
             </div>

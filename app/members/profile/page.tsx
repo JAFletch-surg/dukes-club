@@ -17,6 +17,7 @@ import {
   DEFAULT_DIGEST_PREFERENCES,
   type DigestPreferenceValue,
 } from "@/components/digest/digest-preference-fields";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
 const regions = [
   "North East", "North West (Mersey)", "North West (North Western)",
@@ -429,7 +430,7 @@ const MemberProfile = () => {
                 <p className="text-xs text-muted-foreground mt-3">
                   Don&apos;t have an ACPGBI membership?{' '}
                   <a
-                    href="https://www.acpgbi.org.uk/membership/"
+                    href={ACPGBI_MEMBERSHIP_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-gold hover:text-gold/80 underline"
