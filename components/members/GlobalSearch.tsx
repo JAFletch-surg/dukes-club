@@ -149,7 +149,7 @@ export default function GlobalSearch() {
                   key={video.id}
                   value={video.title}
                   onSelect={() =>
-                    handleSelect(`/members/videos/${video.slug}`)
+                    handleSelect(`/members/videos?v=${video.slug}`)
                   }
                 >
                   <Video className="mr-2 h-4 w-4" />

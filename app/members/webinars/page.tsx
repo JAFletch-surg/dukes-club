@@ -44,6 +44,7 @@ interface WebinarEvent {
 interface WebinarVideo {
   id: string
   title: string
+  slug: string
   thumbnail_url: string | null
   vimeo_plays: number
   duration_seconds: number
@@ -152,7 +153,7 @@ export default function LiveWebinars() {
     // Fetch webinar recordings from videos table
     const { data: vids } = await supabase
       .from('videos')
-      .select('id, title, thumbnail_url, vimeo_plays, duration_seconds')
+      .select('id, title, slug, thumbnail_url, vimeo_plays, duration_seconds')
       .eq('category', 'Webinar')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
@@ -533,7 +534,7 @@ export default function LiveWebinars() {
                         </div>
                         {matchingVideo ? (
                           <Link
-                            href={`/members/videos?v=${matchingVideo.id}`}
+                            href={`/members/videos?v=${matchingVideo.slug}`}
                             className="text-[11px] font-semibold text-primary flex items-center gap-1 mt-0.5"
                             onClick={e => e.stopPropagation()}
                           >
@@ -589,7 +590,7 @@ export default function LiveWebinars() {
 
                       {matchingVideo ? (
                         <Link
-                          href={`/members/videos?v=${matchingVideo.id}`}
+                          href={`/members/videos?v=${matchingVideo.slug}`}
                           className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted/30 transition-colors"
                         >
                           <Video size={13} /> Watch Recording
