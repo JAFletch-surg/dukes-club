@@ -4,12 +4,37 @@ import { AuthProvider } from '@/lib/auth-provider'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import './globals.css'
 
+// Bump this whenever the artwork in app/favicon.ico, app/icon.png or
+// app/apple-icon.png changes. It is what forces browsers off a cached icon.
+const ICON_VERSION = '2'
+
 export const metadata: Metadata = {
   title: "The Dukes' Club | Colorectal Surgery Trainee Network",
   description: "The Dukes' Club is a UK-based network for colorectal surgery trainees.",
-  // Icons are deliberately NOT declared here. Next.js only merges the
-  // file-convention icons (app/icon.png, app/apple-icon.png) when metadata.icons
-  // is unset — setting it makes them silently disappear from the output.
+  // Declaring icons here replaces the file convention rather than adding to it:
+  // Next.js merges app/icon.png and app/apple-icon.png only while metadata.icons
+  // is unset, so every icon has to be listed below or it vanishes from the head.
+  //
+  // We take that trade because the convention serves the .ico at a bare,
+  // unversioned /favicon.ico, and that is the icon browsers refetch on their own
+  // and cache hardest — a stale copy is why the old stock icon comes back. The
+  // ?v= query makes each rendition a new URL. (The convention gave the two PNGs
+  // a content hash automatically; ICON_VERSION above takes over that job.)
+  //
+  // The .ico lives in public/, not app/, for the same reason: app/favicon.ico is
+  // the one file convention Next.js injects into the head even when
+  // metadata.icons is set, which would put an unversioned link back alongside
+  // these. From public/ it still answers the browser's automatic /favicon.ico
+  // request, but the head lists only the versioned URLs below.
+  icons: {
+    icon: [
+      { url: `/favicon.ico?v=${ICON_VERSION}`, sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
+      { url: `/icon.png?v=${ICON_VERSION}`, sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: `/apple-icon.png?v=${ICON_VERSION}`, sizes: '180x180', type: 'image/png' },
+    ],
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
