@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock } from 'lucide-react'
+import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock, Globe } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { sendEmail } from '@/lib/emails/send-email'
@@ -47,13 +47,16 @@ export default function MembersAdmin() {
     if (filter === 'approved' && m.approval_status !== 'approved') return false
     if (filter === 'rejected' && m.approval_status !== 'rejected') return false
     if (filter === 'verify' && !(m.role === 'trainee' && m.acpgbi_number)) return false
+    if (filter === 'international' && m.member_category !== 'international') return false
     if (search) {
       const q = search.toLowerCase()
       return (m.full_name || '').toLowerCase().includes(q) ||
         (m.email || '').toLowerCase().includes(q) ||
         (m.region || '').toLowerCase().includes(q) ||
+        (m.country || '').toLowerCase().includes(q) ||
         (m.role || '').toLowerCase().includes(q) ||
-        (m.acpgbi_number || '').toLowerCase().includes(q)
+        (m.acpgbi_number || '').toLowerCase().includes(q) ||
+        (m.gmc_number || '').toLowerCase().includes(q)
     }
     return true
   })
@@ -64,6 +67,7 @@ export default function MembersAdmin() {
     approved: members.filter((m: any) => m.approval_status === 'approved').length,
     rejected: members.filter((m: any) => m.approval_status === 'rejected').length,
     verify: members.filter((m: any) => m.role === 'trainee' && m.acpgbi_number).length,
+    international: members.filter((m: any) => m.member_category === 'international').length,
   }
 
   // Quick approve (from pending → approved + trainee role)
@@ -259,7 +263,7 @@ export default function MembersAdmin() {
 
       {/* Filters & Search */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
-        {(['all', 'pending', 'approved', 'rejected', 'verify'] as const).map(f => (
+        {(['all', 'pending', 'approved', 'rejected', 'verify', 'international'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -269,7 +273,7 @@ export default function MembersAdmin() {
                 : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >
-            {f === 'all' ? 'All' : f === 'verify' ? 'Verify ACPGBI' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
+            {f === 'all' ? 'All' : f === 'verify' ? 'Verify ACPGBI' : f === 'international' ? 'International' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
           </button>
         ))}
         <div className="sm:ml-auto relative w-full sm:w-auto">
@@ -336,9 +340,9 @@ export default function MembersAdmin() {
               <tr className="border-b border-gray-100">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Region</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Location</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Stage</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">ACPGBI</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Verification</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Joined</th>
@@ -357,22 +361,34 @@ export default function MembersAdmin() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{m.email || '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{m.region || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    {m.member_category === 'international' ? (
+                      <span className="inline-flex items-center gap-1 text-indigo-700">
+                        <Globe size={12} /> {m.country || 'International'}
+                      </span>
+                    ) : (
+                      m.region || '—'
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {m.training_stage ? (
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">{m.training_stage}</span>
                     ) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {m.acpgbi_number ? (
-                      m.role === 'trainee' ? (
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-300 animate-pulse">{m.acpgbi_number}</span>
-                      ) : (
-                        <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-200">{m.acpgbi_number}</span>
-                      )
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
+                    <div className="flex flex-col items-start gap-1">
+                      {m.acpgbi_number ? (
+                        m.role === 'trainee' ? (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-300 animate-pulse">ACPGBI: {m.acpgbi_number}</span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-200">ACPGBI: {m.acpgbi_number}</span>
+                        )
+                      ) : null}
+                      {m.gmc_number && (
+                        <span className="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full text-xs font-medium border border-slate-200">GMC: {m.gmc_number}</span>
+                      )}
+                      {!m.acpgbi_number && !m.gmc_number && <span className="text-gray-300 text-xs">—</span>}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[m.role] || ROLE_COLORS.pending}`}>
@@ -462,7 +478,16 @@ export default function MembersAdmin() {
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[m.role] || ROLE_COLORS.pending}`}>{m.role}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${APPROVAL_COLORS[m.approval_status] || 'bg-gray-100 text-gray-500'}`}>{m.approval_status || 'unknown'}</span>
-                {m.region && <span className="text-xs text-gray-500">{m.region}</span>}
+                {m.member_category === 'international' ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-indigo-700">
+                    <Globe size={11} /> {m.country || 'International'}
+                  </span>
+                ) : (
+                  m.region && <span className="text-xs text-gray-500">{m.region}</span>
+                )}
+                {m.gmc_number && (
+                  <span className="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full text-xs font-medium border border-slate-200">GMC: {m.gmc_number}</span>
+                )}
                 {m.acpgbi_number && (
                   m.role === 'trainee' ? (
                     <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-300 animate-pulse">ACPGBI: {m.acpgbi_number}</span>
@@ -532,12 +557,26 @@ export default function MembersAdmin() {
                   {/* Member details (read-only) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Region</p>
-                      <p className="text-gray-700">{member.region || '—'}</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Category</p>
+                      <p className="text-gray-700">
+                        {member.member_category === 'international' ? 'International' : 'UK / Ireland'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                        {member.member_category === 'international' ? 'Country' : 'Region'}
+                      </p>
+                      <p className="text-gray-700">
+                        {(member.member_category === 'international' ? member.country : member.region) || '—'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Training Stage</p>
                       <p className="text-gray-700">{member.training_stage || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-1">GMC Number</p>
+                      <p className="text-gray-700">{member.gmc_number || '—'}</p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase mb-1">ACPGBI Number</p>

@@ -16,11 +16,26 @@ Approve and manage site members from the Members page.
 
 1. A new user signs up on the site (status: **Pending**, role: **Pending**).
 2. The application appears in the Members list under the **Pending** filter.
-3. Review the applicant's details: name, email, region, and ACPGBI number.
+3. Review the applicant's details: name, email, category (UK/Ireland or International), region or country, GMC number, and ACPGBI number.
 4. **Approve** — Sets the status to "Approved" and the role to "Trainee". An approval email is sent automatically.
 5. **Reject** — Sets the status to "Rejected".
 
 > **Note:** Users with NHS (.nhs.net, .nhs.uk), doctors.org.uk, or .ac.uk email addresses are auto-approved at registration. They will not appear in the Pending list.
+
+### International Members
+
+Registrants choose a category on the sign-up form: **UK / Ireland** (they pick a deanery) or
+**International** (they pick the country they are based in). International accounts always require
+admin review — they are never auto-approved, whatever email domain they use — and are listed under
+the **International** filter, with their country shown in the Location column.
+
+### GMC Numbers
+
+A UK/Ireland registrant using an email we don't recognise is asked for their **GMC number** so you
+have something to check their identity against. It appears in the Location and Verification columns,
+in the edit modal, and in the new-registration email. Look the number up on the
+[GMC register](https://www.gmc-uk.org/registration-and-licensing/the-medical-register) before
+approving. International members are not on the GMC register and are not asked for one.
 
 ### Verification
 
@@ -41,8 +56,8 @@ You can manually change a member's role and approval status via the edit modal.
 
 ### Search and Filter
 
-* Search by name, email, region, role, or ACPGBI number.
-* Filter by approval status: All, Pending, Approved, Rejected, Verify.
+* Search by name, email, region, country, role, ACPGBI number, or GMC number.
+* Filter by approval status: All, Pending, Approved, Rejected, Verify, International.
 
 ---
 

@@ -35,7 +35,9 @@ Manage your account from the profile page.
 
 ### Personal Info
 
-Update your name, hospital, region, training stage, subspecialty interests, and social links (Twitter/X, LinkedIn).
+Update your name, hospital, region (or country, if you registered as an international member),
+training stage, subspecialty interests, and social links (Twitter/X, LinkedIn). UK members can also
+keep their GMC number up to date here.
 
 ### ACPGBI Membership
 

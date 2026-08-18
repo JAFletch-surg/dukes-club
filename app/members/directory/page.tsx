@@ -14,6 +14,8 @@ interface DirectoryMember {
   full_name: string;
   email: string;
   region: string | null;
+  member_category: string | null;
+  country: string | null;
   training_stage: string | null;
   hospital: string | null;
   avatar_url: string | null;
@@ -32,8 +34,12 @@ interface DirectoryMember {
   } | null;
 }
 
+// "International" is not a deanery — picking it filters to members who
+// registered under the international category, whatever country they gave.
+const INTERNATIONAL = "International";
+
 const regions = [
-  "All", "North East", "North West (Mersey)", "North West (North Western)",
+  "All", INTERNATIONAL, "North East", "North West (Mersey)", "North West (North Western)",
   "Yorkshire and the Humber", "East Midlands", "West Midlands",
   "East of England", "London", "Kent, Surrey and Sussex", "Thames Valley",
   "Wessex", "South West (Peninsula)", "South West (Severn)",
@@ -44,6 +50,11 @@ const trainingStages = [
   "All", "FY1", "FY2", "CT1", "CT2", "ST3", "ST4", "ST5", "ST6", "ST7", "ST8",
   "Post-CCT", "Consultant", "SAS", "Academic", "Other",
 ];
+
+// Where a member is placed: their country if they registered as international,
+// otherwise their deanery.
+const memberLocation = (m: DirectoryMember): string | null =>
+  m.member_category === "international" ? m.country : m.region;
 
 const MemberDirectory = () => {
   const { user } = useAuth();
@@ -77,7 +88,7 @@ const MemberDirectory = () => {
       // Fetch all approved members
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, region, training_stage, hospital, avatar_url, subspecialty_interests, social_twitter, social_linkedin, directory_settings')
+        .select('id, full_name, email, region, member_category, country, training_stage, hospital, avatar_url, subspecialty_interests, social_twitter, social_linkedin, directory_settings')
         .eq('approval_status', 'approved')
         .order('full_name');
 
@@ -101,10 +112,11 @@ const MemberDirectory = () => {
       const searchLower = search.toLowerCase();
       const matchesSearch = !search ||
         m.full_name?.toLowerCase().includes(searchLower) ||
-        (m.region || "").toLowerCase().includes(searchLower) ||
+        (memberLocation(m) || "").toLowerCase().includes(searchLower) ||
         (m.hospital || "").toLowerCase().includes(searchLower) ||
         (m.subspecialty_interests || []).some(s => s.toLowerCase().includes(searchLower));
-      const matchesRegion = region === "All" || m.region === region;
+      const matchesRegion = region === "All" ||
+        (region === INTERNATIONAL ? m.member_category === "international" : m.region === region);
       const matchesStage = stage === "All" || m.training_stage === stage;
       return matchesSearch && matchesRegion && matchesStage;
     });
@@ -204,8 +216,8 @@ const MemberDirectory = () => {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {ds?.show_training_stage !== false && member.training_stage && member.training_stage}
-                      {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && member.region && ' · '}
-                      {ds?.show_region !== false && member.region && member.region}
+                      {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && memberLocation(member) && ' · '}
+                      {ds?.show_region !== false && memberLocation(member)}
                     </p>
                     {ds?.show_hospital !== false && member.hospital && (
                       <p className="text-[11px] text-muted-foreground/70 truncate">{member.hospital}</p>
@@ -250,11 +262,11 @@ const MemberDirectory = () => {
                       {ds?.show_training_stage !== false && member.training_stage && (
                         <span>{member.training_stage}</span>
                       )}
-                      {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && member.region && (
+                      {ds?.show_training_stage !== false && member.training_stage && ds?.show_region !== false && memberLocation(member) && (
                         <span> · </span>
                       )}
-                      {ds?.show_region !== false && member.region && (
-                        <span>{member.region}</span>
+                      {ds?.show_region !== false && memberLocation(member) && (
+                        <span>{memberLocation(member)}</span>
                       )}
                     </p>
 

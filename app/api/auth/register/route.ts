@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { resend, FROM_EMAIL } from '@/lib/resend'
 import { welcomeEmail, adminNewRegistrationEmail } from '@/lib/emails/templates'
+import { isValidCountry } from '@/lib/constants/countries'
+import {
+  isApprovedDomain,
+  isMemberCategory,
+  isValidGmcNumber,
+  normaliseGmcNumber,
+  requiresGmcNumber,
+} from '@/lib/registration'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
-
-const APPROVED_DOMAINS = ['nhs.net', 'nhs.uk', 'doctors.org.uk']
-const APPROVED_SUFFIX = '.ac.uk'
-
-function isApprovedDomain(email: string): boolean {
-  const domain = email.split('@')[1]?.toLowerCase() || ''
-  return APPROVED_DOMAINS.includes(domain) || domain.endsWith(APPROVED_SUFFIX)
-}
 
 function getSupabase() {
   return createClient(
@@ -23,18 +23,59 @@ function getSupabase() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, fullName, region, trainingStage, acpgbiNumber, directoryVisible } = body
+    const {
+      email, password, fullName, region, country, trainingStage,
+      acpgbiNumber, gmcNumber, directoryVisible,
+    } = body
+    const memberCategory = body.memberCategory ?? 'uk'
 
-    if (!email || !password || !fullName || !trainingStage || !region) {
+    if (!email || !password || !fullName || !trainingStage) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    if (!isMemberCategory(memberCategory)) {
+      return NextResponse.json({ error: 'Invalid member category' }, { status: 400 })
+    }
+
+    const isInternational = memberCategory === 'international'
+
+    // International members give a country; UK members give their deanery.
+    if (isInternational) {
+      if (!country) {
+        return NextResponse.json({ error: 'Please select the country you are based in' }, { status: 400 })
+      }
+      if (!isValidCountry(country)) {
+        return NextResponse.json({ error: 'Unrecognised country' }, { status: 400 })
+      }
+    } else if (!region) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // UK trainees on an unrecognised email domain must supply a GMC number so
+    // an admin has something to verify them against.
+    const gmcRequired = requiresGmcNumber(memberCategory, email)
+    if (gmcRequired && !gmcNumber) {
+      return NextResponse.json(
+        { error: 'A GMC number is required when registering with a non-NHS email' },
+        { status: 400 }
+      )
+    }
+    if (gmcNumber && !isValidGmcNumber(gmcNumber)) {
+      return NextResponse.json({ error: 'Please enter a valid 7-digit GMC number' }, { status: 400 })
     }
 
     if (password.length < 8) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
+    const storedRegion = isInternational ? null : region
+    const storedCountry = isInternational ? country : null
+    const storedGmcNumber = gmcNumber ? normaliseGmcNumber(gmcNumber) : null
+
     const supabase = getSupabase()
-    const approved = isApprovedDomain(email)
+    // Auto-approval recognises UK NHS/academic domains only — an international
+    // registration always goes to an admin, whatever address it uses.
+    const approved = !isInternational && isApprovedDomain(email)
 
     // Generate a signup confirmation link using the admin API.
     // This creates the user AND returns a confirmation URL without
@@ -46,9 +87,12 @@ export async function POST(request: NextRequest) {
       options: {
         data: {
           full_name: fullName,
-          region,
+          member_category: memberCategory,
+          region: storedRegion,
+          country: storedCountry,
           training_stage: trainingStage,
           acpgbi_number: acpgbiNumber || null,
+          gmc_number: storedGmcNumber,
           directory_visible: directoryVisible ?? true,
         },
         redirectTo: `${SITE_URL}/auth/callback?next=/login?verified=true`,
@@ -68,15 +112,24 @@ export async function POST(request: NextRequest) {
 
     const userId = linkData?.user?.id
 
-    // Auto-approve NHS/approved-domain users server-side
-    if (approved && userId) {
-      const { error: approveError } = await supabase
+    // Write the registration details onto the profile row the signup trigger
+    // created. The category, country and GMC number are set here rather than
+    // relying on the trigger to read them out of the user metadata, and
+    // approved-domain users are approved in the same write.
+    if (userId) {
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update({ approval_status: 'approved', role: 'trainee' })
+        .update({
+          member_category: memberCategory,
+          region: storedRegion,
+          country: storedCountry,
+          gmc_number: storedGmcNumber,
+          ...(approved ? { approval_status: 'approved', role: 'trainee' } : {}),
+        })
         .eq('id', userId)
 
-      if (approveError) {
-        console.error('Auto-approve error:', approveError)
+      if (profileError) {
+        console.error('Profile update error:', profileError)
       }
     }
 
@@ -118,7 +171,10 @@ export async function POST(request: NextRequest) {
         const adminEmail = adminNewRegistrationEmail({
           userName: fullName,
           userEmail: email,
-          region,
+          region: storedRegion,
+          country: storedCountry,
+          memberCategory,
+          gmcNumber: storedGmcNumber,
           trainingStage,
           siteUrl: SITE_URL,
           approved,

@@ -13,9 +13,12 @@ export interface Profile {
   role: string
   approval_status: string
   region: string | null
+  member_category: string | null
+  country: string | null
   training_stage: string | null
   avatar_url: string | null
   acpgbi_number: string | null
+  gmc_number: string | null
   created_at: string | null
 }
 

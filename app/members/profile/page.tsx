@@ -17,6 +17,8 @@ import {
   DEFAULT_DIGEST_PREFERENCES,
   type DigestPreferenceValue,
 } from "@/components/digest/digest-preference-fields";
+import { COUNTRIES } from "@/lib/constants/countries";
+import { isValidGmcNumber, normaliseGmcNumber } from "@/lib/registration";
 
 const regions = [
   "North East", "North West (Mersey)", "North West (North Western)",
@@ -49,6 +51,9 @@ const MemberProfile = () => {
   const [fullName, setFullName] = useState('');
   const [hospital, setHospital] = useState('');
   const [region, setRegion] = useState('');
+  const [country, setCountry] = useState('');
+  const [gmcNumber, setGmcNumber] = useState('');
+  const [gmcError, setGmcError] = useState('');
   const [trainingStage, setTrainingStage] = useState('');
   const [twitter, setTwitter] = useState('');
   const [linkedin, setLinkedin] = useState('');
@@ -74,12 +79,17 @@ const MemberProfile = () => {
   const [savedDigest, setSavedDigest] = useState(false);
   const [digestError, setDigestError] = useState<string | null>(null);
 
+  // International members are placed by country; UK members by deanery.
+  const isInternational = (profile as any)?.member_category === 'international';
+
   // Load profile data
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
       setHospital((profile as any).hospital || '');
       setRegion((profile as any).region || '');
+      setCountry((profile as any).country || '');
+      setGmcNumber((profile as any).gmc_number || '');
       setTrainingStage((profile as any).training_stage || '');
       setTwitter((profile as any).social_twitter || '');
       setLinkedin((profile as any).social_linkedin || '');
@@ -158,6 +168,15 @@ const MemberProfile = () => {
 
   const handleSaveProfile = async () => {
     if (!user) return;
+
+    // The GMC number is what an admin verifies a non-NHS UK account against,
+    // so it has to stay a valid reference number once set.
+    if (gmcNumber && !isValidGmcNumber(gmcNumber)) {
+      setGmcError('Please enter a valid 7-digit GMC number.');
+      return;
+    }
+    setGmcError('');
+
     setSaving(true);
     setSaved(false);
 
@@ -168,7 +187,9 @@ const MemberProfile = () => {
       .update({
         full_name: fullName.trim(),
         hospital,
-        region: region || null,
+        region: isInternational ? null : region || null,
+        country: isInternational ? country || null : null,
+        gmc_number: gmcNumber ? normaliseGmcNumber(gmcNumber) : null,
         training_stage: trainingStage || null,
         social_twitter: twitter,
         social_linkedin: linkedin,
@@ -302,17 +323,31 @@ const MemberProfile = () => {
                   <Label>Hospital / Place of Work</Label>
                   <Input value={hospital} onChange={(e) => setHospital(e.target.value)} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Region</Label>
-                  <select
-                    className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm"
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
-                  >
-                    <option value="">Select region...</option>
-                    {regions.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
+                {isInternational ? (
+                  <div className="space-y-2">
+                    <Label>Country</Label>
+                    <select
+                      className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                    >
+                      <option value="">Select country...</option>
+                      {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Region</Label>
+                    <select
+                      className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm"
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                    >
+                      <option value="">Select region...</option>
+                      {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Training Stage</Label>
                   <select
@@ -324,6 +359,24 @@ const MemberProfile = () => {
                     {trainingStages.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+                {!isInternational && (
+                  <div className="space-y-2">
+                    <Label>GMC Number</Label>
+                    <Input
+                      value={gmcNumber}
+                      inputMode="numeric"
+                      placeholder="7 digits, e.g. 1234567"
+                      onChange={(e) => { setGmcNumber(e.target.value); setGmcError(''); }}
+                    />
+                    {gmcError ? (
+                      <p className="text-xs text-destructive">{gmcError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Used to verify your identity if you registered with a non-NHS email.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Subspecialty Interests */}
