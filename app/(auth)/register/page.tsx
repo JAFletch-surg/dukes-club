@@ -6,16 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, ArrowRight, CheckCircle, Clock, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, CheckCircle, Clock, ShieldCheck, Globe, MapPin } from "lucide-react"
 import AuthLayout from "@/components/auth/AuthLayout"
-
-const APPROVED_DOMAINS = ["nhs.net", "nhs.uk", "doctors.org.uk"]
-const APPROVED_SUFFIX = ".ac.uk"
-
-const isApprovedDomain = (email: string): boolean => {
-  const domain = email.split("@")[1]?.toLowerCase() || ""
-  return APPROVED_DOMAINS.includes(domain) || domain.endsWith(APPROVED_SUFFIX)
-}
+import { COUNTRIES } from "@/lib/constants/countries"
+import {
+  isApprovedDomain,
+  isValidGmcNumber,
+  requiresGmcNumber,
+  type MemberCategory,
+} from "@/lib/registration"
 
 const trainingStages = [
   "FY1", "FY2", "CT1", "CT2",
@@ -32,9 +31,10 @@ const regions = [
 ]
 
 const RegisterPage = () => {
+  const [memberCategory, setMemberCategory] = useState<MemberCategory>("uk")
   const [formData, setFormData] = useState({
     fullName: "", email: "", password: "", confirmPassword: "",
-    acpgbiNumber: "", region: "", trainingStage: "",
+    acpgbiNumber: "", region: "", trainingStage: "", country: "", gmcNumber: "",
   })
   const [directoryVisible, setDirectoryVisible] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
@@ -45,6 +45,23 @@ const RegisterPage = () => {
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const isInternational = memberCategory === "international"
+  // Only UK trainees on a recognised NHS/academic domain skip admin review.
+  const autoApproved = !isInternational && isApprovedDomain(formData.email)
+  const needsGmc = requiresGmcNumber(memberCategory, formData.email)
+
+  // Switching category clears whichever location field no longer applies, so a
+  // half-filled deanery can't be submitted alongside a country.
+  const selectCategory = (category: MemberCategory) => {
+    setMemberCategory(category)
+    setFormData((prev) => ({
+      ...prev,
+      region: category === "international" ? "" : prev.region,
+      country: category === "uk" ? "" : prev.country,
+      gmcNumber: category === "uk" ? prev.gmcNumber : "",
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,8 +76,20 @@ const RegisterPage = () => {
       setError("Please select your training stage.")
       return
     }
-    if (!formData.region) {
+    if (isInternational && !formData.country) {
+      setError("Please select the country you are based in.")
+      return
+    }
+    if (!isInternational && !formData.region) {
       setError("Please select your deanery/region.")
+      return
+    }
+    if (needsGmc && !formData.gmcNumber) {
+      setError("Please enter your GMC number so we can verify your identity.")
+      return
+    }
+    if (needsGmc && !isValidGmcNumber(formData.gmcNumber)) {
+      setError("Please enter a valid 7-digit GMC number.")
       return
     }
     if (formData.password.length < 8) {
@@ -82,7 +111,10 @@ const RegisterPage = () => {
           email: formData.email,
           password: formData.password,
           fullName: formData.fullName,
-          region: formData.region,
+          memberCategory,
+          region: isInternational ? null : formData.region,
+          country: isInternational ? formData.country : null,
+          gmcNumber: needsGmc ? formData.gmcNumber : null,
           trainingStage: formData.trainingStage,
           acpgbiNumber: formData.acpgbiNumber || null,
           directoryVisible,
@@ -104,8 +136,7 @@ const RegisterPage = () => {
 
     setIsLoading(false)
 
-    const approved = isApprovedDomain(formData.email)
-    setApprovalType(approved ? "auto" : "pending")
+    setApprovalType(autoApproved ? "auto" : "pending")
     setSubmitted(true)
   }
 
@@ -127,7 +158,9 @@ const RegisterPage = () => {
             <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
               {approvalType === "auto"
                 ? "Your NHS/academic email has been recognised. Please check your inbox and click the verification link to activate your Trainee account."
-                : "Your account is pending approval by an administrator. You'll receive an email once your account has been reviewed. This usually takes 1–2 working days."}
+                : isInternational
+                  ? "International registrations are reviewed by an administrator. You'll receive an email once your account has been reviewed. This usually takes 1–2 working days."
+                  : "Your account is pending approval by an administrator. You'll receive an email once your account has been reviewed. This usually takes 1–2 working days."}
             </p>
             <p className="text-xs text-muted-foreground mt-3">
               Verification email sent to{" "}
@@ -151,7 +184,9 @@ const RegisterPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Create your account</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            NHS, academic &amp; doctors.org.uk emails are auto-approved
+            {isInternational
+              ? "International members are reviewed by an administrator"
+              : "NHS, academic & doctors.org.uk emails are auto-approved"}
           </p>
         </div>
 
@@ -161,6 +196,37 @@ const RegisterPage = () => {
               {error}
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label>I am registering as <span className="text-destructive">*</span></Label>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { value: "uk" as const, icon: MapPin, title: "UK / Ireland", blurb: "Training or working in a UK or Irish deanery" },
+                { value: "international" as const, icon: Globe, title: "International", blurb: "Based outside the UK and Ireland" },
+              ]).map(({ value, icon: Icon, title, blurb }) => {
+                const selected = memberCategory === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => selectCategory(value)}
+                    aria-pressed={selected}
+                    className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                      selected
+                        ? "border-gold bg-gold/10"
+                        : "border-border hover:border-gold/50"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Icon size={15} className={selected ? "text-gold" : "text-muted-foreground"} />
+                      {title}
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-1">{blurb}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="fullName">Full name <span className="text-destructive">*</span></Label>
@@ -187,13 +253,34 @@ const RegisterPage = () => {
               required
             />
             {formData.email && formData.email.includes("@") && (
-              <p className={`text-xs flex items-center gap-1 ${isApprovedDomain(formData.email) ? "text-gold" : "text-muted-foreground"}`}>
-                {isApprovedDomain(formData.email)
+              <p className={`text-xs flex items-center gap-1 ${autoApproved ? "text-gold" : "text-muted-foreground"}`}>
+                {autoApproved
                   ? "✓ Recognised domain — auto-approved as Trainee"
-                  : "Account will require admin approval"}
+                  : isInternational
+                    ? "International accounts are reviewed by an administrator"
+                    : "Account will require admin approval"}
               </p>
             )}
           </div>
+
+          {needsGmc && (
+            <div className="space-y-2">
+              <Label htmlFor="gmc-number">GMC number <span className="text-destructive">*</span></Label>
+              <Input
+                id="gmc-number"
+                inputMode="numeric"
+                placeholder="7 digits, e.g. 1234567"
+                value={formData.gmcNumber}
+                onChange={(e) => updateField("gmcNumber", e.target.value)}
+                className="h-11"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                You&apos;re registering with an email we can&apos;t recognise, so we ask UK doctors for
+                their GMC reference number to confirm identity before approving the account.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -249,19 +336,35 @@ const RegisterPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Deanery / Region <span className="text-destructive">*</span></Label>
-              <Select value={formData.region} onValueChange={(v) => updateField("region", v)}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isInternational ? (
+              <div className="space-y-2">
+                <Label>Country <span className="text-destructive">*</span></Label>
+                <Select value={formData.country} onValueChange={(v) => updateField("country", v)}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Deanery / Region <span className="text-destructive">*</span></Label>
+                <Select value={formData.region} onValueChange={(v) => updateField("region", v)}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regions.map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -303,7 +406,9 @@ const RegisterPage = () => {
             />
             <div>
               <span className="text-sm font-medium text-foreground">Show me in the Member Directory</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Other members can see your name, region and training stage. You can change this later in your profile.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Other members can see your name, {isInternational ? "country" : "region"} and training stage. You can change this later in your profile.
+              </p>
             </div>
           </label>
 

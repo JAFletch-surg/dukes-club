@@ -425,17 +425,27 @@ export function feedbackRequestEmail(params: {
 export function adminNewRegistrationEmail(params: {
   userName: string
   userEmail: string
-  region: string
+  region?: string | null
+  country?: string | null
+  memberCategory?: 'uk' | 'international'
+  gmcNumber?: string | null
   trainingStage: string
   siteUrl: string
   approved?: boolean
 }): { subject: string; html: string } {
-  const { userName, userEmail, region, trainingStage, siteUrl, approved } = params
+  const {
+    userName, userEmail, region, country, memberCategory, gmcNumber,
+    trainingStage, siteUrl, approved,
+  } = params
+
+  const isInternational = memberCategory === 'international'
 
   return {
     subject: approved
       ? `New registration (auto-approved) — ${userName}`
-      : `New registration pending review — ${userName}`,
+      : isInternational
+        ? `New international registration pending review — ${userName}`
+        : `New registration pending review — ${userName}`,
     html: layout(`
       <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
         New Member Registration
@@ -443,7 +453,9 @@ export function adminNewRegistrationEmail(params: {
       <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.7;">
         ${approved
           ? 'A new user has registered with an approved NHS/academic email and has been automatically approved.'
-          : 'A new user has registered with a non-NHS email and requires admin review.'}
+          : isInternational
+            ? 'A new international member has registered and requires admin review.'
+            : 'A new user has registered with a non-NHS email and requires admin review.'}
       </p>
 
       <div style="background-color:#F9F8F5;border:1px solid #E8E6E1;border-radius:8px;padding:20px;margin:0 0 24px;">
@@ -457,20 +469,31 @@ export function adminNewRegistrationEmail(params: {
             <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${userEmail}</td>
           </tr>
           <tr>
-            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">Region</td>
-            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${region}</td>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">Category</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${isInternational ? 'International' : 'UK / Ireland'}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">${isInternational ? 'Country' : 'Region'}</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${(isInternational ? country : region) || '—'}</td>
           </tr>
           <tr>
             <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">Training</td>
             <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${trainingStage}</td>
           </tr>
+          ${gmcNumber ? `
+          <tr>
+            <td style="padding:6px 12px 6px 0;font-size:13px;color:#888;vertical-align:top;">GMC number</td>
+            <td style="padding:6px 0;font-size:14px;color:#444;font-weight:600;">${gmcNumber}</td>
+          </tr>` : ''}
         </table>
       </div>
 
       ${button('Review in Admin Panel', `${siteUrl}/admin/members`)}
 
       <p style="margin:0;font-size:14px;color:#888;">
-        You can approve or reject this account from the Members section of the admin panel.
+        ${gmcNumber
+          ? 'Check the GMC number on the GMC register before approving. You can approve or reject this account from the Members section of the admin panel.'
+          : 'You can approve or reject this account from the Members section of the admin panel.'}
       </p>
     `),
   }

@@ -120,7 +120,10 @@ export async function POST(request: NextRequest) {
         email = adminNewRegistrationEmail({
           userName: data.userName || 'New User',
           userEmail: data.userEmail || to,
+          memberCategory: data.memberCategory,
           region: data.region || 'Not specified',
+          country: data.country,
+          gmcNumber: data.gmcNumber,
           trainingStage: data.trainingStage || 'Not specified',
           siteUrl: SITE_URL,
           approved: data.approved,

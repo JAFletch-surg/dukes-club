@@ -10,9 +10,11 @@ nav_order: 9
 
 Find other members from the directory page.
 
-* Search by name, region, hospital, or subspecialty.
-* Filter by region or training stage.
-* View member cards showing name, training stage, region, hospital, subspecialty interests, and social links.
+* Search by name, region or country, hospital, or subspecialty.
+* Filter by region or training stage. The region filter includes an **International** option, which
+  shows every member based outside the UK and Ireland.
+* View member cards showing name, training stage, region (or country, for international members),
+  hospital, subspecialty interests, and social links.
 * Click **Message** to send a direct message (if the member allows it).
 * Your own card is marked with a "You" label.
 

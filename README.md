@@ -48,6 +48,18 @@ single folder, which is how the site worked before folders became admin-managed.
 admin opens Manage Folders, that folder is added to the table automatically so nothing is lost.
 Once folders are managed in the UI the variable is ignored and can be removed.
 
+### International members
+
+Registration asks whether someone is joining from the **UK / Ireland** or is **International**.
+UK registrants pick a deanery as before; international registrants pick their country, and their
+account always goes to an admin for review rather than being auto-approved. A UK registrant using an
+email domain we don't recognise is additionally asked for their **GMC number**, which admins check
+before approving.
+
+To enable this on a new environment, run `supabase/add-international-members.sql` in the Supabase SQL
+editor. It adds `member_category`, `country` and `gmc_number` to `profiles` and backfills every
+existing row to the `uk` category.
+
 ### Round-up digest email
 
 A recurring digest of upcoming events, newly published posts and new videos, sent to members at the
