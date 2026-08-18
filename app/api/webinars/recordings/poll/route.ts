@@ -49,9 +49,19 @@ export async function GET(request: NextRequest) {
     if (result.ok) {
       await supabase
         .from('webinar_sessions')
-        .update({ vimeo_id: result.vimeoId, recording_status: 'transferring', recording_error: null })
+        .update({
+          vimeo_id: result.vimeoId,
+          recording_status: 'transferring',
+          // A folder problem is a warning, not a failure — the recording is
+          // safely on Vimeo either way. Surfacing it on the admin card is how
+          // anyone finds out the sync will not be managing this video.
+          recording_error: result.folderError,
+        })
         .eq('id', session.id)
-      steps.push(`session ${session.id}: handed to Vimeo as ${result.vimeoId}`)
+      steps.push(
+        `session ${session.id}: handed to Vimeo as ${result.vimeoId}` +
+          (result.folderError ? ` (warning: ${result.folderError})` : '')
+      )
     } else {
       await supabase
         .from('webinar_sessions')

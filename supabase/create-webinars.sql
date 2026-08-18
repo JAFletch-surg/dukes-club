@@ -13,7 +13,8 @@
 --   1. Database → Replication → enable Realtime on:
 --        webinar_sessions, webinar_chat_messages, webinar_questions,
 --        webinar_polls, webinar_poll_votes, webinar_resources
---   2. Storage → create a PRIVATE bucket named `recordings`
+--   2. Storage → create a PRIVATE bucket named `webinar-recordings`
+--      (must match WEBINAR_S3_BUCKET; the code defaults to that name)
 --   3. Storage → S3 settings → generate an access key pair for LiveKit egress
 --
 

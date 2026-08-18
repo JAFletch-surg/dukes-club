@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { WebhookReceiver } from 'livekit-server-sdk'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getSupabase, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, parseIdentityFromWebhook } from '../_shared'
+import { transferRecordingToVimeo } from '../_recording'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -167,10 +168,17 @@ async function onEgressStarted(supabase: SupabaseClient, event: any) {
 }
 
 /**
- * The recording is finished and uploaded to storage. Mark it ready for
- * transfer — the cron at /api/webinars/recordings/poll picks it up from here
- * and hands it to Vimeo. Doing the transfer on the cron rather than inline
- * means a Vimeo outage cannot lose the recording.
+ * The recording is finished and uploaded to storage.
+ *
+ * The Vimeo handoff is attempted inline, because the cron behind
+ * /api/webinars/recordings/poll only runs daily — Vercel's Hobby plan rejects
+ * any schedule more frequent than that, and this project is on Hobby. Waiting
+ * for the cron would leave a recording sitting unpublished for up to 24 hours.
+ *
+ * The pull upload only queues the job with Vimeo, so this stays fast. If it
+ * fails the row is left at 'uploaded', which is exactly the state the cron and
+ * the admin "Check recordings" button retry from — a Vimeo outage delays the
+ * recording, it never loses it.
  */
 async function onEgressEnded(supabase: SupabaseClient, event: any) {
   const info = event.egressInfo
@@ -201,12 +209,41 @@ async function onEgressEnded(supabase: SupabaseClient, event: any) {
     return
   }
 
+  const recordingPath = file?.filename || session.recording_path
+
   await supabase
     .from('webinar_sessions')
     .update({
       recording_status: 'uploaded',
-      recording_path: file?.filename || session.recording_path,
+      recording_path: recordingPath,
       status: 'processing',
     })
     .eq('id', session.id)
+
+  const { data: full } = await supabase
+    .from('webinar_sessions')
+    .select('id, event_id, recording_path')
+    .eq('id', session.id)
+    .single()
+
+  if (!full) return
+
+  const result = await transferRecordingToVimeo(supabase, full)
+
+  if (result.ok) {
+    await supabase
+      .from('webinar_sessions')
+      .update({
+        vimeo_id: result.vimeoId,
+        recording_status: 'transferring',
+        recording_error: result.folderError,
+      })
+      .eq('id', session.id)
+  } else {
+    // Stays at 'uploaded' so the cron and the admin button retry it.
+    await supabase
+      .from('webinar_sessions')
+      .update({ recording_error: result.error })
+      .eq('id', session.id)
+  }
 }

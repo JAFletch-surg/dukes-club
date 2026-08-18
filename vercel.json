@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/webinars/recordings/poll",
-      "schedule": "0 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

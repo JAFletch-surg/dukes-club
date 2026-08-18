@@ -18,10 +18,13 @@ choose to set up a live room for it.
 
 ## Before the first webinar
 
-Live webinars need a one-off technical setup (LiveKit account, storage bucket, Vimeo folder,
-Supabase realtime). Those steps are in the project `README.md` under "Live webinars" — ask
-whoever maintains the site to complete them once. If they haven't been done, the **Go live**
-button will report that live webinars aren't configured rather than failing silently.
+Live webinars need a one-off technical setup — a LiveKit account, a storage bucket, a Vimeo
+folder with a write-scoped token, and Supabase realtime replication. The full runbook is in
+the project `README.md` under **Live webinars**; ask whoever maintains the site to work
+through it once.
+
+If it hasn't been done, the **Go live** button reports that live webinars aren't configured
+rather than failing silently.
 
 ## Setting up a webinar
 
@@ -107,8 +110,11 @@ You can watch progress in the status badge on the Live Webinars page:
 | **Published** | Done — the recording is in the video library |
 | **Failed** | Something went wrong; the reason is shown on the card |
 
-The transfer runs on a schedule. If you're impatient, or a recording looks stuck, press
-**Check recordings** at the top of the page to run it immediately.
+The Live Webinars page moves recordings along by itself, once a minute, for as long as you
+leave it open — so the simplest thing after ending a webinar is to leave that tab open and
+let it finish. If you closed it, or a recording looks stuck, press **Check recordings** at
+the top of the page. There is also a nightly job at 3am as a backstop, so nothing is ever
+lost by forgetting.
 
 Once published, the recording appears under **Past Webinars** on the members' webinars page
 and in the video library, tagged to its event. There is no need to match it up by hand —

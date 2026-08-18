@@ -93,6 +93,22 @@ export default function WebinarsAdmin() {
 
   useEffect(() => { load() }, [load])
 
+  // The recordings cron only runs daily (Vercel Hobby rejects anything more
+  // frequent), so while this page is open and something is mid-pipeline, drive
+  // it forward here. That means an admin who ends a webinar and leaves the tab
+  // open sees the recording publish itself, without having to know the
+  // "Check recordings" button exists.
+  const pipelineActive = sessions.some(
+    s => s.recording_status === 'uploaded' || s.recording_status === 'transferring'
+  )
+
+  useEffect(() => {
+    if (!pipelineActive) return
+    const id = setInterval(() => { advanceRecordings(true) }, 60000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineActive])
+
   async function createSession() {
     if (!newEventId) return
     setSaving(true)
@@ -136,7 +152,9 @@ export default function WebinarsAdmin() {
     load()
   }
 
-  async function checkRecordings() {
+  /** Runs the recording pipeline one step. `silent` is used by the background
+   *  timer so it doesn't fire a toast every minute. */
+  async function advanceRecordings(silent = false) {
     const { data: { session: authSession } } = await supabase.auth.getSession()
     if (!authSession) return
 
@@ -144,10 +162,13 @@ export default function WebinarsAdmin() {
       headers: { Authorization: `Bearer ${authSession.access_token}` },
     })
     const data = await res.json()
-    showToast(
-      data.steps?.length ? data.steps.join(' · ') : 'Nothing waiting to be processed.',
-      res.ok ? 'ok' : 'err'
-    )
+
+    if (!silent) {
+      showToast(
+        data.steps?.length ? data.steps.join(' · ') : 'Nothing waiting to be processed.',
+        res.ok ? 'ok' : 'err'
+      )
+    }
     load()
   }
 
@@ -168,7 +189,7 @@ export default function WebinarsAdmin() {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button
-            onClick={checkRecordings}
+            onClick={() => advanceRecordings()}
             style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', background: '#fff', border: `1.5px solid ${C.muted}`, color: C.fg, borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}
           >
             <RefreshCw size={15} /> Check recordings

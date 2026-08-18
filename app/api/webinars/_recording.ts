@@ -115,7 +115,10 @@ export async function transferRecordingToVimeo(
     event_id: string
     recording_path: string | null
   }
-): Promise<{ ok: true; vimeoId: string } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; vimeoId: string; folderError: string | null }
+  | { ok: false; error: string }
+> {
   if (!process.env.VIMEO_ACCESS_TOKEN) return { ok: false, error: 'VIMEO_ACCESS_TOKEN is not set' }
   if (!session.recording_path) return { ok: false, error: 'No recording file for this session' }
 
@@ -133,15 +136,15 @@ export async function transferRecordingToVimeo(
     return { ok: false, error: signError?.message || 'Could not sign the recording URL' }
   }
 
+  // Note: the folder is NOT set here. `folder_uri` expects a canonical
+  // resource identifier (/users/{uid}/projects/{pid}); the /me/ alias that
+  // works fine as a request path is not valid as a body value. The video is
+  // moved into the folder by a separate, documented call once it exists.
   const payload: Record<string, any> = {
     upload: { approach: 'pull', link: signed.signedUrl },
     name: event?.title || 'Dukes’ Club webinar',
     description: event?.description_plain || undefined,
     privacy: { view: 'unlisted', embed: 'whitelist' },
-  }
-
-  if (VIMEO_RECORDINGS_FOLDER_ID) {
-    payload.folder_uri = `/me/projects/${VIMEO_RECORDINGS_FOLDER_ID}`
   }
 
   try {
@@ -166,9 +169,41 @@ export async function transferRecordingToVimeo(
     const vimeoId = String(data.uri || '').split('/').pop()?.split(':')[0]
     if (!vimeoId) return { ok: false, error: 'Vimeo did not return a video id' }
 
-    return { ok: true, vimeoId }
+    // Deliberately non-fatal: by this point Vimeo has accepted the recording,
+    // and failing the whole transfer over a folder move would be far worse
+    // than a video sitting outside its folder. The caller records the warning.
+    const folderError = await moveVideoToFolder(vimeoId)
+
+    return { ok: true, vimeoId, folderError }
   } catch (err: any) {
     return { ok: false, error: err?.message || 'Vimeo upload request failed' }
+  }
+}
+
+/**
+ * Files an uploaded video into the recordings folder.
+ *
+ * This matters beyond tidiness: /api/vimeo/sync only manages videos that live
+ * in a folder registered in `vimeo_folders`, so a recording outside the folder
+ * never has its metadata refreshed. Returns null on success, or a message.
+ */
+async function moveVideoToFolder(vimeoId: string): Promise<string | null> {
+  if (!VIMEO_RECORDINGS_FOLDER_ID) {
+    return 'VIMEO_RECORDINGS_FOLDER_ID is not set — the recording is not in a synced folder'
+  }
+
+  try {
+    const res = await fetch(
+      `${VIMEO_API}/me/projects/${VIMEO_RECORDINGS_FOLDER_ID}/videos/${vimeoId}`,
+      { method: 'PUT', headers: VIMEO_HEADERS }
+    )
+    if (!res.ok) {
+      const text = await res.text()
+      return `Uploaded, but could not file it into the Vimeo folder (${res.status}): ${text.slice(0, 200)}`
+    }
+    return null
+  } catch (err: any) {
+    return `Uploaded, but the Vimeo folder move failed: ${err?.message ?? 'unknown error'}`
   }
 }
 
