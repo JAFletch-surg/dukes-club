@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   BarChart3, Calendar, Newspaper, Video, Globe, UserCheck, Mic,
   GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark, LogOut, Layout, FileText, X, Mail,
-  MessageSquare
+  MessageSquare, Radio
 } from 'lucide-react'
 import { useAuth } from '@/lib/use-auth'
 
@@ -17,6 +17,7 @@ const navSections = [
       { href: '/admin', label: 'Dashboard', icon: BarChart3, end: true },
       { href: '/admin/events', label: 'Events', icon: Calendar },
       { href: '/admin/posts', label: 'News & Posts', icon: Newspaper },
+      { href: '/admin/webinars', label: 'Live Webinars', icon: Radio },
       { href: '/admin/videos', label: 'Videos', icon: Video },
       { href: '/admin/podcasts', label: 'Podcasts', icon: Mic },
       { href: '/admin/questions', label: 'Questions', icon: FileText },

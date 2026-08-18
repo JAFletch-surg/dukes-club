@@ -26,6 +26,7 @@ nav_order: 3
 
 * [Getting Started](admin/getting-started.md)
 * [Events](admin/events.md)
+* [Live Webinars](admin/live-webinars.md)
 * [Content](admin/content.md)
 * [Education](admin/education.md)
 * [People](admin/people.md)

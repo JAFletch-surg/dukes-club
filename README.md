@@ -34,8 +34,21 @@ Set these in `.env.local` for development and in the Vercel project settings for
 | `CONTACT_TO_EMAIL` | Where contact form submissions are sent |
 | `INTERNAL_API_SECRET` | Shared secret for internal API calls |
 | `CRON_SECRET` | Bearer token Vercel Cron presents to `/api/digest/cron`. Falls back to `INTERNAL_API_SECRET` if unset |
-| `VIMEO_ACCESS_TOKEN` | Vimeo API token for the account hosting the videos |
+| `VIMEO_ACCESS_TOKEN` | Vimeo API token for the account hosting the videos. **Needs `upload`, `edit`, `interact` and `private` scopes** if live webinar recordings are enabled — the read-only token that serves the video sync is not sufficient |
 | `VIMEO_FOLDER_ID` | *Legacy fallback.* See below |
+| `VIMEO_RECORDINGS_FOLDER_ID` | Vimeo folder that webinar recordings are uploaded into. Must also be registered as an active row in `vimeo_folders` — see below |
+| `LIVEKIT_API_KEY` | LiveKit Cloud API key (live webinars) |
+| `LIVEKIT_API_SECRET` | LiveKit Cloud API secret |
+| `LIVEKIT_HTTP_URL` | `https://<project>.livekit.cloud` — used by the server SDK |
+| `NEXT_PUBLIC_LIVEKIT_URL` | `wss://<project>.livekit.cloud` — used by the browser |
+| `WEBINAR_S3_ENDPOINT` | S3-compatible endpoint recordings are written to, e.g. `https://<ref>.supabase.co/storage/v1/s3` |
+| `WEBINAR_S3_REGION` | Region for the above, e.g. `eu-west-2` |
+| `WEBINAR_S3_BUCKET` | Bucket name (default `webinar-recordings`) |
+| `WEBINAR_S3_ACCESS_KEY_ID` | Access key for the recordings bucket |
+| `WEBINAR_S3_SECRET_ACCESS_KEY` | Secret key for the recordings bucket |
+
+Live webinars are optional. With the `LIVEKIT_*` variables unset, everything else works
+exactly as before and the token routes return a clear 503 rather than failing obscurely.
 
 ### Vimeo folders
 
@@ -59,6 +72,43 @@ before approving.
 To enable this on a new environment, run `supabase/add-international-members.sql` in the Supabase SQL
 editor. It adds `member_category`, `country` and `gmc_number` to `profiles` and backfills every
 existing row to the `uk` category.
+
+### Live webinars
+
+Webinars can run natively on the site rather than linking out to Zoom. The host and any
+guest speakers present from the browser (with screen sharing for slides), attendees watch
+and take part in chat, Q&A and polls, and the session is recorded and published to the
+members' video library afterwards.
+
+**Setting it up:**
+
+1. Run `supabase/create-webinars.sql` in the Supabase SQL editor.
+2. In the Supabase dashboard, **Database → Replication**, enable Realtime on
+   `webinar_sessions`, `webinar_chat_messages`, `webinar_questions`, `webinar_polls`,
+   `webinar_poll_votes` and `webinar_resources`. (Replication is not managed in SQL in this
+   project — the `messages` table was enabled the same way.)
+3. **Storage** → create a **private** bucket named `webinar-recordings`, and raise the
+   project's global upload size limit above the size of a full-length recording (a
+   90-minute 1080p webinar is roughly 1–3 GB).
+4. **Storage → S3 settings** → generate an access key pair and put it in the
+   `WEBINAR_S3_*` variables.
+5. Create a LiveKit Cloud project, put its key/secret/URL in the `LIVEKIT_*` variables, and
+   register `https://<site>/api/webinars/webhook` as a webhook in the LiveKit project
+   settings.
+6. Create a "Webinars" folder in Vimeo, add it under **Admin → Videos → Manage Folders**,
+   and put its id in `VIMEO_RECORDINGS_FOLDER_ID`.
+
+**Running one:** create the event as usual with an event type of Webinar, Online Lecture or
+Hybrid, then go to **Admin → Live Webinars**, create a live room against it, and invite
+guest speakers by email. Each speaker gets a personal link — no Dukes' Club account needed —
+which opens a green room where they can test their camera, microphone and screen sharing
+before anything is broadcast. Open the studio to go live.
+
+**Recordings:** when the session ends, LiveKit finalises the recording into the
+`webinar-recordings` bucket, an hourly cron (`/api/webinars/recordings/poll`) hands it to
+Vimeo, and once Vimeo has finished transcoding it is inserted into the `videos` table linked
+to its event and the storage copy is deleted. Vercel Hobby plans only allow daily crons, so
+there is also a **Check recordings** button on the admin page that runs the same job.
 
 ### Round-up digest email
 

@@ -648,3 +648,127 @@ export function certificateReadyEmail(params: {
     `),
   }
 }
+// ── Live webinars ──────────────────────────────────────────────────
+
+/**
+ * Sent to a guest speaker with their personal join link. This is often the
+ * first thing an external speaker sees from us, so it carries the practical
+ * detail they need: what to expect, and that screen sharing needs a laptop.
+ */
+export function webinarSpeakerInviteEmail(params: {
+  speakerName: string
+  eventTitle: string
+  startsAt: string
+  joinUrl: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { speakerName, eventTitle, startsAt, joinUrl } = params
+  const firstName = speakerName.split(' ').slice(-1)[0] || speakerName
+
+  const when = startsAt
+    ? new Date(startsAt).toLocaleString('en-GB', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : 'To be confirmed'
+
+  return {
+    subject: `You're speaking at ${eventTitle}`,
+    html: layout(`
+      <h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:26px;color:#0F1F3D;">
+        Thank you for speaking
+      </h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        Dear ${escapeHtml(firstName)},
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        You are speaking at <strong>${escapeHtml(eventTitle)}</strong>, hosted live by the
+        Dukes' Club on <strong>${when}</strong>.
+      </p>
+      <p style="margin:0 0 8px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        Use the button below to join. It is personal to you — please don't forward it.
+      </p>
+
+      ${button('Join as speaker', joinUrl)}
+
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:24px 0;background-color:#F7F8FA;border-radius:10px;">
+        <tr><td style="padding:18px 22px;">
+          <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#8A6100;">
+            Before you join
+          </p>
+          <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#3A3A44;">
+            The link opens a green room where you can check your camera, microphone and screen
+            sharing before anything is broadcast. Nothing goes out until you press join.
+          </p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#3A3A44;">
+            <strong>To present slides, join from a laptop</strong> using Chrome, Edge or Safari —
+            phones and tablets cannot share a screen.
+          </p>
+        </td></tr>
+      </table>
+
+      <p style="margin:0;font-size:14px;line-height:1.65;color:#6A6A74;">
+        If you have any trouble on the day, reply to this email and we'll help.
+      </p>
+    `),
+  }
+}
+
+/** Sent to registered attendees the moment the host goes live. */
+export function webinarLiveEmail(params: {
+  name: string
+  eventTitle: string
+  joinUrl: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { name, eventTitle, joinUrl } = params
+  const firstName = name.split(' ')[0] || name
+
+  return {
+    subject: `Starting now — ${eventTitle}`,
+    html: layout(`
+      <h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:26px;color:#0F1F3D;">
+        We're live
+      </h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        Hi ${escapeHtml(firstName)},
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        <strong>${escapeHtml(eventTitle)}</strong> has just started. Join now to watch, ask
+        questions and take part in the polls.
+      </p>
+      ${button('Join the webinar', joinUrl)}
+      <p style="margin:0;font-size:14px;line-height:1.65;color:#6A6A74;">
+        Can't make it? The recording will be published to the members' video library afterwards.
+      </p>
+    `),
+  }
+}
+
+/** Sent once the recording has finished processing and is live on the site. */
+export function webinarRecordingEmail(params: {
+  name: string
+  eventTitle: string
+  watchUrl: string
+  siteUrl: string
+}): { subject: string; html: string } {
+  const { name, eventTitle, watchUrl } = params
+  const firstName = name.split(' ')[0] || name
+
+  return {
+    subject: `Recording available — ${eventTitle}`,
+    html: layout(`
+      <h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:26px;color:#0F1F3D;">
+        The recording is ready
+      </h1>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        Hi ${escapeHtml(firstName)},
+      </p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#3A3A44;">
+        The recording of <strong>${escapeHtml(eventTitle)}</strong> is now available to watch
+        in the members' area, along with the questions and any files shared during the session.
+      </p>
+      ${button('Watch the recording', watchUrl)}
+    `),
+  }
+}

@@ -1,0 +1,669 @@
+'use client'
+
+/**
+ * NOTE ON STYLING: the rest of /admin uses inline `const S = {...}` style
+ * objects, but this studio uses Tailwind because it shares WebinarShell,
+ * WebinarStage and the sidebar panels with the attendee and speaker surfaces.
+ * Re-implementing the stage in inline styles to match the admin convention
+ * would mean maintaining it twice. This inconsistency is deliberate.
+ */
+
+import { useCallback, useEffect, useState } from 'react'
+import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react'
+import {
+  Loader2, Radio, Square, Circle, Plus, X, Play, Check,
+  AlertTriangle, Link2,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useWebinarRealtime } from '@/lib/use-webinar-realtime'
+import { elapsedSince, attachmentKind, MAX_WEBINAR_UPLOAD, type WebinarSession } from '@/lib/webinars'
+import { useImageUpload } from '@/lib/use-image-upload'
+import { WebinarShell, WebinarLayout } from '@/components/webinar/WebinarShell'
+import { WebinarStage } from '@/components/webinar/WebinarStage'
+import { WebinarSidebar } from '@/components/webinar/WebinarSidebar'
+import { ChatPanel } from '@/components/webinar/ChatPanel'
+import { QAPanel } from '@/components/webinar/QAPanel'
+import { ResourcesPanel } from '@/components/webinar/ResourcesPanel'
+import { MediaControls } from '@/components/webinar/MediaControls'
+
+interface Props {
+  event: { id: string; title: string; slug: string; starts_at: string }
+  initialSession: WebinarSession
+  userId: string
+  displayName: string
+}
+
+export function HostStudio({ event, initialSession, userId, displayName }: Props) {
+  const supabase = createClient()
+
+  const [token, setToken] = useState<string | null>(null)
+  const [serverUrl, setServerUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
+  const [confirmGoLive, setConfirmGoLive] = useState(false)
+  const [, setTick] = useState(0)
+
+  const {
+    session, messages, questions, polls, resources, results,
+    sendMessage, askQuestion,
+  } = useWebinarRealtime({ sessionId: initialSession.id, userId })
+
+  const live = session ?? initialSession
+
+  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const authFetch = useCallback(
+    async (url: string, body: any) => {
+      const { data: { session: authSession } } = await supabase.auth.getSession()
+      if (!authSession) throw new Error('Your session has expired.')
+
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authSession.access_token}`,
+        },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Request failed')
+      return data
+    },
+    [supabase]
+  )
+
+  // Join the room as host as soon as the studio opens, so devices can be
+  // checked before going live.
+  const connect = useCallback(async () => {
+    const { data: { session: authSession } } = await supabase.auth.getSession()
+    if (!authSession) return
+
+    const res = await fetch('/api/webinars/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authSession.access_token}`,
+      },
+      body: JSON.stringify({ eventId: event.id }),
+    })
+    const data = await res.json()
+    if (!res.ok) { showToast(data.message || 'Could not join the room', 'err'); return }
+
+    setToken(data.token)
+    setServerUrl(data.url)
+  }, [event.id, supabase])
+
+  useEffect(() => { connect() }, [connect])
+
+  async function goLive() {
+    setConfirmGoLive(false)
+    setBusy('go-live')
+    try {
+      const data = await authFetch(`/api/webinars/${live.id}/session`, { action: 'go-live' })
+      showToast(
+        data.recordingWarning
+          ? `You are live — but recording failed to start: ${data.recordingWarning}`
+          : 'You are live.',
+        data.recordingWarning ? 'err' : 'ok'
+      )
+    } catch (err: any) {
+      showToast(err.message, 'err')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function endSession() {
+    if (!confirm('End the webinar for everyone? This stops the recording and disconnects all attendees.')) return
+    setBusy('end')
+    try {
+      await authFetch(`/api/webinars/${live.id}/session`, { action: 'end' })
+      showToast('Webinar ended. The recording will be processed shortly.')
+    } catch (err: any) {
+      showToast(err.message, 'err')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function toggleRecording() {
+    const action = live.recording_status === 'recording' ? 'stop-recording' : 'start-recording'
+    setBusy('rec')
+    try {
+      await authFetch(`/api/webinars/${live.id}/session`, { action })
+      showToast(action === 'start-recording' ? 'Recording started.' : 'Recording stopped.')
+    } catch (err: any) {
+      showToast(err.message, 'err')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // ── Moderation ────────────────────────────────────────────────────
+  const hideMessage = (id: string) =>
+    supabase.from('webinar_chat_messages').update({ is_hidden: true }).eq('id', id)
+
+  const pinQuestion = (id: string, pinned: boolean) =>
+    supabase.from('webinar_questions').update({ is_pinned: pinned }).eq('id', id)
+
+  const hideQuestion = (id: string) =>
+    supabase.from('webinar_questions').update({ status: 'hidden' }).eq('id', id)
+
+  const answerQuestion = async (
+    questionId: string,
+    answer: { body: string; attachmentUrl?: string; attachmentName?: string; attachmentType?: string }
+  ) => {
+    const { error } = await supabase
+      .from('webinar_questions')
+      .update({
+        answer_body: answer.body || null,
+        answer_attachment_url: answer.attachmentUrl ?? null,
+        answer_attachment_name: answer.attachmentName ?? null,
+        answer_attachment_type: answer.attachmentType ?? null,
+        answered_by: userId,
+        answered_by_name: displayName,
+        answered_at: new Date().toISOString(),
+        status: 'answered',
+      })
+      .eq('id', questionId)
+    return { error: error?.message ?? null }
+  }
+
+  const sidebar = (
+    <WebinarSidebar
+      defaultTab="qa"
+      counts={{ chat: messages.length, qa: questions.length, polls: polls.length, resources: resources.length }}
+      chat={
+        <ChatPanel
+          messages={messages}
+          currentUserId={userId}
+          enabled={live.chat_enabled}
+          canModerate
+          onSend={body => sendMessage(body, displayName, true)}
+          onHide={hideMessage}
+        />
+      }
+      qa={
+        <QAPanel
+          questions={questions}
+          currentUserId={userId}
+          enabled={live.qa_enabled}
+          canAnswer
+          onAsk={body => askQuestion(body, displayName)}
+          onAnswer={answerQuestion}
+          onPin={pinQuestion}
+          onHide={hideQuestion}
+        />
+      }
+      polls={
+        <HostPollPanel
+          sessionId={live.id}
+          polls={polls}
+          results={results}
+          onToast={showToast}
+        />
+      }
+      resources={
+        <HostResourcesPanel
+          sessionId={live.id}
+          resources={resources}
+          userId={userId}
+          onToast={showToast}
+        />
+      }
+    />
+  )
+
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {live.status === 'scheduled' && (
+        <button
+          type="button"
+          onClick={() => setConfirmGoLive(true)}
+          disabled={busy === 'go-live'}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gold text-gold-foreground text-[12.5px] font-bold hover:bg-gold/90 disabled:opacity-50"
+        >
+          {busy === 'go-live' ? <Loader2 size={13} className="animate-spin" /> : <Radio size={13} />}
+          Go live
+        </button>
+      )}
+
+      {live.status === 'live' && (
+        <>
+          <button
+            type="button"
+            onClick={toggleRecording}
+            disabled={busy === 'rec'}
+            title={live.recording_status === 'recording' ? 'Stop recording' : 'Start recording'}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.07] text-[12px] font-semibold hover:bg-white/[0.12] disabled:opacity-50"
+          >
+            {busy === 'rec'
+              ? <Loader2 size={12} className="animate-spin" />
+              : live.recording_status === 'recording'
+                ? <Square size={11} className="fill-current" />
+                : <Circle size={11} className="fill-red-500 text-red-500" />}
+            <span className="hidden md:inline">
+              {live.recording_status === 'recording' ? 'Stop' : 'Record'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={endSession}
+            disabled={busy === 'end'}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 text-white text-[12.5px] font-bold hover:bg-red-500 disabled:opacity-50"
+          >
+            {busy === 'end' && <Loader2 size={12} className="animate-spin" />}
+            End
+          </button>
+        </>
+      )}
+    </div>
+  )
+
+  const body = (
+    <>
+      <WebinarLayout
+        stage={<WebinarStage />}
+        sidebar={sidebar}
+        controls={token ? <MediaControls /> : undefined}
+      />
+
+      {live.status === 'scheduled' && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-navy/90 ring-1 ring-gold/25 text-[12px] text-gold backdrop-blur-sm">
+          Attendees can’t see you yet — press “Go live” when you’re ready
+        </div>
+      )}
+
+      {live.recording_status === 'failed' && live.recording_error && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-lg bg-red-950/90 ring-1 ring-red-500/30 text-[12px] text-red-200 max-w-lg backdrop-blur-sm">
+          <AlertTriangle size={13} className="shrink-0" />
+          Recording problem: {live.recording_error}
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className={`fixed top-20 right-5 z-[100] px-4 py-3 rounded-lg text-white text-sm font-medium shadow-lg max-w-sm ${
+            toast.type === 'ok' ? 'bg-emerald-600' : 'bg-red-600'
+          }`}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      {confirmGoLive && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 grid place-items-center p-4"
+          onClick={() => setConfirmGoLive(false)}
+        >
+          <div
+            className="bg-navy ring-1 ring-white/10 rounded-2xl max-w-md w-full p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="font-serif text-xl mb-1.5">Go live?</h2>
+            <p className="text-navy-foreground/55 text-[13px] leading-relaxed mb-5">
+              Everyone registered for <span className="text-navy-foreground">{event.title}</span> will
+              be taken into the room immediately.
+            </p>
+
+            <ul className="space-y-2 mb-6">
+              <Checklist ok label="Room connected" hint={token ? 'Connected' : 'Connecting…'} />
+              <Checklist
+                ok={live.recording_enabled}
+                label="Recording"
+                hint={live.recording_enabled ? 'Will start automatically' : 'Off for this webinar'}
+              />
+              <Checklist ok={live.chat_enabled} label="Chat" hint={live.chat_enabled ? 'Open' : 'Disabled'} />
+              <Checklist ok={live.qa_enabled} label="Q&A" hint={live.qa_enabled ? 'Open' : 'Disabled'} />
+            </ul>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmGoLive(false)}
+                className="px-4 py-2 text-[13px] text-navy-foreground/60 hover:text-navy-foreground"
+              >
+                Not yet
+              </button>
+              <button
+                type="button"
+                onClick={goLive}
+                className="px-5 py-2.5 rounded-lg bg-gold text-gold-foreground text-[13px] font-bold hover:bg-gold/90"
+              >
+                Go live now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+
+  const shell = (
+    <WebinarShell
+      title={event.title}
+      status={live.status}
+      eyebrow="Host studio"
+      elapsed={elapsedSince(live.started_at)}
+      viewers={live.peak_attendees || undefined}
+      recording={live.recording_status === 'recording'}
+      actions={headerActions}
+    >
+      {body}
+    </WebinarShell>
+  )
+
+  if (!token || !serverUrl) return shell
+
+  return (
+    <LiveKitRoom
+      token={token}
+      serverUrl={serverUrl}
+      connect
+      audio={false}
+      video={false}
+      className="contents"
+    >
+      <RoomAudioRenderer />
+      {shell}
+    </LiveKitRoom>
+  )
+}
+
+function Checklist({ ok, label, hint }: { ok: boolean; label: string; hint: string }) {
+  return (
+    <li className="flex items-center gap-2.5 text-[13px]">
+      <span
+        className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${
+          ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-navy-foreground/40'
+        }`}
+      >
+        {ok ? <Check size={11} /> : <X size={11} />}
+      </span>
+      <span className="text-navy-foreground/85">{label}</span>
+      <span className="ml-auto text-[11.5px] text-navy-foreground/40">{hint}</span>
+    </li>
+  )
+}
+
+/** Poll authoring + launch control, layered over the shared attendee view. */
+function HostPollPanel({
+  sessionId,
+  polls,
+  results,
+  onToast,
+}: {
+  sessionId: string
+  polls: any[]
+  results: any
+  onToast: (msg: string, type?: 'ok' | 'err') => void
+}) {
+  const supabase = createClient()
+  const [creating, setCreating] = useState(false)
+  const [question, setQuestion] = useState('')
+  const [options, setOptions] = useState(['', ''])
+  const [saving, setSaving] = useState(false)
+
+  async function create() {
+    const clean = options.map(o => o.trim()).filter(Boolean)
+    if (!question.trim() || clean.length < 2) {
+      onToast('A poll needs a question and at least two options.', 'err')
+      return
+    }
+
+    setSaving(true)
+    const { error } = await supabase.from('webinar_polls').insert({
+      session_id: sessionId,
+      question: question.trim(),
+      options: clean.map((label, i) => ({ id: String.fromCharCode(97 + i), label })),
+      sort_order: polls.length,
+    })
+    setSaving(false)
+
+    if (error) { onToast(error.message, 'err'); return }
+    setQuestion('')
+    setOptions(['', ''])
+    setCreating(false)
+    onToast('Poll saved as a draft.')
+  }
+
+  async function setStatus(pollId: string, status: 'live' | 'closed') {
+    const patch: Record<string, any> = { status }
+    if (status === 'live') patch.launched_at = new Date().toISOString()
+    if (status === 'closed') patch.closed_at = new Date().toISOString()
+
+    const { error } = await supabase.from('webinar_polls').update(patch).eq('id', pollId)
+    if (error) onToast(error.message, 'err')
+    else onToast(status === 'live' ? 'Poll is live for attendees.' : 'Poll closed.')
+  }
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-0">
+        {polls.map(poll => (
+          <div key={poll.id} className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08] p-3">
+            <p className="font-serif text-[14.5px] leading-snug mb-2">{poll.question}</p>
+
+            <div className="space-y-1 mb-2.5">
+              {poll.options.map((o: any) => {
+                const count = results[poll.id]?.counts[o.id] ?? 0
+                const voters = results[poll.id]?.voters ?? 0
+                const pct = voters ? Math.round((count / voters) * 100) : 0
+                return (
+                  <div key={o.id} className="relative rounded-md overflow-hidden ring-1 ring-white/10">
+                    <div className="wb-bar absolute inset-y-0 left-0 bg-gold/25" style={{ width: `${pct}%` }} />
+                    <div className="relative flex items-center gap-2 px-2.5 py-1.5">
+                      <span className="text-[12.5px] flex-1">{o.label}</span>
+                      <span className="text-[11.5px] tabular-nums text-navy-foreground/60">
+                        {count} · {pct}%
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {poll.status === 'draft' && (
+                <button
+                  type="button"
+                  onClick={() => setStatus(poll.id, 'live')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-gold-foreground text-[11.5px] font-bold hover:bg-gold/90"
+                >
+                  <Play size={10} /> Launch
+                </button>
+              )}
+              {poll.status === 'live' && (
+                <button
+                  type="button"
+                  onClick={() => setStatus(poll.id, 'closed')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] text-[11.5px] font-semibold hover:bg-white/[0.14]"
+                >
+                  <Square size={10} /> Close
+                </button>
+              )}
+              <span className="ml-auto text-[11px] text-navy-foreground/40">
+                {results[poll.id]?.voters ?? 0} responses · {poll.status}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {creating ? (
+          <div className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08] p-3 space-y-2">
+            <input
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              placeholder="Poll question"
+              className="w-full px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[13px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+            />
+            {options.map((opt, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  value={opt}
+                  onChange={e => setOptions(prev => prev.map((o, j) => (j === i ? e.target.value : o)))}
+                  placeholder={`Option ${i + 1}`}
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[12.5px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+                />
+                {options.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setOptions(prev => prev.filter((_, j) => j !== i))}
+                    aria-label="Remove option"
+                    className="text-navy-foreground/40 hover:text-red-400"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setOptions(prev => [...prev, ''])}
+              className="text-[11.5px] text-navy-foreground/50 hover:text-navy-foreground"
+            >
+              + Add option
+            </button>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setCreating(false)}
+                className="text-[11.5px] text-navy-foreground/50 hover:text-navy-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={create}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-gold-foreground text-[11.5px] font-bold disabled:opacity-50"
+              >
+                {saving && <Loader2 size={10} className="animate-spin" />}
+                Save poll
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="w-full py-2.5 rounded-lg ring-1 ring-dashed ring-white/15 text-[12.5px] text-navy-foreground/50 hover:text-navy-foreground hover:ring-white/25 inline-flex items-center justify-center gap-1.5"
+          >
+            <Plus size={13} /> New poll
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Resource library plus the composer that pushes one to the audience. */
+function HostResourcesPanel({
+  sessionId,
+  resources,
+  userId,
+  onToast,
+}: {
+  sessionId: string
+  resources: any[]
+  userId: string
+  onToast: (msg: string, type?: 'ok' | 'err') => void
+}) {
+  const supabase = createClient()
+  const { upload, uploading } = useImageUpload()
+  const [title, setTitle] = useState('')
+  const [url, setUrl] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function share() {
+    if (!title.trim() || (!url.trim() && !file)) {
+      onToast('Add a title and either a link or a file.', 'err')
+      return
+    }
+
+    setSaving(true)
+    let finalUrl = url.trim()
+    let kind: string = 'link'
+
+    if (file) {
+      const uploaded = await upload(file, 'webinar-resources')
+      if (!uploaded) { onToast('Upload failed.', 'err'); setSaving(false); return }
+      finalUrl = uploaded
+      kind = attachmentKind(file)
+    }
+
+    const { error } = await supabase.from('webinar_resources').insert({
+      session_id: sessionId,
+      title: title.trim(),
+      url: finalUrl,
+      kind,
+      posted_by: userId,
+    })
+    setSaving(false)
+
+    if (error) { onToast(error.message, 'err'); return }
+    setTitle('')
+    setUrl('')
+    setFile(null)
+    onToast('Shared with everyone watching.')
+  }
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <ResourcesPanel resources={resources} />
+
+      <div className="border-t border-white/[0.08] p-3 space-y-2 shrink-0">
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Title, e.g. “Anastomotic leak consensus”"
+          className="w-full px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[12.5px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+        />
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          disabled={!!file}
+          placeholder="Paste a link…"
+          className="w-full px-3 py-1.5 rounded-lg bg-white/[0.04] ring-1 ring-white/10 text-[12px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50 disabled:opacity-40"
+        />
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-1.5 text-[11.5px] text-navy-foreground/60 hover:text-navy-foreground cursor-pointer">
+            <Link2 size={12} />
+            {file ? file.name.slice(0, 20) : 'or attach a file'}
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                if (f.size > MAX_WEBINAR_UPLOAD) { onToast('Files must be under 10MB.', 'err'); return }
+                setFile(f)
+                setUrl('')
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={share}
+            disabled={saving || uploading}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-gold-foreground text-[11.5px] font-bold hover:bg-gold/90 disabled:opacity-50"
+          >
+            {(saving || uploading) && <Loader2 size={10} className="animate-spin" />}
+            Share now
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

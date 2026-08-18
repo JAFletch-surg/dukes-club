@@ -11,6 +11,9 @@ import {
   adminNewRegistrationEmail,
   feedbackRequestEmail,
   certificateReadyEmail,
+  webinarSpeakerInviteEmail,
+  webinarLiveEmail,
+  webinarRecordingEmail,
 } from '@/lib/emails/templates'
 
 function getSupabase() {
@@ -22,7 +25,7 @@ function getSupabase() {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.org.uk'
 
-type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration' | 'feedback_request' | 'certificate_ready'
+type EmailType = 'welcome' | 'approval' | 'rejection' | 'booking_confirmation' | 'booking_status' | 'password_reset' | 'admin_new_registration' | 'feedback_request' | 'certificate_ready' | 'webinar_speaker_invite' | 'webinar_live' | 'webinar_recording'
 
 export async function POST(request: NextRequest) {
   try {
@@ -145,6 +148,34 @@ export async function POST(request: NextRequest) {
           eventId: data.eventId,
           certificateId: data.certificateId,
           cpdPoints: data.cpdPoints,
+        })
+        break
+
+      case 'webinar_speaker_invite':
+        email = webinarSpeakerInviteEmail({
+          speakerName: data.speakerName || 'Speaker',
+          eventTitle: data.eventTitle,
+          startsAt: data.startsAt,
+          joinUrl: data.joinUrl,
+          siteUrl: SITE_URL,
+        })
+        break
+
+      case 'webinar_live':
+        email = webinarLiveEmail({
+          name: data.name || 'Member',
+          eventTitle: data.eventTitle,
+          joinUrl: data.joinUrl,
+          siteUrl: SITE_URL,
+        })
+        break
+
+      case 'webinar_recording':
+        email = webinarRecordingEmail({
+          name: data.name || 'Member',
+          eventTitle: data.eventTitle,
+          watchUrl: data.watchUrl,
+          siteUrl: SITE_URL,
         })
         break
 
