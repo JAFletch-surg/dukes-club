@@ -55,7 +55,9 @@ Members can tick "don't show my name against my answers". For those responses yo
 This is enforced in the database, not just hidden in the page: admins read through a
 `site_feedback_admin` view that never returns the member's id at all. There is deliberately no
 admin read policy on the underlying table, so there is no way to work backwards from the results
-page to a name.
+page to a name. The view itself holds no special privileges — the one privileged read is a
+`SECURITY DEFINER` function, `site_feedback_admin_rows()`, which checks `is_admin()` before it
+returns anything.
 
 What anonymity does **not** hide: the response is still tagged with training grade and region,
 because that is what makes the results useful to segment. On a club this size that can narrow a

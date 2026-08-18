@@ -1221,11 +1221,13 @@ CREATE POLICY "podcasts_delete_admin" ON podcasts
 -- Write-once, like event_feedback_responses: no UPDATE, no DELETE policy.
 --
 -- There is intentionally NO admin SELECT policy. Admins read through the
--- site_feedback_admin view (a security-definer view guarded by is_admin()),
--- which never projects user_id and nulls the name/email of members who asked
--- not to be identified. Adding an admin SELECT policy here would defeat that.
--- The table, the view and the reasoning all live in
--- supabase/create-site-feedback.sql.
+-- site_feedback_admin view, which never projects user_id and nulls the
+-- name/email of members who asked not to be identified. The view is
+-- security_invoker; the single privileged read behind it is the SECURITY
+-- DEFINER function site_feedback_admin_rows(), which pins its search_path and
+-- guards itself with is_admin(). Adding an admin SELECT policy here would
+-- defeat the whole arrangement. The table, the view, the function and the
+-- reasoning all live in supabase/create-site-feedback.sql.
 
 ALTER TABLE site_feedback_responses ENABLE ROW LEVEL SECURITY;
 

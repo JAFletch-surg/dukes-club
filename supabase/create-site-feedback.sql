@@ -111,39 +111,82 @@ CREATE POLICY "site_feedback_responses_insert_own"
   WITH CHECK (user_id = auth.uid() AND is_approved_member());
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- VIEW: site_feedback_admin
+-- THE COMMITTEE'S READ PATH: site_feedback_admin_rows() + site_feedback_admin
 -- ─────────────────────────────────────────────────────────────────────────────
--- The committee's read path. Deliberately created WITHOUT security_invoker, so
--- it runs with the view owner's rights and bypasses the row-level policies
--- above — the WHERE is_admin() guard below is what replaces them, and a
--- non-admin selecting this view gets zero rows rather than an error.
+-- There is no admin SELECT policy on the table above, so something has to read
+-- past RLS on the committee's behalf — and that is exactly what lets the read
+-- withhold user_id entirely instead of trusting the browser to hide it.
 --
--- (Supabase's linter flags security-definer views by default. It is deliberate
--- here: it is the mechanism that lets the view withhold user_id entirely while
--- still returning the answers. Do not "fix" it by adding security_invoker and
--- an admin SELECT policy on the base table — that would hand every admin the
--- user_id of every anonymous response.)
+-- That privileged read lives in one SECURITY DEFINER *function*, not in a
+-- security-definer view:
+--
+--   * the function pins its search_path and re-checks is_admin() itself, so the
+--     elevated rights are explicit, narrow, and auditable in one place;
+--   * the view over it is created WITH (security_invoker = true), so it claims
+--     no rights of its own — which is what Supabase's "Security Definer View"
+--     advisory (and anyone reading pg_views) wants to see;
+--   * PostgREST still sees a plain relation, so the client carries on doing
+--     .from('site_feedback_admin').select('*') unchanged.
+--
+-- A non-admin gets zero rows rather than an error, as before: the results page
+-- never renders for them anyway, and an empty read is the quieter failure.
+--
+-- What must NOT change: do not "simplify" this into a plain security_invoker
+-- view over site_feedback_responses plus an admin SELECT policy on the table.
+-- That would hand every admin the user_id of every anonymous response.
 
 DROP VIEW IF EXISTS site_feedback_admin;
+DROP FUNCTION IF EXISTS site_feedback_admin_rows();
 
-CREATE VIEW site_feedback_admin AS
+CREATE FUNCTION site_feedback_admin_rows()
+RETURNS TABLE (
+  id UUID,
+  questionnaire_version TEXT,
+  answers JSONB,
+  ux_rating SMALLINT,
+  nps_score SMALLINT,
+  is_anonymous BOOLEAN,
+  role_at_submission TEXT,
+  region_at_submission TEXT,
+  training_stage_at_submission TEXT,
+  submitted_at TIMESTAMPTZ,
+  full_name TEXT,
+  email TEXT
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+-- pg_temp last so a caller cannot shadow public objects with temporary ones.
+SET search_path = public, pg_temp
+AS $$
   SELECT
     r.id,
-    r.questionnaire_version,
+    r.questionnaire_version::text,
     r.answers,
     r.ux_rating,
     r.nps_score,
     r.is_anonymous,
-    r.role_at_submission,
-    r.region_at_submission,
-    r.training_stage_at_submission,
+    r.role_at_submission::text,
+    r.region_at_submission::text,
+    r.training_stage_at_submission::text,
     r.submitted_at,
-    CASE WHEN r.is_anonymous THEN NULL ELSE p.full_name END AS full_name,
-    CASE WHEN r.is_anonymous THEN NULL ELSE p.email     END AS email
+    (CASE WHEN r.is_anonymous THEN NULL ELSE p.full_name END)::text,
+    (CASE WHEN r.is_anonymous THEN NULL ELSE p.email     END)::text
   FROM site_feedback_responses r
   JOIN profiles p ON p.id = r.user_id
   WHERE is_admin();
+$$;
 
+-- Only signed-in users may execute it; the is_admin() guard inside does the
+-- rest. PUBLIC includes anon, so revoke before granting.
+REVOKE ALL ON FUNCTION site_feedback_admin_rows() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION site_feedback_admin_rows() TO authenticated;
+
+CREATE VIEW site_feedback_admin
+  WITH (security_invoker = true) AS
+  SELECT * FROM site_feedback_admin_rows();
+
+REVOKE ALL ON site_feedback_admin FROM PUBLIC;
 GRANT SELECT ON site_feedback_admin TO authenticated;
 
 -- =============================================================================
@@ -163,5 +206,19 @@ GRANT SELECT ON site_feedback_admin TO authenticated;
 --   -- unique constraint is on the PAIR, not on user_id alone
 --   SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
 --    WHERE conrelid = 'site_feedback_responses'::regclass;
+--
+--   -- the view claims no rights of its own: expect {security_invoker=true}
+--   SELECT relname, reloptions FROM pg_class
+--    WHERE relname = 'site_feedback_admin';
+--
+--   -- the one privileged read: expect prosecdef = true and a pinned
+--   -- search_path in proconfig
+--   SELECT proname, prosecdef, proconfig FROM pg_proc
+--    WHERE proname = 'site_feedback_admin_rows';
+--
+--   -- and the view still has no user_id column
+--   SELECT column_name FROM information_schema.columns
+--    WHERE table_name = 'site_feedback_admin'
+--    ORDER BY ordinal_position;
 --
 -- =============================================================================
