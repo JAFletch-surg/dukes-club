@@ -36,24 +36,24 @@ export function ResourcesPanel({ resources }: { resources: WebinarResource[] }) 
             href={resource.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="wb-msg-enter flex gap-3 p-3 rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08] hover:bg-white/[0.07] hover:ring-white/[0.14] transition-colors group"
+            className="wb-msg-enter flex gap-3 p-3 rounded-lg bg-white ring-1 ring-slate-200 hover:bg-slate-100 hover:ring-slate-300 transition-colors group"
           >
-            <span className="w-8 h-8 rounded-md bg-gold/15 text-gold grid place-items-center shrink-0">
+            <span className="w-8 h-8 rounded-md bg-amber-100 text-amber-700 grid place-items-center shrink-0">
               <Icon size={15} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-medium text-navy-foreground/90 truncate group-hover:text-navy-foreground">
+              <span className="block text-[13.5px] font-medium text-slate-700 truncate group-hover:text-slate-900">
                 {resource.title}
               </span>
               {resource.description && (
-                <span className="block text-[12px] text-navy-foreground/45 line-clamp-2 mt-0.5">
+                <span className="block text-[12px] text-slate-400 line-clamp-2 mt-0.5">
                   {resource.description}
                 </span>
               )}
             </span>
             <ExternalLink
               size={13}
-              className="text-navy-foreground/25 shrink-0 mt-0.5 group-hover:text-gold transition-colors"
+              className="text-slate-300 shrink-0 mt-0.5 group-hover:text-amber-700 transition-colors"
             />
           </a>
         )

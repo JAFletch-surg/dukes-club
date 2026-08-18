@@ -56,8 +56,8 @@ export function WebinarSidebar({
   const current = tabs.some(t => t.id === active) ? active : tabs[0]?.id
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[hsl(220_35%_11%)]">
-      <div className="flex shrink-0 border-b border-white/[0.08]" role="tablist">
+    <div className="flex flex-col h-full min-h-0 bg-slate-50">
+      <div className="flex shrink-0 border-b border-slate-200" role="tablist">
         {tabs.map(tab => {
           const Icon = tab.icon
           const isActive = current === tab.id
@@ -71,14 +71,14 @@ export function WebinarSidebar({
               className={cn(
                 'relative flex-1 flex items-center justify-center gap-1.5 py-3 text-[12px] font-semibold transition-colors',
                 isActive
-                  ? 'text-gold'
-                  : 'text-navy-foreground/45 hover:text-navy-foreground/75'
+                  ? 'text-amber-700'
+                  : 'text-slate-400 hover:text-slate-600'
               )}
             >
               <Icon size={14} />
               <span className="hidden sm:inline">{tab.label}</span>
               {typeof tab.badge === 'number' && tab.badge > 0 && (
-                <span className="text-[10px] text-navy-foreground/40 tabular-nums">
+                <span className="text-[10px] text-slate-400 tabular-nums">
                   {tab.badge}
                 </span>
               )}

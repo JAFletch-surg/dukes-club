@@ -25,6 +25,8 @@ const MembersDashboard = () => {
   const [calendarDates, setCalendarDates] = useState<any[]>([]);
   const [latestVideos, setLatestVideos] = useState<any[]>([]);
   const [myBookings, setMyBookings] = useState<any[]>([]);
+  /** event_id → webinar_sessions.status, for booked native webinars */
+  const [webinarStatuses, setWebinarStatuses] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [questionStats, setQuestionStats] = useState<any>(null);
@@ -100,13 +102,29 @@ const MembersDashboard = () => {
         if (user) {
           const { data: bookings, error: bookingsErr } = await supabase
             .from('event_bookings')
-            .select('*, events!event_bookings_event_id_fkey(title, slug, starts_at, ends_at, location, event_type, zoom_url)')
+            .select('*, events!event_bookings_event_id_fkey(title, slug, starts_at, ends_at, location, event_type, zoom_url, stream_type)')
             .eq('user_id', user.id)
             .neq('status', 'cancelled')
             .order('created_at', { ascending: false });
 
           if (bookingsErr) console.error('[Dashboard] Bookings error:', bookingsErr.message);
-          if (bookings) setMyBookings(bookings);
+          if (bookings) {
+            setMyBookings(bookings);
+
+            // Live-room state for any booked webinar that runs natively on the
+            // site, so a session in progress can be joined straight from here.
+            const bookedEventIds = bookings.map((b: any) => b.event_id).filter(Boolean);
+            if (bookedEventIds.length > 0) {
+              const { data: sessions } = await supabase
+                .from('webinar_sessions')
+                .select('event_id, status')
+                .in('event_id', bookedEventIds);
+
+              const map: Record<string, string> = {};
+              (sessions || []).forEach((s: any) => { map[s.event_id] = s.status; });
+              setWebinarStatuses(map);
+            }
+          }
 
           // Fetch question stats - use maybeSingle() since user may not have stats yet
           const { data: qStats, error: qStatsErr } = await supabase
@@ -651,6 +669,15 @@ const MembersDashboard = () => {
                   const sc = statusConfig[booking.status] || statusConfig.pending;
                   const StatusIcon = sc.icon;
 
+                  // Native webinars get a way in from here — a live session is
+                  // the most time-critical thing this list can show.
+                  const webinarStatus = webinarStatuses[booking.event_id];
+                  const isLiveNow = webinarStatus === 'live';
+                  const canJoinWebinar =
+                    !!webinarStatus &&
+                    ['approved', 'confirmed'].includes(booking.status) &&
+                    !['ended', 'published'].includes(webinarStatus);
+
                   return (
                     <div key={booking.id} className="rounded-lg border border-border overflow-hidden">
                       <div className="flex items-start gap-3 p-4">
@@ -665,6 +692,12 @@ const MembersDashboard = () => {
                             <Badge variant="outline" className={`text-[10px] shrink-0 ${sc.bg} ${sc.text} border-0`}>
                               {sc.label}
                             </Badge>
+                            {isLiveNow && (
+                              <Badge variant="outline" className="text-[10px] shrink-0 bg-red-600 text-white border-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white wb-live-dot mr-1" />
+                                LIVE
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                             {ev?.starts_at && <span>{formatDate(ev.starts_at)}</span>}
@@ -686,6 +719,26 @@ const MembersDashboard = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Native webinar: join the live room */}
+                      {canJoinWebinar && (
+                        <div className={`border-t border-border px-4 py-2.5 flex items-center justify-between gap-3 ${isLiveNow ? 'bg-red-50' : 'bg-muted/20'}`}>
+                          <span className="text-xs text-muted-foreground">
+                            {isLiveNow ? 'This webinar is live now' : 'Runs online, here on the site'}
+                          </span>
+                          <Link
+                            href={`/webinar/${ev?.slug}`}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${
+                              isLiveNow
+                                ? 'bg-red-600 text-white hover:bg-red-500'
+                                : 'border border-border text-foreground hover:bg-muted'
+                            }`}
+                          >
+                            <Play size={11} />
+                            {isLiveNow ? 'Join now' : 'Open webinar'}
+                          </Link>
+                        </div>
+                      )}
 
                       {/* UPCOMING: show status message + cancel button */}
                       {!isPast && ['pending', 'approved', 'waitlisted'].includes(booking.status) && (

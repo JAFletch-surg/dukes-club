@@ -96,7 +96,7 @@ export function ParticipantTile({
       {/* Lower third — used on the stage, where there is room for it */}
       {showLowerThird && !isScreenShare && (
         <div className="absolute bottom-4 left-4 max-w-[70%] bg-navy/85 backdrop-blur-sm px-3.5 py-2 rounded-md">
-          <p className="font-serif text-lg leading-tight text-navy-foreground truncate">{name}</p>
+          <p className="text-lg font-semibold leading-tight text-white truncate">{name}</p>
           {meta?.title && (
             <p className="text-[10px] font-semibold tracking-[0.14em] uppercase text-gold mt-0.5 truncate">
               {meta.title}

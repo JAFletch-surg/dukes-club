@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, roomService, livekitConfigured } from '../../_shared'
-import { startSessionRecording, stopSessionRecording } from '../../_recording'
+import { startSessionRecording, stopSessionRecording, settleEgress } from '../../_recording'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -81,6 +81,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if (session.egress_id) {
       const result = await stopSessionRecording(session.egress_id)
       if (!result.ok) recordingWarning = result.error
+      // Ask LiveKit what actually happened and move the recording along, rather
+      // than waiting on a webhook that may never have been registered.
+      await settleEgress(supabase, sessionId, session.egress_id)
     }
 
     if (livekitConfigured()) {
@@ -164,7 +167,15 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     const result = await stopSessionRecording(session.egress_id)
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 })
 
-    return NextResponse.json({ ok: true })
+    await settleEgress(supabase, sessionId, session.egress_id)
+
+    const { data: updated } = await supabase
+      .from('webinar_sessions')
+      .select()
+      .eq('id', sessionId)
+      .single()
+
+    return NextResponse.json({ ok: true, session: updated })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

@@ -131,22 +131,22 @@ export function GreenRoom({
           : 'The host has not opened the room yet.'
 
   return (
-    <div className="min-h-screen bg-navy text-navy-foreground grid place-items-center px-4 py-10">
+    <div className="min-h-screen bg-slate-50 text-slate-900 grid place-items-center px-4 py-10">
       <div className="w-full max-w-3xl">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-5 h-px bg-gold" />
-          <p className="text-gold/80 text-[11px] font-semibold tracking-[0.2em]">SPEAKER GREEN ROOM</p>
+          <p className="text-amber-700 text-[11px] font-bold tracking-[0.2em]">SPEAKER GREEN ROOM</p>
         </div>
 
-        <h1 className="font-serif text-3xl sm:text-4xl leading-tight mb-1.5">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-1.5">
           You’re speaking at <span className="italic">{eventTitle}</span>
         </h1>
-        <p className="text-navy-foreground/60 text-sm mb-7">{statusLine}</p>
+        <p className="text-slate-900/60 text-sm mb-7">{statusLine}</p>
 
         <div className="grid lg:grid-cols-[1.3fr_1fr] gap-6">
           {/* Preview */}
           <div>
-            <div className="aspect-video rounded-xl overflow-hidden ring-1 ring-white/10 bg-black/50 relative">
+            <div className="aspect-video rounded-xl overflow-hidden ring-1 ring-slate-300 bg-slate-900 relative">
               <video
                 ref={videoRef}
                 autoPlay
@@ -163,7 +163,7 @@ export function GreenRoom({
                 <div className="absolute inset-0 grid place-items-center text-center px-6">
                   <div>
                     <Video size={26} className="text-red-400 mx-auto mb-2" />
-                    <p className="text-sm text-navy-foreground/70">
+                    <p className="text-sm text-slate-600">
                       No camera access. Check the padlock icon in your browser’s address bar.
                     </p>
                   </div>
@@ -173,14 +173,14 @@ export function GreenRoom({
 
             {/* Mic level */}
             <div className="mt-3 flex items-center gap-3">
-              <Mic size={15} className={mic === 'ok' ? 'text-gold' : 'text-navy-foreground/40'} />
-              <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <Mic size={15} className={mic === 'ok' ? 'text-gold' : 'text-slate-400'} />
+              <div className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
                 <div
                   className="h-full bg-gold transition-[width] duration-75"
                   style={{ width: `${level}%` }}
                 />
               </div>
-              <span className="text-[11px] text-navy-foreground/50 w-24 text-right">
+              <span className="text-[11px] text-slate-500 w-24 text-right">
                 {mic === 'ok' ? 'Say something' : mic === 'checking' ? 'Checking…' : 'No microphone'}
               </span>
             </div>
@@ -189,13 +189,13 @@ export function GreenRoom({
           {/* Checklist + join */}
           <div className="space-y-5">
             <div>
-              <label className="block text-[11px] font-semibold tracking-[0.14em] uppercase text-navy-foreground/50 mb-1.5">
+              <label className="block text-[11px] font-semibold tracking-[0.14em] uppercase text-slate-500 mb-1.5">
                 How your name appears on screen
               </label>
               <input
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-sm text-navy-foreground placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+                className="w-full px-3 py-2.5 rounded-lg bg-white ring-1 ring-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 placeholder="Miss Jane Smith"
               />
             </div>
@@ -217,9 +217,9 @@ export function GreenRoom({
             </div>
 
             {!canShareScreen && (
-              <div className="flex gap-2.5 p-3 rounded-lg bg-amber-500/10 ring-1 ring-amber-500/25">
+              <div className="flex gap-2.5 p-3 rounded-lg bg-amber-50 ring-1 ring-amber-300">
                 <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[12.5px] leading-relaxed text-amber-100/90">
+                <p className="text-[12.5px] leading-relaxed text-amber-900">
                   Screen sharing isn’t available in this browser. To present slides, join from a
                   laptop using Chrome, Edge or Safari.
                 </p>
@@ -230,7 +230,7 @@ export function GreenRoom({
               <button
                 type="button"
                 onClick={testShare}
-                className="w-full py-2.5 rounded-lg text-sm font-semibold bg-white/[0.06] ring-1 ring-white/10 hover:bg-white/[0.1] transition-colors"
+                className="w-full py-2.5 rounded-lg text-sm font-semibold bg-white ring-1 ring-slate-300 hover:bg-slate-50 transition-colors"
               >
                 {shareTested ? 'Test your slides again' : 'Test your slides'}
               </button>
@@ -248,7 +248,7 @@ export function GreenRoom({
               {sessionStatus === 'live' ? 'Join the live webinar' : 'Join as speaker'}
             </button>
 
-            <p className="text-[11px] text-navy-foreground/40 text-center leading-relaxed">
+            <p className="text-[11px] text-slate-400 text-center leading-relaxed">
               Nothing is broadcast until you join. Your camera and microphone stay on this
               device until then.
             </p>
@@ -267,13 +267,13 @@ function CheckRow({ state, label, hint }: { state: CheckState; label: string; hi
           'w-5 h-5 rounded-full grid place-items-center shrink-0',
           state === 'ok' && 'bg-emerald-500/20 text-emerald-400',
           state === 'fail' && 'bg-red-500/20 text-red-400',
-          state === 'checking' && 'bg-white/10 text-navy-foreground/50'
+          state === 'checking' && 'bg-white/10 text-slate-500'
         )}
       >
         {state === 'ok' ? <Check size={12} /> : state === 'fail' ? <X size={12} /> : <Loader2 size={11} className="animate-spin" />}
       </span>
-      <span className="text-navy-foreground/85">{label}</span>
-      {hint && <span className="ml-auto text-[11px] text-navy-foreground/40">{hint}</span>}
+      <span className="text-slate-700">{label}</span>
+      {hint && <span className="ml-auto text-[11px] text-slate-400">{hint}</span>}
     </div>
   )
 }

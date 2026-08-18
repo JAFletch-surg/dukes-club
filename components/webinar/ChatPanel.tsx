@@ -83,18 +83,18 @@ export function ChatPanel({
                 <span
                   className={cn(
                     'text-[12px] font-semibold truncate',
-                    msg.is_staff ? 'text-gold' : 'text-navy-foreground/80',
-                    msg.user_id === currentUserId && !msg.is_staff && 'text-navy-foreground'
+                    msg.is_staff ? 'text-amber-700' : 'text-slate-700',
+                    msg.user_id === currentUserId && !msg.is_staff && 'text-slate-900'
                   )}
                 >
                   {msg.display_name}
                 </span>
                 {msg.is_staff && (
-                  <span className="text-[9px] font-bold tracking-[0.12em] uppercase text-gold/70 shrink-0">
+                  <span className="text-[9px] font-bold tracking-[0.12em] uppercase text-amber-600 shrink-0">
                     Speaker
                   </span>
                 )}
-                <span className="text-[10px] text-navy-foreground/30 ml-auto shrink-0">
+                <span className="text-[10px] text-slate-400 ml-auto shrink-0">
                   {new Date(msg.created_at).toLocaleTimeString('en-GB', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -105,13 +105,13 @@ export function ChatPanel({
                     type="button"
                     onClick={() => onHide(msg.id)}
                     title="Hide this message"
-                    className="opacity-0 group-hover:opacity-100 text-navy-foreground/40 hover:text-red-400 transition-opacity shrink-0"
+                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 transition-opacity shrink-0"
                   >
                     <EyeOff size={12} />
                   </button>
                 )}
               </div>
-              <p className="text-[13.5px] leading-relaxed text-navy-foreground/90 break-words">
+              <p className="text-[13.5px] leading-relaxed text-slate-700 break-words">
                 {msg.body}
               </p>
             </div>
@@ -121,7 +121,7 @@ export function ChatPanel({
       </div>
 
       {!readOnly && (
-        <form onSubmit={submit} className="border-t border-white/[0.08] p-3 shrink-0">
+        <form onSubmit={submit} className="border-t border-slate-200 p-3 shrink-0">
           {error && <p className="text-[11.5px] text-red-300 mb-2">{error}</p>}
           <div className="flex gap-2">
             <input
@@ -130,7 +130,7 @@ export function ChatPanel({
               disabled={!enabled || sending}
               maxLength={2000}
               placeholder={enabled ? 'Message everyone…' : 'Chat is off for this webinar'}
-              className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[13.5px] text-navy-foreground placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50 disabled:opacity-50"
+              className="flex-1 px-3 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-50"
             />
             <button
               type="submit"

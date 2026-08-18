@@ -88,13 +88,13 @@ function PollCard({
   }
 
   return (
-    <div className="wb-panel-enter rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08] p-3.5">
+    <div className="wb-panel-enter rounded-lg bg-white ring-1 ring-slate-200 p-3.5">
       <div className="flex items-start gap-2 mb-2.5">
-        <p className="font-serif text-[15px] leading-snug text-navy-foreground flex-1">
+        <p className="text-[15px] font-semibold leading-snug text-slate-100 flex-1">
           {poll.question}
         </p>
         {isOpen && (
-          <span className="text-[9px] font-bold tracking-[0.1em] uppercase text-gold shrink-0 mt-1">
+          <span className="text-[9px] font-bold tracking-[0.1em] uppercase text-amber-700 shrink-0 mt-1">
             Open
           </span>
         )}
@@ -114,8 +114,8 @@ function PollCard({
               onClick={() => toggle(option.id)}
               className={cn(
                 'relative w-full text-left rounded-md overflow-hidden ring-1 transition-colors',
-                picked ? 'ring-gold/60' : 'ring-white/10',
-                isOpen && !hasVoted && enabled && 'hover:ring-white/25 cursor-pointer',
+                picked ? 'ring-amber-500' : 'ring-slate-200',
+                isOpen && !hasVoted && enabled && 'hover:ring-slate-300 cursor-pointer',
                 (!isOpen || hasVoted) && 'cursor-default'
               )}
             >
@@ -123,17 +123,17 @@ function PollCard({
                 <div
                   className={cn(
                     'wb-bar absolute inset-y-0 left-0',
-                    picked ? 'bg-gold/25' : 'bg-white/[0.07]'
+                    picked ? 'bg-amber-200' : 'bg-slate-100'
                   )}
                   style={{ width: `${pct}%` }}
                 />
               )}
 
               <div className="relative flex items-center gap-2 px-3 py-2">
-                {picked && <Check size={12} className="text-gold shrink-0" />}
-                <span className="text-[13px] text-navy-foreground/90 flex-1">{option.label}</span>
+                {picked && <Check size={12} className="text-amber-700 shrink-0" />}
+                <span className="text-[13px] text-slate-700 flex-1">{option.label}</span>
                 {showResults && (
-                  <span className="text-[12px] font-semibold text-navy-foreground/70 shrink-0 tabular-nums">
+                  <span className="text-[12px] font-semibold text-slate-900/70 shrink-0 tabular-nums">
                     {pct}%
                   </span>
                 )}
@@ -158,7 +158,7 @@ function PollCard({
           </button>
         )}
 
-        <p className="text-[11px] text-navy-foreground/40 ml-auto">
+        <p className="text-[11px] text-slate-400 ml-auto">
           {voters === 0
             ? 'No responses yet'
             : `${voters} response${voters === 1 ? '' : 's'}`}
@@ -168,7 +168,7 @@ function PollCard({
       </div>
 
       {poll.status === 'closed' && !poll.results_visible && (
-        <p className="text-[11px] text-navy-foreground/40 mt-1.5">
+        <p className="text-[11px] text-slate-400 mt-1.5">
           The host has kept these results private.
         </p>
       )}

@@ -243,7 +243,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
             onClick={toggleRecording}
             disabled={busy === 'rec'}
             title={live.recording_status === 'recording' ? 'Stop recording' : 'Start recording'}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.07] text-[12px] font-semibold hover:bg-white/[0.12] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-[12px] font-semibold hover:bg-slate-200 disabled:opacity-50"
           >
             {busy === 'rec'
               ? <Loader2 size={12} className="animate-spin" />
@@ -278,7 +278,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
       />
 
       {live.status === 'scheduled' && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-navy/90 ring-1 ring-gold/25 text-[12px] text-gold backdrop-blur-sm">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-white ring-1 ring-amber-300 text-[12px] font-medium text-amber-800 shadow-lg">
           Attendees can’t see you yet — press “Go live” when you’re ready
         </div>
       )}
@@ -306,12 +306,12 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
           onClick={() => setConfirmGoLive(false)}
         >
           <div
-            className="bg-navy ring-1 ring-white/10 rounded-2xl max-w-md w-full p-6"
+            className="bg-white ring-1 ring-slate-200 rounded-2xl shadow-xl max-w-md w-full p-6"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="font-serif text-xl mb-1.5">Go live?</h2>
-            <p className="text-navy-foreground/55 text-[13px] leading-relaxed mb-5">
-              Everyone registered for <span className="text-navy-foreground">{event.title}</span> will
+            <h2 className="text-xl font-bold tracking-tight mb-1.5">Go live?</h2>
+            <p className="text-slate-500 text-[13px] leading-relaxed mb-5">
+              Everyone registered for <span className="text-slate-900">{event.title}</span> will
               be taken into the room immediately.
             </p>
 
@@ -330,7 +330,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
               <button
                 type="button"
                 onClick={() => setConfirmGoLive(false)}
-                className="px-4 py-2 text-[13px] text-navy-foreground/60 hover:text-navy-foreground"
+                className="px-4 py-2 text-[13px] text-slate-500 hover:text-slate-900"
               >
                 Not yet
               </button>
@@ -384,13 +384,13 @@ function Checklist({ ok, label, hint }: { ok: boolean; label: string; hint: stri
     <li className="flex items-center gap-2.5 text-[13px]">
       <span
         className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${
-          ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-navy-foreground/40'
+          ok ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-100 text-slate-400'
         }`}
       >
         {ok ? <Check size={11} /> : <X size={11} />}
       </span>
-      <span className="text-navy-foreground/85">{label}</span>
-      <span className="ml-auto text-[11.5px] text-navy-foreground/40">{hint}</span>
+      <span className="text-slate-700">{label}</span>
+      <span className="ml-auto text-[11.5px] text-slate-400">{hint}</span>
     </li>
   )
 }
@@ -450,8 +450,8 @@ function HostPollPanel({
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-0">
         {polls.map(poll => (
-          <div key={poll.id} className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08] p-3">
-            <p className="font-serif text-[14.5px] leading-snug mb-2">{poll.question}</p>
+          <div key={poll.id} className="rounded-lg bg-white ring-1 ring-slate-200 p-3">
+            <p className="text-[14.5px] font-semibold leading-snug mb-2">{poll.question}</p>
 
             <div className="space-y-1 mb-2.5">
               {poll.options.map((o: any) => {
@@ -459,11 +459,11 @@ function HostPollPanel({
                 const voters = results[poll.id]?.voters ?? 0
                 const pct = voters ? Math.round((count / voters) * 100) : 0
                 return (
-                  <div key={o.id} className="relative rounded-md overflow-hidden ring-1 ring-white/10">
+                  <div key={o.id} className="relative rounded-md overflow-hidden ring-1 ring-slate-200">
                     <div className="wb-bar absolute inset-y-0 left-0 bg-gold/25" style={{ width: `${pct}%` }} />
                     <div className="relative flex items-center gap-2 px-2.5 py-1.5">
                       <span className="text-[12.5px] flex-1">{o.label}</span>
-                      <span className="text-[11.5px] tabular-nums text-navy-foreground/60">
+                      <span className="text-[11.5px] tabular-nums text-slate-500">
                         {count} · {pct}%
                       </span>
                     </div>
@@ -486,12 +486,12 @@ function HostPollPanel({
                 <button
                   type="button"
                   onClick={() => setStatus(poll.id, 'closed')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.08] text-[11.5px] font-semibold hover:bg-white/[0.14]"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-[11.5px] font-semibold hover:bg-slate-200"
                 >
                   <Square size={10} /> Close
                 </button>
               )}
-              <span className="ml-auto text-[11px] text-navy-foreground/40">
+              <span className="ml-auto text-[11px] text-slate-400">
                 {results[poll.id]?.voters ?? 0} responses · {poll.status}
               </span>
             </div>
@@ -499,12 +499,12 @@ function HostPollPanel({
         ))}
 
         {creating ? (
-          <div className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08] p-3 space-y-2">
+          <div className="rounded-lg bg-white ring-1 ring-slate-200 p-3 space-y-2">
             <input
               value={question}
               onChange={e => setQuestion(e.target.value)}
               placeholder="Poll question"
-              className="w-full px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[13px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+              className="w-full px-3 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-[13px] placeholder:text-slate-900/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
             />
             {options.map((opt, i) => (
               <div key={i} className="flex gap-2">
@@ -512,14 +512,14 @@ function HostPollPanel({
                   value={opt}
                   onChange={e => setOptions(prev => prev.map((o, j) => (j === i ? e.target.value : o)))}
                   placeholder={`Option ${i + 1}`}
-                  className="flex-1 px-3 py-1.5 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[12.5px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-white ring-1 ring-slate-200 text-[12.5px] placeholder:text-slate-900/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
                 />
                 {options.length > 2 && (
                   <button
                     type="button"
                     onClick={() => setOptions(prev => prev.filter((_, j) => j !== i))}
                     aria-label="Remove option"
-                    className="text-navy-foreground/40 hover:text-red-400"
+                    className="text-slate-400 hover:text-red-400"
                   >
                     <X size={13} />
                   </button>
@@ -529,7 +529,7 @@ function HostPollPanel({
             <button
               type="button"
               onClick={() => setOptions(prev => [...prev, ''])}
-              className="text-[11.5px] text-navy-foreground/50 hover:text-navy-foreground"
+              className="text-[11.5px] text-slate-500 hover:text-slate-900"
             >
               + Add option
             </button>
@@ -537,7 +537,7 @@ function HostPollPanel({
               <button
                 type="button"
                 onClick={() => setCreating(false)}
-                className="text-[11.5px] text-navy-foreground/50 hover:text-navy-foreground"
+                className="text-[11.5px] text-slate-500 hover:text-slate-900"
               >
                 Cancel
               </button>
@@ -556,7 +556,7 @@ function HostPollPanel({
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="w-full py-2.5 rounded-lg ring-1 ring-dashed ring-white/15 text-[12.5px] text-navy-foreground/50 hover:text-navy-foreground hover:ring-white/25 inline-flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 rounded-lg ring-1 ring-dashed ring-slate-300 text-[12.5px] text-slate-500 hover:text-slate-900 hover:ring-slate-400 inline-flex items-center justify-center gap-1.5"
           >
             <Plus size={13} /> New poll
           </button>
@@ -622,22 +622,22 @@ function HostResourcesPanel({
     <div className="flex flex-col h-full min-h-0">
       <ResourcesPanel resources={resources} />
 
-      <div className="border-t border-white/[0.08] p-3 space-y-2 shrink-0">
+      <div className="border-t border-slate-200 p-3 space-y-2 shrink-0">
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="Title, e.g. “Anastomotic leak consensus”"
-          className="w-full px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[12.5px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
+          className="w-full px-3 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-[12.5px] placeholder:text-slate-900/30 focus:outline-none focus:ring-2 focus:ring-gold/50"
         />
         <input
           value={url}
           onChange={e => setUrl(e.target.value)}
           disabled={!!file}
           placeholder="Paste a link…"
-          className="w-full px-3 py-1.5 rounded-lg bg-white/[0.04] ring-1 ring-white/10 text-[12px] placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50 disabled:opacity-40"
+          className="w-full px-3 py-1.5 rounded-lg bg-white ring-1 ring-slate-200 text-[12px] placeholder:text-slate-900/30 focus:outline-none focus:ring-2 focus:ring-gold/50 disabled:opacity-40"
         />
         <div className="flex items-center gap-2">
-          <label className="inline-flex items-center gap-1.5 text-[11.5px] text-navy-foreground/60 hover:text-navy-foreground cursor-pointer">
+          <label className="inline-flex items-center gap-1.5 text-[11.5px] text-slate-500 hover:text-slate-900 cursor-pointer">
             <Link2 size={12} />
             {file ? file.name.slice(0, 20) : 'or attach a file'}
             <input

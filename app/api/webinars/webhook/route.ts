@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { WebhookReceiver } from 'livekit-server-sdk'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getSupabase, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, parseIdentityFromWebhook } from '../_shared'
-import { transferRecordingToVimeo } from '../_recording'
+import { applyEgressResult } from '../_recording'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -187,63 +187,24 @@ async function onEgressEnded(supabase: SupabaseClient, event: any) {
 
   const { data: session } = await supabase
     .from('webinar_sessions')
-    .select('id, recording_path')
+    .select('id')
     .eq('egress_id', egressId)
     .maybeSingle()
 
   if (!session) return
 
   const file = info.fileResults?.[0] ?? info.file
-  // EGRESS_COMPLETE = 3 in the egress status enum; anything else is a failure.
-  const failed = info.status !== undefined && info.status !== 3 && !file?.filename
-
-  if (failed) {
-    await supabase
-      .from('webinar_sessions')
-      .update({
-        recording_status: 'failed',
-        recording_error: info.error || 'Egress did not complete',
-        status: 'ended',
-      })
-      .eq('id', session.id)
-    return
-  }
-
-  const recordingPath = file?.filename || session.recording_path
+  // EGRESS_COMPLETE is 3 in the egress status enum.
+  const complete = (info.status === undefined || info.status === 3) && !!file?.filename
 
   await supabase
     .from('webinar_sessions')
-    .update({
-      recording_status: 'uploaded',
-      recording_path: recordingPath,
-      status: 'processing',
-    })
+    .update({ status: 'processing' })
     .eq('id', session.id)
 
-  const { data: full } = await supabase
-    .from('webinar_sessions')
-    .select('id, event_id, recording_path')
-    .eq('id', session.id)
-    .single()
-
-  if (!full) return
-
-  const result = await transferRecordingToVimeo(supabase, full)
-
-  if (result.ok) {
-    await supabase
-      .from('webinar_sessions')
-      .update({
-        vimeo_id: result.vimeoId,
-        recording_status: 'transferring',
-        recording_error: result.folderError,
-      })
-      .eq('id', session.id)
-  } else {
-    // Stays at 'uploaded' so the cron and the admin button retry it.
-    await supabase
-      .from('webinar_sessions')
-      .update({ recording_error: result.error })
-      .eq('id', session.id)
-  }
+  await applyEgressResult(supabase, session.id, {
+    complete,
+    filename: file?.filename ?? null,
+    error: info.error || null,
+  })
 }

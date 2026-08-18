@@ -34,25 +34,25 @@ export function WebinarShell({
   children,
 }: Props) {
   return (
-    <div className="fixed inset-0 flex flex-col bg-navy text-navy-foreground">
-      <header className="h-14 shrink-0 flex items-center gap-3 px-3 sm:px-4 border-b border-white/[0.08] bg-navy">
+    <div className="fixed inset-0 flex flex-col bg-white text-slate-900">
+      <header className="h-14 shrink-0 flex items-center gap-3 px-3 sm:px-4 border-b border-slate-200 bg-white">
         <Link href="/members/webinars" className="shrink-0" aria-label="Back to webinars">
           <img
-            src="/images/logo-white.png"
+            src="/images/logo-navy.png"
             alt="Dukes' Club"
             className="h-7 max-w-[110px] object-contain"
           />
         </Link>
 
-        <div className="w-px h-6 bg-white/10 hidden sm:block" />
+        <div className="w-px h-6 bg-slate-200 hidden sm:block" />
 
         <div className="min-w-0 flex-1">
           {eyebrow && (
-            <p className="text-gold/70 text-[9px] font-bold tracking-[0.18em] uppercase leading-none mb-0.5">
+            <p className="text-amber-600 text-[9px] font-bold tracking-[0.18em] uppercase leading-none mb-0.5">
               {eyebrow}
             </p>
           )}
-          <h1 className="font-serif text-[15px] sm:text-lg leading-tight truncate">{title}</h1>
+          <h1 className="text-[15px] sm:text-lg font-semibold leading-tight truncate">{title}</h1>
         </div>
 
         <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
@@ -67,7 +67,7 @@ export function WebinarShell({
 
           {recording && (
             <span
-              className="flex items-center gap-1.5 text-[11px] text-navy-foreground/50"
+              className="flex items-center gap-1.5 text-[11px] text-slate-500"
               title="This session is being recorded"
             >
               <Circle size={8} className="fill-red-500 text-red-500 wb-live-dot" />
@@ -76,13 +76,13 @@ export function WebinarShell({
           )}
 
           {elapsed && status === 'live' && (
-            <span className="text-[12px] text-navy-foreground/50 tabular-nums hidden sm:inline">
+            <span className="text-[12px] text-slate-500 tabular-nums hidden sm:inline">
               {elapsed}
             </span>
           )}
 
           {typeof viewers === 'number' && (
-            <span className="flex items-center gap-1.5 text-[12px] text-navy-foreground/50 tabular-nums">
+            <span className="flex items-center gap-1.5 text-[12px] text-slate-500 tabular-nums">
               <Users size={13} />
               {viewers}
             </span>
@@ -110,7 +110,10 @@ export function WebinarLayout({
 }) {
   return (
     <div className={cn('h-full flex flex-col lg:flex-row min-h-0')}>
-      <div className="relative flex-1 min-h-0 lg:min-w-0 flex flex-col">
+      {/* On mobile the stage is fixed at 16:9 and the sidebar takes the rest,
+          so this wrapper must not grow — flex-1 here left a dead white band
+          between the video and the tab bar. On desktop it fills the column. */}
+      <div className="relative shrink-0 lg:shrink lg:flex-1 min-h-0 lg:min-w-0 flex flex-col">
         {/* On mobile the stage is a fixed 16:9 block pinned to the top so the
             sidebar below it always has room; on desktop it fills the column. */}
         <div className="relative w-full aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0 shrink-0">
@@ -122,7 +125,7 @@ export function WebinarLayout({
       </div>
 
       {sidebar && (
-        <aside className="flex-1 lg:flex-none lg:w-[360px] xl:w-[380px] min-h-0 border-t lg:border-t-0 lg:border-l border-white/[0.08] flex flex-col">
+        <aside className="flex-1 lg:flex-none lg:w-[360px] xl:w-[380px] min-h-0 border-t lg:border-t-0 lg:border-l border-slate-200 flex flex-col">
           {sidebar}
         </aside>
       )}

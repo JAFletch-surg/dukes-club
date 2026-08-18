@@ -131,23 +131,23 @@ export function SpeakerRoom({ slug }: { slug: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-navy grid place-items-center">
-        <Loader2 size={28} className="animate-spin text-gold" />
+      <div className="min-h-screen bg-slate-50 grid place-items-center">
+        <Loader2 size={28} className="animate-spin text-amber-700" />
       </div>
     )
   }
 
   if (error === 'invalid' || error === 'ended') {
     return (
-      <div className="min-h-screen bg-navy text-navy-foreground grid place-items-center px-5">
+      <div className="min-h-screen bg-slate-50 text-slate-900 grid place-items-center px-5">
         <div className="max-w-md text-center">
           <div className="w-14 h-14 rounded-full bg-amber-500/12 grid place-items-center mx-auto mb-5">
             <AlertTriangle size={24} className="text-amber-400" />
           </div>
-          <h1 className="font-serif text-2xl mb-2">
+          <h1 className="text-2xl font-bold tracking-tight mb-2">
             {error === 'ended' ? 'This webinar has finished' : 'This speaker link isn’t valid'}
           </h1>
-          <p className="text-navy-foreground/55 text-sm leading-relaxed">
+          <p className="text-slate-500 text-sm leading-relaxed">
             {error === 'ended'
               ? 'Thank you for speaking. The recording will be published to Dukes’ Club members shortly.'
               : 'The link may have expired or been replaced. Please ask the organisers to send you a new one.'}
@@ -238,7 +238,7 @@ export function SpeakerRoom({ slug }: { slug: string }) {
         recording={session?.recording_status === 'recording'}
         actions={
           !isLive && (
-            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-navy-foreground/50">
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500">
               <Radio size={12} /> Not broadcasting yet
             </span>
           )

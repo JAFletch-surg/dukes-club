@@ -87,41 +87,41 @@ export function QAPanel({
               className={cn(
                 'wb-msg-enter rounded-lg p-3 ring-1 transition-colors',
                 q.is_pinned
-                  ? 'bg-gold/[0.08] ring-gold/25'
-                  : 'bg-white/[0.04] ring-white/[0.08]'
+                  ? 'bg-amber-50 ring-amber-300'
+                  : 'bg-white ring-slate-200'
               )}
             >
               <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-[12px] font-semibold text-navy-foreground/80 truncate">
+                <span className="text-[12px] font-semibold text-slate-700 truncate">
                   {q.display_name}
                   {q.user_id === currentUserId && (
-                    <span className="text-navy-foreground/40 font-normal"> (you)</span>
+                    <span className="text-slate-400 font-normal"> (you)</span>
                   )}
                 </span>
-                {q.is_pinned && <Pin size={10} className="text-gold shrink-0" />}
+                {q.is_pinned && <Pin size={10} className="text-amber-700 shrink-0" />}
                 {q.status === 'answered' && (
                   <span className="text-[9px] font-bold tracking-[0.1em] uppercase text-emerald-400 shrink-0">
                     Answered
                   </span>
                 )}
-                <span className="text-[10px] text-navy-foreground/30 ml-auto shrink-0">
+                <span className="text-[10px] text-slate-400 ml-auto shrink-0">
                   {new Date(q.created_at).toLocaleTimeString('en-GB', {
                     hour: '2-digit', minute: '2-digit',
                   })}
                 </span>
               </div>
 
-              <p className="text-[13.5px] leading-relaxed text-navy-foreground/90 break-words">
+              <p className="text-[13.5px] leading-relaxed text-slate-700 break-words">
                 {q.body}
               </p>
 
               {(q.answer_body || q.answer_attachment_url) && (
                 <div className="mt-2.5 pl-3 border-l-2 border-gold/40">
-                  <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-gold/70 mb-1">
+                  <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-amber-600 mb-1">
                     {q.answered_by_name ?? 'Answer'}
                   </p>
                   {q.answer_body && (
-                    <p className="text-[13px] leading-relaxed text-navy-foreground/85 break-words">
+                    <p className="text-[13px] leading-relaxed text-slate-700 break-words">
                       {q.answer_body}
                     </p>
                   )}
@@ -130,7 +130,7 @@ export function QAPanel({
                       href={q.answer_attachment_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 mt-1.5 text-[12px] text-gold hover:underline"
+                      className="inline-flex items-center gap-1.5 mt-1.5 text-[12px] text-amber-700 hover:underline"
                     >
                       {q.answer_attachment_type === 'link'
                         ? <ExternalLink size={11} />
@@ -142,11 +142,11 @@ export function QAPanel({
               )}
 
               {canAnswer && (
-                <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-white/[0.06]">
+                <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-slate-200">
                   <button
                     type="button"
                     onClick={() => setAnswering(answering === q.id ? null : q.id)}
-                    className="text-[11.5px] font-semibold text-gold hover:text-gold/80"
+                    className="text-[11.5px] font-semibold text-amber-700 hover:text-amber-600"
                   >
                     {q.status === 'answered' ? 'Edit answer' : 'Answer'}
                   </button>
@@ -154,7 +154,7 @@ export function QAPanel({
                     <button
                       type="button"
                       onClick={() => onPin(q.id, !q.is_pinned)}
-                      className="text-[11.5px] text-navy-foreground/50 hover:text-navy-foreground inline-flex items-center gap-1"
+                      className="text-[11.5px] text-slate-500 hover:text-slate-900 inline-flex items-center gap-1"
                     >
                       <Pin size={11} /> {q.is_pinned ? 'Unpin' : 'Pin'}
                     </button>
@@ -163,7 +163,7 @@ export function QAPanel({
                     <button
                       type="button"
                       onClick={() => onHide(q.id)}
-                      className="text-[11.5px] text-navy-foreground/50 hover:text-red-400 inline-flex items-center gap-1 ml-auto"
+                      className="text-[11.5px] text-slate-500 hover:text-red-400 inline-flex items-center gap-1 ml-auto"
                     >
                       <EyeOff size={11} /> Hide
                     </button>
@@ -188,7 +188,7 @@ export function QAPanel({
       </div>
 
       {!readOnly && (
-        <form onSubmit={submit} className="border-t border-white/[0.08] p-3 shrink-0">
+        <form onSubmit={submit} className="border-t border-slate-200 p-3 shrink-0">
           {error && <p className="text-[11.5px] text-red-300 mb-2">{error}</p>}
           <div className="flex gap-2">
             <input
@@ -197,7 +197,7 @@ export function QAPanel({
               disabled={!enabled || sending}
               maxLength={1000}
               placeholder={enabled ? 'Ask a question…' : 'Q&A is off for this webinar'}
-              className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[13.5px] text-navy-foreground placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50 disabled:opacity-50"
+              className="flex-1 px-3 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-50"
             />
             <button
               type="submit"
@@ -273,7 +273,7 @@ function AnswerComposer({
         onChange={e => setBody(e.target.value)}
         rows={3}
         placeholder="Type your answer…"
-        className="w-full px-3 py-2 rounded-lg bg-white/[0.06] ring-1 ring-white/10 text-[13px] text-navy-foreground placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50 resize-none"
+        className="w-full px-3 py-2 rounded-lg bg-white ring-1 ring-slate-200 text-[13px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
       />
 
       <input
@@ -281,11 +281,11 @@ function AnswerComposer({
         onChange={e => setLinkUrl(e.target.value)}
         disabled={!!file}
         placeholder="…or paste a link (paper, guideline, video)"
-        className="w-full px-3 py-1.5 rounded-lg bg-white/[0.04] ring-1 ring-white/10 text-[12.5px] text-navy-foreground placeholder:text-navy-foreground/30 focus:outline-none focus:ring-2 focus:ring-gold/50 disabled:opacity-40"
+        className="w-full px-3 py-1.5 rounded-lg bg-white ring-1 ring-slate-200 text-[12.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-40"
       />
 
       <div className="flex items-center gap-2">
-        <label className="inline-flex items-center gap-1.5 text-[11.5px] text-navy-foreground/60 hover:text-navy-foreground cursor-pointer">
+        <label className="inline-flex items-center gap-1.5 text-[11.5px] text-slate-500 hover:text-slate-900 cursor-pointer">
           <Paperclip size={12} />
           {file ? 'Change file' : 'Attach PDF or image'}
           <input
@@ -307,7 +307,7 @@ function AnswerComposer({
         </label>
 
         {file && (
-          <span className="inline-flex items-center gap-1 text-[11.5px] text-gold">
+          <span className="inline-flex items-center gap-1 text-[11.5px] text-amber-700">
             {file.name.slice(0, 24)}
             <button type="button" onClick={() => setFile(null)} aria-label="Remove file">
               <X size={11} />
@@ -319,7 +319,7 @@ function AnswerComposer({
           <button
             type="button"
             onClick={onCancel}
-            className="text-[11.5px] text-navy-foreground/50 hover:text-navy-foreground"
+            className="text-[11.5px] text-slate-500 hover:text-slate-900"
           >
             Cancel
           </button>

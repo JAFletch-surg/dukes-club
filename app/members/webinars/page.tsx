@@ -271,15 +271,25 @@ export default function LiveWebinars() {
     return events.filter(e => {
       const s = search.toLowerCase()
       const matchesSearch = !s || e.title.toLowerCase().includes(s) || e.speakers.some(sp => sp.toLowerCase().includes(s))
-      const isUpcoming = new Date(e.starts_at) >= now
+      const live = e.session?.status === 'live'
+      const isUpcoming = live || new Date(e.starts_at) >= now
       const matchesStatus = statusFilter === 'all' || (statusFilter === 'upcoming' ? isUpcoming : !isUpcoming)
       const matchesTags = selectedTags.length === 0 || selectedTags.some(t => e.subspecialties?.includes(t))
       return matchesSearch && matchesStatus && matchesTags
     })
   }, [events, search, statusFilter, selectedTags])
 
-  const upcoming = filtered.filter(e => new Date(e.starts_at) >= now).sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
-  const past = filtered.filter(e => new Date(e.starts_at) < now)
+  // A webinar that is live RIGHT NOW has a start time in the past, so
+  // classifying purely on starts_at buried it in "Past Webinars" as a
+  // "recording coming soon" card — with no way in. Live state wins over the
+  // clock.
+  const isLive = (e: WebinarEvent) => e.session?.status === 'live'
+
+  const liveNow = filtered.filter(isLive)
+  const upcoming = filtered
+    .filter(e => !isLive(e) && new Date(e.starts_at) >= now)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+  const past = filtered.filter(e => !isLive(e) && new Date(e.starts_at) < now)
 
   // ── Loading / empty states ─────────────────────────
 
@@ -343,6 +353,59 @@ export default function LiveWebinars() {
           </div>
         )}
       </div>
+
+      {/* Live now — pinned above everything, because a webinar in progress is
+          the single most time-critical thing on this page. */}
+      {liveNow.length > 0 && (
+        <div className="space-y-3">
+          {liveNow.map(event => {
+            const registered = !!event.booking && ['approved', 'confirmed'].includes(event.booking.status)
+            return (
+              <div
+                key={event.id}
+                className="rounded-xl border-2 border-red-500/60 bg-gradient-to-r from-red-50 to-white p-4 sm:p-5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600 text-white text-[11px] font-bold tracking-wide">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white wb-live-dot" />
+                    LIVE NOW
+                  </span>
+                  {event.speakers.length > 0 && (
+                    <span className="text-xs text-muted-foreground truncate">
+                      {event.speakers.slice(0, 2).join(', ')}
+                    </span>
+                  )}
+                </div>
+
+                <h2 className="text-lg sm:text-xl font-bold text-foreground mt-2 mb-1">
+                  {event.title}
+                </h2>
+                {event.description_plain && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {event.description_plain}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/webinar/${event.slug}`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-colors"
+                  >
+                    <Play size={15} />
+                    {registered ? 'Join now' : 'Register and join'}
+                  </Link>
+                  <Link
+                    href={`/events/${event.slug}`}
+                    className="text-sm text-muted-foreground hover:text-foreground px-2"
+                  >
+                    Event details
+                  </Link>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Upcoming Webinars */}
       {(statusFilter === 'all' || statusFilter === 'upcoming') && upcoming.length > 0 && (

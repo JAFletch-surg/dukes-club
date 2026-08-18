@@ -174,7 +174,7 @@ export function AttendeeRoom({
     return (
       <Gate
         event={event}
-        icon={<Lock size={26} className="text-gold" />}
+        icon={<Lock size={26} className="text-amber-700" />}
         title={booking?.status === 'pending' ? 'Your place is awaiting approval' : 'Register to join'}
         body={
           booking?.status === 'pending'
@@ -205,25 +205,25 @@ export function AttendeeRoom({
         <div className="h-full flex flex-col lg:flex-row min-h-0">
           <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-8">
             <div className="max-w-2xl mx-auto">
-              <h2 className="font-serif text-2xl mb-2">This webinar has finished</h2>
+              <h2 className="text-2xl font-bold tracking-tight mb-2">This webinar has finished</h2>
 
               {live.recording_video_id ? (
                 <>
-                  <p className="text-navy-foreground/55 text-sm mb-5">
+                  <p className="text-slate-500 text-sm mb-5">
                     The recording is ready to watch.
                   </p>
-                  <div className="rounded-xl overflow-hidden ring-1 ring-white/10">
+                  <div className="rounded-xl overflow-hidden ring-1 ring-slate-200">
                     <RecordingPlayer videoId={live.recording_video_id} />
                   </div>
                 </>
               ) : (
-                <div className="flex gap-3 p-4 rounded-lg bg-white/[0.04] ring-1 ring-white/[0.08]">
-                  <Clock size={17} className="text-gold shrink-0 mt-0.5" />
+                <div className="flex gap-3 p-4 rounded-lg bg-white ring-1 ring-slate-200">
+                  <Clock size={17} className="text-amber-700 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-navy-foreground/85 mb-1">
+                    <p className="text-sm text-slate-700 mb-1">
                       The recording is being processed
                     </p>
-                    <p className="text-[12.5px] text-navy-foreground/45 leading-relaxed">
+                    <p className="text-[12.5px] text-slate-400 leading-relaxed">
                       It usually appears within an hour or two, here and in the webinars
                       library. We’ll email you when it’s ready.
                     </p>
@@ -234,14 +234,14 @@ export function AttendeeRoom({
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
                   href="/members/webinars"
-                  className="inline-flex items-center gap-2 text-[13px] text-navy-foreground/60 hover:text-navy-foreground"
+                  className="inline-flex items-center gap-2 text-[13px] text-slate-500 hover:text-slate-900"
                 >
                   <ArrowLeft size={14} /> Back to webinars
                 </Link>
                 {live.recording_video_id && (
                   <Link
                     href={`/members/videos?v=${live.recording_video_id}`}
-                    className="inline-flex items-center gap-2 text-[13px] text-gold hover:underline"
+                    className="inline-flex items-center gap-2 text-[13px] text-amber-700 hover:underline"
                   >
                     <PlayCircle size={14} /> Open in the video library
                   </Link>
@@ -250,7 +250,7 @@ export function AttendeeRoom({
             </div>
           </div>
 
-          <aside className="flex-1 lg:flex-none lg:w-[360px] xl:w-[380px] min-h-0 border-t lg:border-t-0 lg:border-l border-white/[0.08] flex flex-col">
+          <aside className="flex-1 lg:flex-none lg:w-[360px] xl:w-[380px] min-h-0 border-t lg:border-t-0 lg:border-l border-slate-200 flex flex-col">
             {sidebar}
           </aside>
         </div>
@@ -274,19 +274,19 @@ export function AttendeeRoom({
             <div className="relative text-center px-6 py-10">
               <div className="flex items-center justify-center gap-2 mb-3">
                 <div className="w-5 h-px bg-gold" />
-                <p className="text-gold/80 text-[10px] font-bold tracking-[0.2em]">STARTING SOON</p>
+                <p className="text-amber-700 text-[10px] font-bold tracking-[0.2em]">STARTING SOON</p>
                 <div className="w-5 h-px bg-gold" />
               </div>
 
-              <h2 className="font-serif text-2xl sm:text-4xl leading-tight mb-4 max-w-2xl">
+              <h2 className="text-2xl sm:text-4xl font-bold tracking-tight leading-tight mb-4 max-w-2xl">
                 {event.title}
               </h2>
 
-              <p className="text-5xl sm:text-6xl font-serif text-gold tabular-nums mb-3">
+              <p className="text-5xl sm:text-6xl font-bold tracking-tight text-amber-700 tabular-nums mb-3">
                 {countdownTo(event.starts_at)}
               </p>
 
-              <p className="text-navy-foreground/50 text-sm flex items-center justify-center gap-2">
+              <p className="text-slate-500 text-sm flex items-center justify-center gap-2">
                 <Calendar size={14} />
                 {new Date(event.starts_at).toLocaleString('en-GB', {
                   weekday: 'long', day: 'numeric', month: 'long',
@@ -296,14 +296,14 @@ export function AttendeeRoom({
 
               {joinError && <p className="text-red-300 text-[12.5px] mt-4">{joinError}</p>}
 
-              <p className="text-navy-foreground/35 text-[12px] mt-6 max-w-md mx-auto leading-relaxed">
+              <p className="text-slate-400 text-[12px] mt-6 max-w-md mx-auto leading-relaxed">
                 You’re registered. This page will take you straight in the moment the
                 host goes live — no need to refresh.
               </p>
             </div>
           </div>
 
-          <aside className="flex-1 lg:flex-none lg:w-[360px] xl:w-[380px] min-h-0 border-t lg:border-t-0 lg:border-l border-white/[0.08] flex flex-col">
+          <aside className="flex-1 lg:flex-none lg:w-[360px] xl:w-[380px] min-h-0 border-t lg:border-t-0 lg:border-l border-slate-200 flex flex-col">
             {sidebar}
           </aside>
         </div>
@@ -355,7 +355,7 @@ function RecordingPlayer({ videoId }: { videoId: string }) {
   if (!video) {
     return (
       <div className="aspect-video bg-black/50 grid place-items-center">
-        <Loader2 size={22} className="animate-spin text-gold" />
+        <Loader2 size={22} className="animate-spin text-amber-700" />
       </div>
     )
   }
@@ -383,20 +383,20 @@ function Gate({
   action?: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-navy text-navy-foreground grid place-items-center px-5 py-12">
+    <div className="min-h-screen bg-slate-50 text-slate-900 grid place-items-center px-5 py-12">
       <div className="max-w-lg text-center">
-        <div className="w-14 h-14 rounded-full bg-gold/12 grid place-items-center mx-auto mb-5">
+        <div className="w-14 h-14 rounded-full bg-amber-100 grid place-items-center mx-auto mb-5">
           {icon}
         </div>
-        <p className="text-gold/70 text-[10px] font-bold tracking-[0.2em] mb-2">DUKES’ LIVE</p>
-        <h1 className="font-serif text-3xl leading-tight mb-2">{title}</h1>
-        <p className="font-serif italic text-navy-foreground/50 text-lg mb-4">{event.title}</p>
-        <p className="text-navy-foreground/55 text-sm leading-relaxed mb-7">{body}</p>
+        <p className="text-amber-700 text-[10px] font-bold tracking-[0.2em] mb-2">DUKES’ LIVE</p>
+        <h1 className="text-3xl font-bold tracking-tight leading-tight mb-2">{title}</h1>
+        <p className="text-slate-400 text-lg mb-4">{event.title}</p>
+        <p className="text-slate-500 text-sm leading-relaxed mb-7">{body}</p>
         {action}
         <div className="mt-7">
           <Link
             href="/members/webinars"
-            className="inline-flex items-center gap-2 text-[13px] text-navy-foreground/50 hover:text-navy-foreground"
+            className="inline-flex items-center gap-2 text-[13px] text-slate-500 hover:text-slate-900"
           >
             <ArrowLeft size={14} /> Back to webinars
           </Link>

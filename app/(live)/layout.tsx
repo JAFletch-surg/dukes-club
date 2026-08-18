@@ -14,5 +14,5 @@
  * credentials.
  */
 export default function LiveLayout({ children }: { children: React.ReactNode }) {
-  return <div className="bg-navy min-h-screen">{children}</div>
+  return <div className="bg-white min-h-screen">{children}</div>
 }

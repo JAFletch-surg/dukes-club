@@ -3,6 +3,7 @@ import {
   EncodedFileOutput,
   EncodedFileType,
   EncodingOptionsPreset,
+  EgressStatus,
   S3Upload,
 } from 'livekit-server-sdk'
 import { egressClient, livekitConfigured, VIMEO_API, VIMEO_HEADERS } from './_shared'
@@ -89,10 +90,114 @@ export async function stopSessionRecording(
     await egressClient().stopEgress(egressId)
     return { ok: true }
   } catch (err: any) {
-    // Egress that already stopped on its own (room emptied) is not an error.
-    if (/not found|already/i.test(err?.message || '')) return { ok: true }
+    // An egress that already finished by itself is not a failure — the room
+    // emptying ends it, and LiveKit then refuses the stop with
+    // "egress with status EGRESS_COMPLETE cannot be stopped". Treat every
+    // already-finished shape as success so the host isn't shown a red error
+    // for a recording that is safely on disk.
+    const message: string = err?.message || ''
+    if (/not found|already|cannot be stopped|EGRESS_(COMPLETE|ENDING|ABORTED|FAILED|LIMIT_REACHED)/i.test(message)) {
+      return { ok: true }
+    }
     console.error('[webinar] stopEgress failed', err)
-    return { ok: false, error: err?.message || 'Failed to stop recording' }
+    return { ok: false, error: message || 'Failed to stop recording' }
+  }
+}
+
+/**
+ * Applies a finished egress to the session row and hands the file to Vimeo.
+ *
+ * Shared by the LiveKit webhook and the stop/end path, so the pipeline moves
+ * forward even when the webhook has not been registered in the LiveKit project
+ * settings — a manual setup step that is easy to miss, and which would
+ * otherwise leave every recording stuck on "Recording" forever.
+ */
+export async function applyEgressResult(
+  supabase: SupabaseClient,
+  sessionId: string,
+  info: { complete: boolean; filename?: string | null; error?: string | null }
+): Promise<void> {
+  const { data: session } = await supabase
+    .from('webinar_sessions')
+    .select('id, event_id, recording_path, recording_status')
+    .eq('id', sessionId)
+    .maybeSingle()
+
+  if (!session) return
+  // Already past this point — don't re-upload a recording on a second call.
+  if (['transferring', 'done'].includes(session.recording_status)) return
+
+  if (!info.complete) {
+    await supabase
+      .from('webinar_sessions')
+      .update({
+        recording_status: 'failed',
+        recording_error: info.error || 'Recording did not complete',
+      })
+      .eq('id', sessionId)
+    return
+  }
+
+  const recordingPath = info.filename || session.recording_path
+
+  await supabase
+    .from('webinar_sessions')
+    .update({ recording_status: 'uploaded', recording_path: recordingPath })
+    .eq('id', sessionId)
+
+  const result = await transferRecordingToVimeo(supabase, {
+    id: session.id,
+    event_id: session.event_id,
+    recording_path: recordingPath,
+  })
+
+  if (result.ok) {
+    await supabase
+      .from('webinar_sessions')
+      .update({
+        vimeo_id: result.vimeoId,
+        recording_status: 'transferring',
+        recording_error: result.folderError,
+      })
+      .eq('id', sessionId)
+  } else {
+    // Left at 'uploaded' so the cron and the admin button retry from here.
+    await supabase
+      .from('webinar_sessions')
+      .update({ recording_error: result.error })
+      .eq('id', sessionId)
+  }
+}
+
+/**
+ * Asks LiveKit directly what happened to an egress and applies the result.
+ * Used after a manual stop, so the host does not have to wait on a webhook.
+ */
+export async function settleEgress(
+  supabase: SupabaseClient,
+  sessionId: string,
+  egressId: string
+): Promise<void> {
+  if (!livekitConfigured()) return
+
+  try {
+    const list = await egressClient().listEgress({ egressId })
+    const info = list?.[0]
+    if (!info) return
+
+    // Still running or winding down — the webhook or the next stop will catch it.
+    if (info.status === EgressStatus.EGRESS_STARTING || info.status === EgressStatus.EGRESS_ACTIVE) {
+      return
+    }
+
+    const file = (info as any).fileResults?.[0] ?? (info as any).file
+    await applyEgressResult(supabase, sessionId, {
+      complete: info.status === EgressStatus.EGRESS_COMPLETE && !!file?.filename,
+      filename: file?.filename ?? null,
+      error: (info as any).error || null,
+    })
+  } catch (err) {
+    console.error('[webinar] settleEgress failed', err)
   }
 }
 
