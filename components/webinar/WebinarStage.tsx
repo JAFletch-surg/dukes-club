@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { Track } from 'livekit-client'
-import { useTracks, useConnectionState } from '@livekit/components-react'
+import { useTracks, useConnectionState, useMaybeRoomContext } from '@livekit/components-react'
 import { ConnectionState } from 'livekit-client'
 import { Loader2, Video as VideoIcon, WifiOff } from 'lucide-react'
 import { ParticipantTile } from './ParticipantTile'
@@ -10,12 +10,36 @@ import { ParticipantTile } from './ParticipantTile'
 /**
  * The shared stage, used identically by the attendee, speaker and host views.
  *
+ * The LiveKit hooks below throw outright if there is no Room in context, which
+ * takes down the whole page rather than degrading — and neither the build nor
+ * the typechecker can catch it, because it only happens at render. So the
+ * public component is a guard: it calls the one hook that is allowed to come
+ * back empty, and only mounts the hook-using body once a room actually exists.
+ *
+ * That makes the stage safe to render before a token has been fetched, which
+ * is exactly the window the host studio sits in while it connects.
+ */
+export function WebinarStage() {
+  const room = useMaybeRoomContext()
+
+  if (!room) {
+    return (
+      <StageMessage icon={<Loader2 size={30} className="animate-spin text-gold" />}>
+        Connecting to the webinar room…
+      </StageMessage>
+    )
+  }
+
+  return <ConnectedStage />
+}
+
+/**
  * Three layouts, chosen in this order:
  *   1. Someone is sharing a screen  → share-dominant (the PowerPoint case)
  *   2. Exactly one camera           → that camera fills the stage
  *   3. Several cameras              → the active speaker leads, rest filmstrip
  */
-export function WebinarStage() {
+function ConnectedStage() {
   const connectionState = useConnectionState()
 
   const tracks = useTracks(

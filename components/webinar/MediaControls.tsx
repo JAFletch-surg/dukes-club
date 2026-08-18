@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useLocalParticipant } from '@livekit/components-react'
+import { useLocalParticipant, useMaybeRoomContext } from '@livekit/components-react'
 import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +19,14 @@ interface Props {
  * affordance.
  */
 export function MediaControls({ onLeave, canShareScreen = true }: Props) {
+  // useLocalParticipant throws without a Room in context, so guard the same way
+  // WebinarStage does — render nothing rather than take the page down.
+  const room = useMaybeRoomContext()
+  if (!room) return null
+  return <ConnectedControls onLeave={onLeave} canShareScreen={canShareScreen} />
+}
+
+function ConnectedControls({ onLeave, canShareScreen = true }: Props) {
   const { localParticipant } = useLocalParticipant()
   const [busy, setBusy] = useState<string | null>(null)
 
