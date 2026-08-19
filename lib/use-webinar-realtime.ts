@@ -51,6 +51,10 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
   // re-created (and thus re-subscribing) whenever poll state changes.
   const pollIdsRef = useRef<string[]>([])
 
+  /** Set the first time a postgres_changes event actually arrives. Proof that
+   *  replication is enabled, which lets the polling floor back off. */
+  const realtimeAliveRef = useRef(false)
+
   // ── Poll tallies come from a SECURITY DEFINER function, so attendees see
   //    the counts without being able to read anyone else's vote row. ──────
   const refreshResults = useCallback(
@@ -85,13 +89,13 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
     [supabase, userId]
   )
 
-  // ── Initial load ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!sessionId || !enabled) { setLoading(false); return }
+  // ── Load / refresh ────────────────────────────────────────────────
+  // Also used as the polling floor below, so the panels work whether or not
+  // Realtime replication was ever switched on for these tables.
+  const refresh = useCallback(
+    async (opts: { initial?: boolean } = {}) => {
+      if (!sessionId || !enabled) return
 
-    let cancelled = false
-
-    ;(async () => {
       const [sessionRes, chatRes, qRes, pollRes, resRes] = await Promise.all([
         supabase.from('webinar_sessions').select('*').eq('id', sessionId).maybeSingle(),
         supabase
@@ -120,22 +124,60 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
           .order('created_at', { ascending: false }),
       ])
 
-      if (cancelled) return
-
       setSession(sessionRes.data as WebinarSession | null)
       setMessages((chatRes.data ?? []) as ChatMessage[])
       setQuestions((qRes.data ?? []) as WebinarQuestion[])
       setPolls((pollRes.data ?? []) as WebinarPoll[])
       setResources((resRes.data ?? []) as WebinarResource[])
-      setLoading(false)
+      if (opts.initial) setLoading(false)
 
       const ids = ((pollRes.data ?? []) as WebinarPoll[]).map(p => p.id)
       pollIdsRef.current = ids
       ids.forEach(refreshResults)
-    })()
+    },
+    [sessionId, enabled, supabase, refreshResults]
+  )
 
-    return () => { cancelled = true }
-  }, [sessionId, enabled, supabase, refreshResults])
+  useEffect(() => {
+    if (!sessionId || !enabled) { setLoading(false); return }
+    refresh({ initial: true })
+  }, [sessionId, enabled, refresh])
+
+  // ── Polling floor ─────────────────────────────────────────────────
+  // Enabling Realtime replication on the webinar_* tables is a manual Supabase
+  // dashboard step, and when it is skipped postgres_changes silently delivers
+  // nothing — which previously meant polls and questions never appeared at all.
+  // Poll every 10s so the feature works regardless, then back off to 30s once a
+  // realtime event has actually arrived, since that proves replication is on and
+  // polling is only a safety net from then on. (A flat 5s poll across five
+  // tables would be a lot of needless traffic with a hundred people watching.)
+  useEffect(() => {
+    if (!sessionId || !enabled) return
+
+    let interval: ReturnType<typeof setInterval>
+    let currentMs = 0
+
+    const arm = () => {
+      const ms = realtimeAliveRef.current ? 30000 : 10000
+      if (ms === currentMs) return
+      currentMs = ms
+      if (interval) clearInterval(interval)
+      interval = setInterval(() => {
+        refresh()
+        arm()
+      }, ms)
+    }
+    arm()
+
+    // Browsers throttle timers in background tabs, so catch up on return.
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      if (interval) clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [sessionId, enabled, refresh])
 
   // ── Realtime ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -149,13 +191,17 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'webinar_sessions', filter: `id=eq.${sessionId}` },
-        payload => setSession(payload.new as WebinarSession)
+        payload => {
+          realtimeAliveRef.current = true
+          setSession(payload.new as WebinarSession)
+        }
       )
       // Chat
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'webinar_chat_messages', filter },
         payload => {
+          realtimeAliveRef.current = true
           const msg = payload.new as ChatMessage
           if (msg.is_hidden) return
           setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]))
@@ -246,13 +292,26 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
       const text = body.trim()
       if (!text) return { error: 'Message is empty' }
 
-      const { error } = await supabase.from('webinar_chat_messages').insert({
-        session_id: sessionId,
-        user_id: userId,
-        display_name: displayName,
-        is_staff: isStaff,
-        body: text.slice(0, 2000),
-      })
+      // .select() matters: without it the row only reached the UI when the
+      // realtime subscription echoed it back, so with replication off the
+      // sender watched their own message vanish. Merging the returned row makes
+      // the write self-sufficient; the echo is then a de-duplicated no-op.
+      const { data, error } = await supabase
+        .from('webinar_chat_messages')
+        .insert({
+          session_id: sessionId,
+          user_id: userId,
+          display_name: displayName,
+          is_staff: isStaff,
+          body: text.slice(0, 2000),
+        })
+        .select()
+        .single()
+
+      if (data) {
+        const msg = data as ChatMessage
+        setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]))
+      }
       return { error: error?.message ?? null }
     },
     [sessionId, userId, supabase]
@@ -264,12 +323,21 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
       const text = body.trim()
       if (!text) return { error: 'Question is empty' }
 
-      const { error } = await supabase.from('webinar_questions').insert({
-        session_id: sessionId,
-        user_id: userId,
-        display_name: displayName,
-        body: text.slice(0, 1000),
-      })
+      const { data, error } = await supabase
+        .from('webinar_questions')
+        .insert({
+          session_id: sessionId,
+          user_id: userId,
+          display_name: displayName,
+          body: text.slice(0, 1000),
+        })
+        .select()
+        .single()
+
+      if (data) {
+        const q = data as WebinarQuestion
+        setQuestions(prev => (prev.some(x => x.id === q.id) ? prev : [q, ...prev]))
+      }
       return { error: error?.message ?? null }
     },
     [sessionId, userId, supabase]
@@ -301,5 +369,9 @@ export function useWebinarRealtime({ sessionId, userId, enabled = true }: Option
     askQuestion,
     vote,
     refreshResults,
+    /** Re-read everything. Call after a write this hook does not own (poll
+     *  create/launch, resource share) so the actor sees it straight away
+     *  rather than waiting on a realtime echo that may never come. */
+    refresh,
   }
 }

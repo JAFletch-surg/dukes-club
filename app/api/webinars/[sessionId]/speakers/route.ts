@@ -78,7 +78,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({
       ok: true,
       speaker: updated,
-      inviteUrl: speakerUrl(event?.slug, raw),
+      inviteUrl: speakerUrl(request, event?.slug, raw),
     })
   }
 
@@ -108,13 +108,30 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   return NextResponse.json({
     ok: true,
     speaker: created,
-    inviteUrl: speakerUrl(event?.slug, raw),
+    inviteUrl: speakerUrl(request, event?.slug, raw),
     eventTitle: event?.title,
     startsAt: event?.starts_at,
   })
 }
 
-function speakerUrl(slug: string | undefined, rawToken: string): string {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || ''
+/**
+ * Builds the speaker's magic link against the deployment that issued it.
+ *
+ * NEXT_PUBLIC_SITE_URL points at production even on a Vercel preview, so using
+ * it here sent testers' invites to the live site — which 404s until the branch
+ * is merged. Deriving the origin from the request means a preview issues
+ * preview links and production issues production links, with no configuration,
+ * and a staging invite can never route someone to production by accident.
+ */
+function speakerUrl(request: NextRequest, slug: string | undefined, rawToken: string): string {
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+
+  const base =
+    (forwardedHost ? `${forwardedProto}://${forwardedHost}` : null) ??
+    request.nextUrl.origin ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    ''
+
   return `${base}/webinar/${slug ?? ''}/speaker?t=${rawToken}`
 }

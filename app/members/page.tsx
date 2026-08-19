@@ -27,6 +27,9 @@ const MembersDashboard = () => {
   const [myBookings, setMyBookings] = useState<any[]>([]);
   /** event_id → webinar_sessions.status, for booked native webinars */
   const [webinarStatuses, setWebinarStatuses] = useState<Record<string, string>>({});
+  /** Booked event ids, kept so the LIVE badge can be refreshed on a timer
+   *  without re-running the whole dashboard load. */
+  const [bookedEventIds, setBookedEventIds] = useState<string[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [questionStats, setQuestionStats] = useState<any>(null);
@@ -113,12 +116,13 @@ const MembersDashboard = () => {
 
             // Live-room state for any booked webinar that runs natively on the
             // site, so a session in progress can be joined straight from here.
-            const bookedEventIds = bookings.map((b: any) => b.event_id).filter(Boolean);
-            if (bookedEventIds.length > 0) {
+            const ids = bookings.map((b: any) => b.event_id).filter(Boolean);
+            setBookedEventIds(ids);
+            if (ids.length > 0) {
               const { data: sessions } = await supabase
                 .from('webinar_sessions')
                 .select('event_id, status')
-                .in('event_id', bookedEventIds);
+                .in('event_id', ids);
 
               const map: Record<string, string> = {};
               (sessions || []).forEach((s: any) => { map[s.event_id] = s.status; });
@@ -203,6 +207,32 @@ const MembersDashboard = () => {
 
     fetchDashboardData();
   }, [user, authLoading]);
+
+  // Keep the LIVE badge honest without re-running the whole dashboard load: a
+  // webinar can start or finish while someone sits on this page, and the
+  // badge previously only reflected whatever was true at first paint.
+  useEffect(() => {
+    if (bookedEventIds.length === 0) return;
+
+    const poll = async () => {
+      const { data: sessions } = await supabase
+        .from('webinar_sessions')
+        .select('event_id, status')
+        .in('event_id', bookedEventIds);
+      if (!sessions) return;
+      const map: Record<string, string> = {};
+      sessions.forEach((s: any) => { map[s.event_id] = s.status; });
+      setWebinarStatuses(map);
+    };
+
+    const id = setInterval(poll, 30000);
+    const onVisible = () => { if (document.visibilityState === 'visible') poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [bookedEventIds, supabase]);
 
   const handleCancelBooking = async (bookingId: string) => {
     if (!confirm('Are you sure you want to cancel this application? This cannot be undone.')) return;

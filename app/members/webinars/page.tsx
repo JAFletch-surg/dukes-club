@@ -182,6 +182,35 @@ export default function LiveWebinars() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Re-read the live-room state periodically. Without this a LIVE badge stayed
+  // lit after the host ended the session until someone hard-refreshed, and a
+  // webinar going live never appeared to anyone already sitting on this page.
+  // Only the session rows are re-fetched — the event list rarely changes.
+  const refreshSessions = useCallback(async () => {
+    if (!user || events.length === 0) return
+
+    const { data: sessions } = await supabase
+      .from('webinar_sessions')
+      .select('event_id, status, recording_video_id')
+      .in('event_id', events.map(e => e.id))
+
+    if (!sessions) return
+    setEvents(prev => prev.map(e => ({
+      ...e,
+      session: sessions.find((s: any) => s.event_id === e.id) || null,
+    })))
+  }, [user, events, supabase])
+
+  useEffect(() => {
+    const id = setInterval(refreshSessions, 30000)
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshSessions() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refreshSessions])
+
   // ── Register for webinar ───────────────────────────
 
   const handleRegister = async (event: WebinarEvent) => {

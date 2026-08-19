@@ -99,10 +99,14 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 
     const { data: updated } = await supabase
       .from('webinar_sessions')
+      // recording_status is deliberately NOT set here. `session` was read
+      // before settleEgress() ran, so writing it back would stamp 'recording'
+      // over the progress settleEgress just made and strand the file — the
+      // cron and the admin button both look for 'uploaded'. That column is
+      // owned by settleEgress and the webhook; this action owns status only.
       .update({
         status: 'ended',
         ended_at: new Date().toISOString(),
-        recording_status: session.egress_id ? 'recording' : session.recording_status,
       })
       .eq('id', sessionId)
       .select()

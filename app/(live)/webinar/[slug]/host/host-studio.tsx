@@ -45,7 +45,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
 
   const {
     session, messages, questions, polls, resources, results,
-    sendMessage, askQuestion,
+    sendMessage, askQuestion, refresh,
   } = useWebinarRealtime({ sessionId: initialSession.id, userId })
 
   const live = session ?? initialSession
@@ -114,6 +114,9 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
           : 'You are live.',
         data.recordingWarning ? 'err' : 'ok'
       )
+      // These routes return the updated row; take it straight away rather than
+      // waiting on a realtime echo, so the header flips the moment it lands.
+      await refresh()
     } catch (err: any) {
       showToast(err.message, 'err')
     } finally {
@@ -126,6 +129,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
     setBusy('end')
     try {
       await authFetch(`/api/webinars/${live.id}/session`, { action: 'end' })
+      await refresh()
       showToast('Webinar ended. The recording will be processed shortly.')
     } catch (err: any) {
       showToast(err.message, 'err')
@@ -139,6 +143,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
     setBusy('rec')
     try {
       await authFetch(`/api/webinars/${live.id}/session`, { action })
+      await refresh()
       showToast(action === 'start-recording' ? 'Recording started.' : 'Recording stopped.')
     } catch (err: any) {
       showToast(err.message, 'err')
@@ -148,14 +153,22 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
   }
 
   // ── Moderation ────────────────────────────────────────────────────
-  const hideMessage = (id: string) =>
-    supabase.from('webinar_chat_messages').update({ is_hidden: true }).eq('id', id)
+  // Each of these follows the write with a refresh, so the moderator sees the
+  // effect immediately instead of waiting on a realtime echo.
+  const hideMessage = async (id: string) => {
+    await supabase.from('webinar_chat_messages').update({ is_hidden: true }).eq('id', id)
+    await refresh()
+  }
 
-  const pinQuestion = (id: string, pinned: boolean) =>
-    supabase.from('webinar_questions').update({ is_pinned: pinned }).eq('id', id)
+  const pinQuestion = async (id: string, pinned: boolean) => {
+    await supabase.from('webinar_questions').update({ is_pinned: pinned }).eq('id', id)
+    await refresh()
+  }
 
-  const hideQuestion = (id: string) =>
-    supabase.from('webinar_questions').update({ status: 'hidden' }).eq('id', id)
+  const hideQuestion = async (id: string) => {
+    await supabase.from('webinar_questions').update({ status: 'hidden' }).eq('id', id)
+    await refresh()
+  }
 
   const answerQuestion = async (
     questionId: string,
@@ -174,6 +187,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
         status: 'answered',
       })
       .eq('id', questionId)
+    if (!error) await refresh()
     return { error: error?.message ?? null }
   }
 
@@ -209,6 +223,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
           polls={polls}
           results={results}
           onToast={showToast}
+          onChanged={refresh}
         />
       }
       resources={
@@ -217,6 +232,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
           resources={resources}
           userId={userId}
           onToast={showToast}
+          onChanged={refresh}
         />
       }
     />
@@ -401,11 +417,16 @@ function HostPollPanel({
   polls,
   results,
   onToast,
+  onChanged,
 }: {
   sessionId: string
   polls: any[]
   results: any
   onToast: (msg: string, type?: 'ok' | 'err') => void
+  /** Re-reads the session's data. Without this a new poll only appeared if a
+   *  realtime echo arrived, so with replication off the host saved a draft and
+   *  then had nothing to launch. */
+  onChanged: () => Promise<void> | void
 }) {
   const supabase = createClient()
   const [creating, setCreating] = useState(false)
@@ -433,7 +454,8 @@ function HostPollPanel({
     setQuestion('')
     setOptions(['', ''])
     setCreating(false)
-    onToast('Poll saved as a draft.')
+    await onChanged()
+    onToast('Poll saved as a draft. Press Launch when you want it live.')
   }
 
   async function setStatus(pollId: string, status: 'live' | 'closed') {
@@ -442,8 +464,9 @@ function HostPollPanel({
     if (status === 'closed') patch.closed_at = new Date().toISOString()
 
     const { error } = await supabase.from('webinar_polls').update(patch).eq('id', pollId)
-    if (error) onToast(error.message, 'err')
-    else onToast(status === 'live' ? 'Poll is live for attendees.' : 'Poll closed.')
+    if (error) { onToast(error.message, 'err'); return }
+    await onChanged()
+    onToast(status === 'live' ? 'Poll is live for attendees.' : 'Poll closed.')
   }
 
   return (
@@ -572,11 +595,13 @@ function HostResourcesPanel({
   resources,
   userId,
   onToast,
+  onChanged,
 }: {
   sessionId: string
   resources: any[]
   userId: string
   onToast: (msg: string, type?: 'ok' | 'err') => void
+  onChanged: () => Promise<void> | void
 }) {
   const supabase = createClient()
   const { upload, uploading } = useImageUpload()
@@ -615,6 +640,7 @@ function HostResourcesPanel({
     setTitle('')
     setUrl('')
     setFile(null)
+    await onChanged()
     onToast('Shared with everyone watching.')
   }
 
