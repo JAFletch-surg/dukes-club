@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageSquare, HelpCircle, BarChart3, Paperclip } from 'lucide-react'
+import { MessageSquare, HelpCircle, BarChart3, Paperclip, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type SidebarTab = 'chat' | 'qa' | 'polls' | 'resources'
+export type SidebarTab = 'chat' | 'qa' | 'polls' | 'resources' | 'people'
 
 interface TabDef {
   id: SidebarTab
@@ -20,6 +20,8 @@ interface Props {
   qa: React.ReactNode
   polls: React.ReactNode
   resources: React.ReactNode
+  /** Studio only — the roster with spotlight, mute and remove. */
+  people?: React.ReactNode
   counts?: Partial<Record<SidebarTab, number>>
   hide?: Partial<Record<SidebarTab, boolean>>
   /** Pulses a tab when something arrives on it while you are elsewhere. */
@@ -38,6 +40,7 @@ export function WebinarSidebar({
   qa,
   polls,
   resources,
+  people,
   counts = {},
   hide = {},
   attention = {},
@@ -45,6 +48,7 @@ export function WebinarSidebar({
   const [active, setActive] = useState<SidebarTab>(defaultTab)
 
   const allTabs: TabDef[] = [
+    { id: 'people', label: 'People', icon: Users, badge: counts.people, hidden: !people },
     { id: 'chat', label: 'Chat', icon: MessageSquare, badge: counts.chat, hidden: hide.chat },
     { id: 'qa', label: 'Q&A', icon: HelpCircle, badge: counts.qa, hidden: hide.qa },
     { id: 'polls', label: 'Polls', icon: BarChart3, badge: counts.polls, hidden: hide.polls },
@@ -96,6 +100,7 @@ export function WebinarSidebar({
         {current === 'qa' && qa}
         {current === 'polls' && polls}
         {current === 'resources' && resources}
+        {current === 'people' && people}
       </div>
     </div>
   )

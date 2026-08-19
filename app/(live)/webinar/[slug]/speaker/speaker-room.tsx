@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react'
 import { Loader2, AlertTriangle, Radio } from 'lucide-react'
 import { elapsedSince } from '@/lib/webinars'
-import { WebinarShell, WebinarLayout } from '@/components/webinar/WebinarShell'
+import { WebinarShell, WebinarLayout, type SheetSnap } from '@/components/webinar/WebinarShell'
+import { TheatreControls } from '@/components/webinar/StageControls'
+import { useTheatre } from '@/lib/use-theatre'
 import { WebinarStage } from '@/components/webinar/WebinarStage'
 import { WebinarSidebar } from '@/components/webinar/WebinarSidebar'
 import { ChatPanel } from '@/components/webinar/ChatPanel'
@@ -42,6 +44,11 @@ export function SpeakerRoom({ slug }: { slug: string }) {
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const { theatre, toggle: toggleTheatre } = useTheatre(surfaceRef)
+  const [overlayOpen, setOverlayOpen] = useState(false)
+  const [snap, setSnap] = useState<SheetSnap>('half')
 
   /**
    * A guest has no auth.users row, so Supabase RLS cannot admit them and
@@ -238,6 +245,7 @@ export function SpeakerRoom({ slug }: { slug: string }) {
         eyebrow="You are a speaker"
         elapsed={elapsedSince(session?.started_at ?? null)}
         recording={session?.recording_status === 'recording'}
+        hideHeader={theatre}
         actions={
           !isLive && (
             <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -246,11 +254,30 @@ export function SpeakerRoom({ slug }: { slug: string }) {
           )
         }
       >
-        <WebinarLayout
-          stage={<WebinarStage />}
-          sidebar={sidebar}
-          controls={<MediaControls />}
-        />
+        <div ref={surfaceRef} className="h-full">
+          <WebinarLayout
+            theatre={theatre}
+            overlayOpen={overlayOpen}
+            onOverlayChange={setOverlayOpen}
+            snap={snap}
+            onSnapChange={setSnap}
+            stage={
+              <>
+                <WebinarStage
+                  stageMode={session?.stage_mode ?? 'auto'}
+                  spotlightIdentity={session?.spotlight_identity ?? null}
+                />
+                <TheatreControls
+                  theatre={theatre}
+                  onToggleTheatre={toggleTheatre}
+                  onOpenPanel={() => setOverlayOpen(true)}
+                />
+              </>
+            }
+            sidebar={sidebar}
+            controls={<MediaControls />}
+          />
+        </div>
       </WebinarShell>
     </LiveKitRoom>
   )

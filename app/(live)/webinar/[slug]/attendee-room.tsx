@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react'
 import { Loader2, Calendar, ArrowLeft, Lock, Clock, PlayCircle } from 'lucide-react'
@@ -8,7 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 import { registerForEvent } from '@/lib/events'
 import { useWebinarRealtime } from '@/lib/use-webinar-realtime'
 import { countdownTo, elapsedSince, type WebinarSession } from '@/lib/webinars'
-import { WebinarShell, WebinarLayout } from '@/components/webinar/WebinarShell'
+import { WebinarShell, WebinarLayout, type SheetSnap } from '@/components/webinar/WebinarShell'
+import { TheatreControls } from '@/components/webinar/StageControls'
+import { useTheatre } from '@/lib/use-theatre'
 import { WebinarStage } from '@/components/webinar/WebinarStage'
 import { WebinarSidebar } from '@/components/webinar/WebinarSidebar'
 import { ChatPanel } from '@/components/webinar/ChatPanel'
@@ -60,6 +62,13 @@ export function AttendeeRoom({
   const [joinError, setJoinError] = useState<string | null>(null)
   const [, setTick] = useState(0)
 
+  // Mobile viewing state: theatre fills the screen in landscape, the panel
+  // becomes a tap-to-open overlay there, and in portrait it has three heights.
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const { theatre, toggle: toggleTheatre } = useTheatre(surfaceRef)
+  const [overlayOpen, setOverlayOpen] = useState(false)
+  const [snap, setSnap] = useState<SheetSnap>('half')
+
   const {
     session, messages, questions, polls, resources, results,
     sendMessage, askQuestion, vote,
@@ -67,6 +76,9 @@ export function AttendeeRoom({
 
   const live = session ?? initialSession
   const registered = !!booking && ['approved', 'confirmed'].includes(booking.status)
+  /** Badges the overlay button in theatre, so a poll launching mid-talk is
+   *  not missed while the panel is hidden. */
+  const livePoll = polls.some(p => p.status === 'live')
 
   // Drives the countdown and the elapsed clock.
   useEffect(() => {
@@ -330,8 +342,32 @@ export function AttendeeRoom({
         elapsed={elapsedSince(live.started_at)}
         viewers={live.peak_attendees || undefined}
         recording={live.recording_status === 'recording'}
+        hideHeader={theatre}
       >
-        <WebinarLayout stage={<WebinarStage />} sidebar={sidebar} />
+        <div ref={surfaceRef} className="h-full">
+          <WebinarLayout
+            theatre={theatre}
+            overlayOpen={overlayOpen}
+            onOverlayChange={setOverlayOpen}
+            snap={snap}
+            onSnapChange={setSnap}
+            stage={
+              <>
+                <WebinarStage
+                  stageMode={live.stage_mode}
+                  spotlightIdentity={live.spotlight_identity}
+                />
+                <TheatreControls
+                  theatre={theatre}
+                  onToggleTheatre={toggleTheatre}
+                  onOpenPanel={() => setOverlayOpen(true)}
+                  unread={livePoll}
+                />
+              </>
+            }
+            sidebar={sidebar}
+          />
+        </div>
       </WebinarShell>
     </LiveKitRoom>
   )

@@ -143,6 +143,70 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({ ok: true, session: updated })
   }
 
+  // ── Stage layout ─────────────────────────────────────────────────
+  // Host-authoritative: everyone renders from these two columns, so a handover
+  // can't leave two attendees looking at different people.
+  if (body.action === 'stage') {
+    const mode = body.stageMode
+    if (!['auto', 'spotlight', 'grid'].includes(mode)) {
+      return NextResponse.json({ error: 'Unknown stage mode' }, { status: 400 })
+    }
+
+    const { data: updated } = await supabase
+      .from('webinar_sessions')
+      .update({
+        stage_mode: mode,
+        spotlight_identity: mode === 'spotlight' ? (body.identity ?? null) : null,
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    return NextResponse.json({ ok: true, session: updated })
+  }
+
+  // ── Participant moderation ───────────────────────────────────────
+  // The host token already carries roomAdmin, so these are permitted; there
+  // was simply no way to reach them from the UI.
+  if (body.action === 'mute' || body.action === 'remove') {
+    if (!livekitConfigured()) {
+      return NextResponse.json({ error: 'LiveKit is not configured' }, { status: 503 })
+    }
+    if (!body.identity) {
+      return NextResponse.json({ error: 'identity is required' }, { status: 400 })
+    }
+
+    try {
+      const service = roomService()
+
+      if (body.action === 'remove') {
+        await service.removeParticipant(session.room_name, body.identity)
+      } else {
+        const participant = await service.getParticipant(session.room_name, body.identity)
+        const audio = participant.tracks.find(t => t.type === 1 /* AUDIO */)
+        if (audio) {
+          await service.mutePublishedTrack(session.room_name, body.identity, audio.sid, true)
+        }
+      }
+
+      // Someone who has been removed or is no longer publishing should not be
+      // left spotlit on an empty stage.
+      if (body.action === 'remove' && session.spotlight_identity === body.identity) {
+        await supabase
+          .from('webinar_sessions')
+          .update({ stage_mode: 'auto', spotlight_identity: null })
+          .eq('id', sessionId)
+      }
+
+      return NextResponse.json({ ok: true })
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: err?.message || 'Could not update that participant' },
+        { status: 502 }
+      )
+    }
+  }
+
   // ── Manual recording control ─────────────────────────────────────
   if (body.action === 'start-recording' || body.action === 'stop-recording') {
     if (!livekitConfigured()) {

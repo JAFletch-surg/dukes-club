@@ -9,6 +9,24 @@ export type RecordingStatus = 'none' | 'recording' | 'uploaded' | 'transferring'
 export type WebinarRole = 'host' | 'speaker' | 'attendee'
 export type SpeakerRole = 'host' | 'speaker' | 'moderator'
 
+/**
+ * Who is on the main stage, decided by the host rather than by each viewer's
+ * browser — otherwise two attendees can see different people mid-handover.
+ */
+export type StageMode = 'auto' | 'spotlight' | 'grid'
+
+export const STAGE_MODE_LABELS: Record<StageMode, string> = {
+  auto: 'Auto',
+  spotlight: 'Spotlight',
+  grid: 'Grid',
+}
+
+export const STAGE_MODE_HINTS: Record<StageMode, string> = {
+  auto: 'Slides lead if someone is presenting, otherwise whoever is speaking',
+  spotlight: 'One person fills the stage for everyone',
+  grid: 'Everyone side by side, for a panel',
+}
+
 export interface WebinarSession {
   id: string
   event_id: string
@@ -27,6 +45,9 @@ export interface WebinarSession {
   vimeo_id: string | null
   recording_video_id: string | null
   peak_attendees: number
+  stage_mode: StageMode
+  /** LiveKit identity of the spotlit participant, when stage_mode is 'spotlight' */
+  spotlight_identity: string | null
 }
 
 export interface WebinarSpeaker {

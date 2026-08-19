@@ -8,7 +8,7 @@
  * would mean maintaining it twice. This inconsistency is deliberate.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react'
 import {
   Loader2, Radio, Square, Circle, Plus, X, Play, Check, Eye,
@@ -19,7 +19,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useWebinarRealtime } from '@/lib/use-webinar-realtime'
 import { elapsedSince, attachmentKind, MAX_WEBINAR_UPLOAD, type WebinarSession } from '@/lib/webinars'
 import { useImageUpload } from '@/lib/use-image-upload'
-import { WebinarShell, WebinarLayout } from '@/components/webinar/WebinarShell'
+import { WebinarShell, WebinarLayout, type SheetSnap } from '@/components/webinar/WebinarShell'
+import { StageModeControls, TheatreControls } from '@/components/webinar/StageControls'
+import { PeoplePanel, type RosterEntry } from '@/components/webinar/PeoplePanel'
+import { useTheatre } from '@/lib/use-theatre'
 import { WebinarStage } from '@/components/webinar/WebinarStage'
 import { WebinarSidebar } from '@/components/webinar/WebinarSidebar'
 import { ChatPanel } from '@/components/webinar/ChatPanel'
@@ -43,6 +46,18 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const [confirmGoLive, setConfirmGoLive] = useState(false)
   const [, setTick] = useState(0)
+
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const { theatre, toggle: toggleTheatre } = useTheatre(surfaceRef)
+  const [overlayOpen, setOverlayOpen] = useState(false)
+  const [snap, setSnap] = useState<SheetSnap>('half')
+
+  // Live roster from LiveKit. The endpoint has always returned this; nothing
+  // called it until now, which is why the studio had no idea who was in the room.
+  const [roster, setRoster] = useState<RosterEntry[]>([])
+  const [rosterLoading, setRosterLoading] = useState(true)
+  const [personBusy, setPersonBusy] = useState<string | null>(null)
+  const [slidesOnly, setSlidesOnly] = useState(false)
 
   const {
     session, messages, questions, polls, resources, results,
@@ -153,6 +168,62 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
     }
   }
 
+  // ── Roster ────────────────────────────────────────────────────────
+  const loadRoster = useCallback(async () => {
+    const { data: { session: authSession } } = await supabase.auth.getSession()
+    if (!authSession) return
+    try {
+      const res = await fetch(`/api/webinars/${initialSession.id}/session`, {
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setRoster(data.participants ?? [])
+    } catch {
+      // Transient — the next tick picks it up.
+    } finally {
+      setRosterLoading(false)
+    }
+  }, [initialSession.id, supabase])
+
+  useEffect(() => {
+    loadRoster()
+    const id = setInterval(loadRoster, 5000)
+    return () => clearInterval(id)
+  }, [loadRoster])
+
+  async function setStageMode(mode: 'auto' | 'spotlight' | 'grid', identity?: string | null) {
+    try {
+      await authFetch(`/api/webinars/${live.id}/session`, {
+        action: 'stage',
+        stageMode: mode,
+        identity: identity ?? null,
+      })
+      await refresh()
+    } catch (err: any) {
+      showToast(err.message, 'err')
+    }
+  }
+
+  async function spotlight(identity: string | null) {
+    if (identity) await setStageMode('spotlight', identity)
+    else await setStageMode('auto')
+    showToast(identity ? 'They are on the main stage for everyone.' : 'Back to the automatic layout.')
+  }
+
+  async function moderate(action: 'mute' | 'remove', identity: string) {
+    setPersonBusy(identity)
+    try {
+      await authFetch(`/api/webinars/${live.id}/session`, { action, identity })
+      showToast(action === 'mute' ? 'Microphone muted.' : 'Removed from the webinar.')
+      await Promise.all([loadRoster(), refresh()])
+    } catch (err: any) {
+      showToast(err.message, 'err')
+    } finally {
+      setPersonBusy(null)
+    }
+  }
+
   // ── Moderation ────────────────────────────────────────────────────
   // Each of these follows the write with a refresh, so the moderator sees the
   // effect immediately instead of waiting on a realtime echo.
@@ -194,8 +265,36 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
 
   const sidebar = (
     <WebinarSidebar
-      defaultTab="qa"
-      counts={{ chat: messages.length, qa: questions.length, polls: polls.length, resources: resources.length }}
+      defaultTab="people"
+      counts={{
+        people: roster.length,
+        chat: messages.length,
+        qa: questions.length,
+        polls: polls.length,
+        resources: resources.length,
+      }}
+      people={
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="shrink-0 px-3 pt-3 pb-2 border-b border-slate-200">
+            <StageModeControls
+              mode={live.stage_mode ?? 'auto'}
+              onChange={m => setStageMode(m, m === 'spotlight' ? live.spotlight_identity : null)}
+              slidesOnly={slidesOnly}
+              onSlidesOnlyChange={setSlidesOnly}
+              hasShare
+            />
+          </div>
+          <PeoplePanel
+            roster={roster}
+            loading={rosterLoading}
+            spotlightIdentity={live.stage_mode === 'spotlight' ? live.spotlight_identity : null}
+            busy={personBusy}
+            onSpotlight={spotlight}
+            onMute={id => moderate('mute', id)}
+            onRemove={id => moderate('remove', id)}
+          />
+        </div>
+      }
       chat={
         <ChatPanel
           messages={messages}
@@ -288,11 +387,31 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
 
   const body = (
     <>
-      <WebinarLayout
-        stage={<WebinarStage />}
-        sidebar={sidebar}
-        controls={token ? <MediaControls /> : undefined}
-      />
+      <div ref={surfaceRef} className="h-full">
+        <WebinarLayout
+          theatre={theatre}
+          overlayOpen={overlayOpen}
+          onOverlayChange={setOverlayOpen}
+          snap={snap}
+          onSnapChange={setSnap}
+          stage={
+            <>
+              <WebinarStage
+                stageMode={live.stage_mode ?? 'auto'}
+                spotlightIdentity={live.spotlight_identity}
+                slidesOnly={slidesOnly}
+              />
+              <TheatreControls
+                theatre={theatre}
+                onToggleTheatre={toggleTheatre}
+                onOpenPanel={() => setOverlayOpen(true)}
+              />
+            </>
+          }
+          sidebar={sidebar}
+          controls={token ? <MediaControls /> : undefined}
+        />
+      </div>
 
       {live.status === 'scheduled' && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-full bg-white ring-1 ring-amber-300 text-[12px] font-medium text-amber-800 shadow-lg">
@@ -374,6 +493,7 @@ export function HostStudio({ event, initialSession, userId, displayName }: Props
       viewers={live.peak_attendees || undefined}
       recording={live.recording_status === 'recording'}
       actions={headerActions}
+      hideHeader={theatre}
     >
       {body}
     </WebinarShell>
