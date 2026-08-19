@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { Track, type Participant, type TrackPublication } from 'livekit-client'
+import { useIsSpeaking, useIsMuted } from '@livekit/components-react'
 import { MicOff, Monitor } from 'lucide-react'
 import { readMetadata } from '@/lib/webinars'
 import { cn } from '@/lib/utils'
@@ -34,8 +35,14 @@ export function ParticipantTile({
   const meta = readMetadata(participant.metadata)
   const name = participant.name || meta?.name || 'Speaker'
   const isScreenShare = publication?.source === Track.Source.ScreenShare
-  const isSpeaking = participant.isSpeaking && !isScreenShare
-  const micMuted = participant.isMicrophoneEnabled === false
+
+  // Reactive hooks, not `participant.isSpeaking` / `.isMicrophoneEnabled`.
+  // Those properties are correct when read but mutate in place on a stable
+  // object, so React never re-renders — the speaking ring and the muted icon
+  // would be frozen at whatever they were when the tile first mounted.
+  const speaking = useIsSpeaking(participant)
+  const isSpeaking = speaking && !isScreenShare
+  const micMuted = useIsMuted({ participant, source: Track.Source.Microphone })
 
   useEffect(() => {
     const track = publication?.track

@@ -27,12 +27,18 @@ export function MediaControls({ onLeave, canShareScreen = true }: Props) {
 }
 
 function ConnectedControls({ onLeave, canShareScreen = true }: Props) {
-  const { localParticipant } = useLocalParticipant()
+  // Take the enabled flags the hook returns, NOT the properties of the same
+  // name on localParticipant. The participant is a stable object whose internal
+  // state mutates in place, so reading through it never re-renders — the mute
+  // actually happened, but the icon never changed, which made the buttons look
+  // dead. These three are the hook's reactive state.
+  const {
+    localParticipant,
+    isMicrophoneEnabled: micOn,
+    isCameraEnabled: camOn,
+    isScreenShareEnabled: sharing,
+  } = useLocalParticipant()
   const [busy, setBusy] = useState<string | null>(null)
-
-  const micOn = localParticipant.isMicrophoneEnabled
-  const camOn = localParticipant.isCameraEnabled
-  const sharing = localParticipant.isScreenShareEnabled
 
   const run = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key)

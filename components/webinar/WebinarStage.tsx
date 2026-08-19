@@ -2,7 +2,12 @@
 
 import { useMemo } from 'react'
 import { Track, ConnectionState } from 'livekit-client'
-import { useTracks, useConnectionState, useMaybeRoomContext } from '@livekit/components-react'
+import {
+  useTracks,
+  useConnectionState,
+  useMaybeRoomContext,
+  useSpeakingParticipants,
+} from '@livekit/components-react'
 import { Loader2, Video as VideoIcon, WifiOff } from 'lucide-react'
 import { ParticipantTile } from './ParticipantTile'
 import { readMetadata, type StageMode } from '@/lib/webinars'
@@ -64,10 +69,17 @@ function ConnectedStage({ stageMode = 'auto', spotlightIdentity, slidesOnly }: P
     [tracks]
   )
 
-  const activeCamera = useMemo(
-    () => cameras.find(t => t.participant.isSpeaking) ?? cameras[0],
-    [cameras]
-  )
+  // useSpeakingParticipants is reactive; `participant.isSpeaking` is not, so
+  // reading it directly meant the "active speaker" layout never actually
+  // followed whoever was talking — it froze on whoever happened to be first.
+  const speaking = useSpeakingParticipants()
+
+  const activeCamera = useMemo(() => {
+    const loudest = speaking[0]
+    return (
+      (loudest && cameras.find(t => t.participant.identity === loudest.identity)) ?? cameras[0]
+    )
+  }, [cameras, speaking])
 
   if (connectionState === ConnectionState.Connecting) {
     return (

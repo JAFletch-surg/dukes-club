@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, roomService, livekitConfigured } from '../../_shared'
-import { startSessionRecording, stopSessionRecording, settleEgress } from '../../_recording'
+import { startSessionRecording, stopAndSettle } from '../../_recording'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -79,11 +79,11 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     // you only find that out an hour later.
     let recordingWarning: string | null = null
     if (session.egress_id) {
-      const result = await stopSessionRecording(session.egress_id)
-      if (!result.ok) recordingWarning = result.error
-      // Ask LiveKit what actually happened and move the recording along, rather
-      // than waiting on a webhook that may never have been registered.
-      await settleEgress(supabase, sessionId, session.egress_id)
+      // Stops, then waits a few seconds for LiveKit to finalise the file, so
+      // the recording is usually already on its way to Vimeo by the time this
+      // returns rather than depending on a webhook that may not be registered.
+      const result = await stopAndSettle(supabase, sessionId, session.egress_id)
+      if (!result.ok) recordingWarning = result.error ?? null
     }
 
     if (livekitConfigured()) {
@@ -232,10 +232,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if (!session.egress_id) {
       return NextResponse.json({ ok: true, note: 'Not recording' })
     }
-    const result = await stopSessionRecording(session.egress_id)
-    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 })
 
-    await settleEgress(supabase, sessionId, session.egress_id)
+    const result = await stopAndSettle(supabase, sessionId, session.egress_id)
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 })
 
     const { data: updated } = await supabase
       .from('webinar_sessions')
@@ -243,7 +242,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       .eq('id', sessionId)
       .single()
 
-    return NextResponse.json({ ok: true, session: updated })
+    // settled false means LiveKit is still writing the file. Not an error —
+    // the webhook and the recordings poll both pick it up from here.
+    return NextResponse.json({ ok: true, session: updated, settled: result.settled })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

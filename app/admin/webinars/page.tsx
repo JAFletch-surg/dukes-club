@@ -100,7 +100,12 @@ export default function WebinarsAdmin() {
   // open sees the recording publish itself, without having to know the
   // "Check recordings" button exists.
   const pipelineActive = sessions.some(
-    s => s.recording_status === 'uploaded' || s.recording_status === 'transferring'
+    s =>
+      s.recording_status === 'uploaded' ||
+      s.recording_status === 'transferring' ||
+      // Stopped but LiveKit was still writing the file when the request came
+      // back — the poll route finalises these.
+      (s.recording_status === 'recording' && s.status !== 'live')
   )
 
   useEffect(() => {

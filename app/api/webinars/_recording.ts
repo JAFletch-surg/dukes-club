@@ -177,28 +177,72 @@ export async function settleEgress(
   supabase: SupabaseClient,
   sessionId: string,
   egressId: string
-): Promise<void> {
-  if (!livekitConfigured()) return
+): Promise<'settled' | 'pending' | 'unknown'> {
+  if (!livekitConfigured()) return 'unknown'
 
   try {
     const list = await egressClient().listEgress({ egressId })
     const info = list?.[0]
-    if (!info) return
+    if (!info) return 'unknown'
 
-    // Still running or winding down — the webhook or the next stop will catch it.
-    if (info.status === EgressStatus.EGRESS_STARTING || info.status === EgressStatus.EGRESS_ACTIVE) {
-      return
+    // EGRESS_ENDING is the state stopEgress() puts it in while the file is
+    // being finalised and uploaded — it is NOT a failure, and it is exactly
+    // what you see in the seconds after pressing stop. Leaving it out of this
+    // guard meant every manual stop fell through and marked the recording
+    // failed, which is the opposite of what happened.
+    if (
+      info.status === EgressStatus.EGRESS_STARTING ||
+      info.status === EgressStatus.EGRESS_ACTIVE ||
+      info.status === EgressStatus.EGRESS_ENDING
+    ) {
+      return 'pending'
     }
 
     const file = (info as any).fileResults?.[0] ?? (info as any).file
+    const complete = info.status === EgressStatus.EGRESS_COMPLETE && !!file?.filename
+
     await applyEgressResult(supabase, sessionId, {
-      complete: info.status === EgressStatus.EGRESS_COMPLETE && !!file?.filename,
+      complete,
       filename: file?.filename ?? null,
       error: (info as any).error || null,
     })
+
+    // The egress is over either way; leaving the id set makes the studio think
+    // a recording is still running and offer "stop" for something that ended.
+    await supabase.from('webinar_sessions').update({ egress_id: null }).eq('id', sessionId)
+
+    return 'settled'
   } catch (err) {
     console.error('[webinar] settleEgress failed', err)
+    return 'unknown'
   }
+}
+
+/**
+ * Stops a recording and waits briefly for LiveKit to finish writing the file.
+ *
+ * A short recording usually finalises in a couple of seconds, so most of the
+ * time the host presses stop and the status has already moved on by the time
+ * the request returns. A long one may not, and that is fine — the webhook and
+ * the recordings poll both settle it later.
+ */
+export async function stopAndSettle(
+  supabase: SupabaseClient,
+  sessionId: string,
+  egressId: string,
+  attempts = 6
+): Promise<{ ok: boolean; settled: boolean; error?: string }> {
+  const stopped = await stopSessionRecording(egressId)
+  if (!stopped.ok) return { ok: false, settled: false, error: stopped.error }
+
+  for (let i = 0; i < attempts; i++) {
+    const result = await settleEgress(supabase, sessionId, egressId)
+    if (result === 'settled') return { ok: true, settled: true }
+    if (result === 'unknown') break
+    await new Promise(r => setTimeout(r, 1500))
+  }
+
+  return { ok: true, settled: false }
 }
 
 // ── Vimeo transfer ──────────────────────────────────────────────────

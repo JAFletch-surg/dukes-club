@@ -4,6 +4,7 @@ import { getSupabase, requireAdmin, VIMEO_API, VIMEO_HEADERS } from '../../_shar
 import {
   transferRecordingToVimeo,
   checkVimeoTranscode,
+  settleEgress,
   S3_BUCKET,
 } from '../../_recording'
 
@@ -36,6 +37,22 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabase()
   const steps: string[] = []
+
+  // ── 0. Finish off recordings LiveKit was still writing ────────────
+  // A recording that was stopped but had not finished finalising when the
+  // request returned sits here with its egress id still set. Without this it
+  // would wait for a webhook that may never have been registered.
+  const { data: stopping } = await supabase
+    .from('webinar_sessions')
+    .select('id, egress_id')
+    .eq('recording_status', 'recording')
+    .not('egress_id', 'is', null)
+    .limit(5)
+
+  for (const session of stopping ?? []) {
+    const state = await settleEgress(supabase, session.id, session.egress_id!)
+    if (state === 'settled') steps.push(`session ${session.id}: recording finalised`)
+  }
 
   // ── 1. Hand freshly-uploaded recordings to Vimeo ──────────────────
   const { data: uploaded } = await supabase
