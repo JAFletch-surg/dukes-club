@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { AuthProvider } from '@/lib/auth-provider'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import './globals.css'
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
         </AuthProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
