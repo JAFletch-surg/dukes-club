@@ -7,6 +7,10 @@ export function isStreamingEvent(eventType: string | null | undefined): boolean 
   return !!eventType && (STREAMING_EVENT_TYPES as readonly string[]).includes(eventType)
 }
 
+// A native webinar runs on this site via LiveKit (see lib/webinars.ts) rather
+// than linking out to Zoom or embedding a Vimeo Live event.
+export { WEBINAR_STREAM_TYPE, isNativeWebinar } from '@/lib/webinars'
+
 interface RegisterForEventParams {
   eventId: string
   userId: string

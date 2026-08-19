@@ -1,0 +1,187 @@
+'use client'
+
+import { useState } from 'react'
+import { BarChart3, Loader2, Check } from 'lucide-react'
+import type { WebinarPoll } from '@/lib/webinars'
+import type { PollResults } from '@/lib/use-webinar-realtime'
+import { cn } from '@/lib/utils'
+import { PanelEmpty } from './PanelEmpty'
+
+interface Props {
+  polls: WebinarPoll[]
+  results: Record<string, PollResults>
+  enabled: boolean
+  readOnly?: boolean
+  onVote: (pollId: string, optionIds: string[]) => Promise<{ error: string | null }>
+}
+
+export function PollPanel({ polls, results, enabled, readOnly, onVote }: Props) {
+  // Drafts never reach attendees (RLS blocks them), but a host viewing this
+  // panel would otherwise see unlaunched polls mixed in with live ones.
+  const visible = polls.filter(p => p.status !== 'draft')
+
+  if (visible.length === 0) {
+    return (
+      <PanelEmpty
+        icon={<BarChart3 size={22} />}
+        title="No polls yet"
+        body="When the host launches a poll it will appear here."
+      />
+    )
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 min-h-0">
+      {visible.map(poll => (
+        <PollCard
+          key={poll.id}
+          poll={poll}
+          result={results[poll.id]}
+          enabled={enabled && !readOnly}
+          onVote={onVote}
+        />
+      ))}
+    </div>
+  )
+}
+
+function PollCard({
+  poll,
+  result,
+  enabled,
+  onVote,
+}: {
+  poll: WebinarPoll
+  result?: PollResults
+  enabled: boolean
+  onVote: (pollId: string, optionIds: string[]) => Promise<{ error: string | null }>
+}) {
+  const [selected, setSelected] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const myVote = result?.myVote ?? null
+  const hasVoted = !!myVote?.length
+  const isOpen = poll.status === 'live'
+  const voters = result?.voters ?? 0
+
+  // Results appear once you've voted (so you can't peek and be swayed), or
+  // once the host closes the poll, and only if they've made them visible.
+  const showResults = poll.results_visible && (hasVoted || poll.status === 'closed')
+
+  function toggle(optionId: string) {
+    if (!isOpen || hasVoted) return
+    setSelected(prev =>
+      poll.allow_multiple
+        ? prev.includes(optionId) ? prev.filter(id => id !== optionId) : [...prev, optionId]
+        : [optionId]
+    )
+  }
+
+  async function submit() {
+    if (!selected.length) { setError('Pick an option first.'); return }
+    setSaving(true)
+    setError(null)
+    const res = await onVote(poll.id, selected)
+    setSaving(false)
+    if (res.error) setError(res.error)
+  }
+
+  return (
+    <div className="wb-panel-enter rounded-lg bg-white ring-1 ring-slate-200 p-3.5">
+      <div className="flex items-start gap-2 mb-2.5">
+        <p className="text-[15px] font-semibold leading-snug text-slate-900 flex-1">
+          {poll.question}
+        </p>
+        {isOpen && (
+          <span className="text-[9px] font-bold tracking-[0.1em] uppercase text-amber-700 shrink-0 mt-1">
+            Open
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {poll.options.map(option => {
+          const count = result?.counts[option.id] ?? 0
+          const pct = voters > 0 ? Math.round((count / voters) * 100) : 0
+          const picked = myVote?.includes(option.id) || selected.includes(option.id)
+
+          // Before results are shown this is a choice button; afterwards it is
+          // a bar chart. The bar sits BELOW the label rather than washing
+          // behind it, so it can carry a full-strength blue without dragging
+          // the text contrast down with it.
+          return (
+            <button
+              key={option.id}
+              type="button"
+              disabled={!enabled || !isOpen || hasVoted}
+              onClick={() => toggle(option.id)}
+              className={cn(
+                'w-full text-left rounded-md px-3 py-2 ring-1 transition-colors',
+                picked ? 'ring-primary' : 'ring-slate-200',
+                isOpen && !hasVoted && enabled && 'hover:ring-slate-300 cursor-pointer',
+                (!isOpen || hasVoted) && 'cursor-default'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                {picked && <Check size={12} className="text-primary shrink-0" />}
+                <span className="text-[13px] text-slate-700 flex-1">{option.label}</span>
+                {showResults && (
+                  <span className="text-[12px] font-semibold text-slate-900 shrink-0 tabular-nums">
+                    {pct}%
+                  </span>
+                )}
+              </div>
+
+              {showResults && (
+                <div className="mt-1.5 h-1.5 rounded-full bg-accent overflow-hidden">
+                  <div
+                    className={cn(
+                      'wb-bar h-full rounded-full',
+                      // One hue for every option — bar length already encodes
+                      // the magnitude, so a different colour per option would
+                      // only re-say it. The deeper step marks your own answer,
+                      // which is a property of the entity, not of its rank.
+                      picked ? 'bg-primary' : 'bg-chart-1'
+                    )}
+                    style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%` }}
+                  />
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {error && <p className="text-[11.5px] text-red-300 mt-2">{error}</p>}
+
+      <div className="flex items-center gap-3 mt-3">
+        {isOpen && !hasVoted && enabled && (
+          <button
+            type="button"
+            onClick={submit}
+            disabled={saving || !selected.length}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gold text-gold-foreground text-[12px] font-semibold hover:bg-gold/90 disabled:opacity-40"
+          >
+            {saving && <Loader2 size={11} className="animate-spin" />}
+            Submit
+          </button>
+        )}
+
+        <p className="text-[11px] text-slate-400 ml-auto">
+          {voters === 0
+            ? 'No responses yet'
+            : `${voters} response${voters === 1 ? '' : 's'}`}
+          {hasVoted && ' · you voted'}
+          {poll.status === 'closed' && ' · closed'}
+        </p>
+      </div>
+
+      {poll.status === 'closed' && !poll.results_visible && (
+        <p className="text-[11px] text-slate-400 mt-1.5">
+          The host has kept these results private.
+        </p>
+      )}
+    </div>
+  )
+}

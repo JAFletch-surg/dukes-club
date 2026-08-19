@@ -14,7 +14,7 @@ import { richTextToHtml, htmlToPlainText } from '@/lib/rich-text'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
-const STREAM_TYPES = ['zoom', 'vimeo_live', 'hybrid']
+const STREAM_TYPES = ['livekit', 'zoom', 'vimeo_live', 'hybrid']
 const ACCESS_LEVELS = ['public', 'registered', 'members_only', 'invite_only']
 const SUBSPECIALTIES = [
   'Cancer - Colon','Cancer - Rectal','Cancer - Anal','Cancer - Advanced',
@@ -598,9 +598,22 @@ export default function EventsAdmin() {
                   <div>
                     <label style={S.label}>Stream Type</label>
                     <select style={S.select} value={form.stream_type} onChange={(e) => setForm({ ...form, stream_type: e.target.value })}>
-                      {STREAM_TYPES.map(t => <option key={t} value={t}>{t === 'zoom' ? 'Zoom' : t === 'vimeo_live' ? 'Vimeo Live' : 'Hybrid (Zoom + Vimeo)'}</option>)}
+                      {STREAM_TYPES.map(t => <option key={t} value={t}>{t === 'livekit' ? "Dukes' Live (on this site)" : t === 'zoom' ? 'Zoom' : t === 'vimeo_live' ? 'Vimeo Live' : 'Hybrid (Zoom + Vimeo)'}</option>)}
                     </select>
                   </div>
+                  {form.stream_type === 'livekit' && (
+                    <div style={{ display: 'flex', gap: 10, padding: '12px 14px', background: '#FFF9E8', border: '1px solid #F0DFA8', borderRadius: 10 }}>
+                      <Radio size={16} style={{ color: '#8A6100', flexShrink: 0, marginTop: 1 }} />
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#181820', marginBottom: 3 }}>Runs natively on the site</p>
+                        <p style={{ fontSize: 12.5, color: '#504F58', lineHeight: 1.5 }}>
+                          Attendees watch, chat, ask questions and vote in polls without leaving Dukes&rsquo; Club, and the
+                          recording is published to the video library afterwards. Set up the live room and invite guest
+                          speakers under <a href="/admin/webinars" style={{ color: '#0078D4', fontWeight: 600 }}>Live Webinars</a>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {(form.stream_type === 'zoom' || form.stream_type === 'hybrid') && (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">

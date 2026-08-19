@@ -103,3 +103,57 @@
     animation: none;
   }
 }
+/* ── Live webinar surfaces (/webinar/*) ─────────────────────────────
+   Same reason as above: no `animate-in` here, so every motion the live
+   stage needs is hand-rolled. Kept together so the dark surfaces have one
+   place to look. */
+
+@keyframes wb-live-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+.wb-live-dot {
+  animation: wb-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes wb-msg-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wb-msg-enter {
+  animation: wb-msg-in 0.18s ease-out;
+}
+
+@keyframes wb-panel-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wb-panel-enter {
+  animation: wb-panel-in 0.22s ease-out;
+}
+
+/* Poll result bars grow from zero rather than snapping to width. */
+.wb-bar {
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The stage well: video sits on near-black so letterboxing reads as
+   deliberate rather than as a broken layout. */
+.wb-stage-well {
+  background:
+    radial-gradient(ellipse at 50% 0%, hsl(220 60% 14%) 0%, hsl(220 60% 6%) 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-live-dot,
+  .wb-msg-enter,
+  .wb-panel-enter {
+    animation: none;
+  }
+  .wb-bar {
+    transition: none;
+  }
+}

@@ -39,6 +39,23 @@ Click an event to see full details: description, timetable (single or multi-day)
 
 Some in-person courses require a verified ACPGBI membership number. Add your number in your [Profile](member-portal.md#acpgbi-membership) to gain access.
 
+## Live webinars
+
+Some webinars run directly on the site rather than on Zoom. Once you're registered, the
+webinar appears under **Live Webinars** in the members' area with a **Join now** button.
+
+* You don't need to install anything or refresh the page — when the host goes live, the
+  page takes you straight in.
+* You watch and listen; your camera and microphone are never used.
+* Alongside the video you can chat with other attendees, ask the speaker questions, and vote
+  in polls. Questions the speaker answers show their reply underneath, sometimes with a
+  paper or slide attached.
+* Anything the host shares during the session stays on the page afterwards under **Files**.
+
+If you can't make it, or want to watch again, the recording is published to the same page
+and to the video library, usually within a couple of hours. You'll get an email when it's
+ready.
+
 ## Cancelling
 
 You can cancel a registration from the event page at any time.

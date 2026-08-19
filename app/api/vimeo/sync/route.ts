@@ -247,6 +247,8 @@ export async function POST(request: NextRequest) {
       if (existingIds.has(vimeoId)) {
         // Update existing — only sync Vimeo-owned fields, preserve manual edits.
         // vimeo_folder_id is refreshed because a video can be moved on Vimeo.
+        // event_id is deliberately absent: it is set by the webinar recording
+        // pipeline and must survive every subsequent sync.
         const { error } = await supabase
           .from('videos')
           .update({
@@ -315,6 +317,11 @@ export async function POST(request: NextRequest) {
           .update({ status: 'archived', synced_at: new Date().toISOString() })
           .in('vimeo_id', staleIds)
           .eq('status', 'published')
+          // Webinar recordings are published by the live-webinar pipeline, not
+          // by this sync. If VIMEO_RECORDINGS_FOLDER_ID has not been registered
+          // in vimeo_folders, they would look "stale" here and get archived out
+          // from under the webinar that produced them.
+          .is('event_id', null)
 
         if (archiveErr) {
           console.error('[Vimeo Sync] Failed to archive stale videos:', archiveErr.message)

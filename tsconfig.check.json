@@ -1,0 +1,8 @@
+{
+  "//": "Typecheck-only config. `npx tsc --noEmit` against the main tsconfig aborts with TS2688 because @types/mapbox-gl pulls in the deprecated, empty @types/mapbox__point-geometry stub, which TypeScript tries to load as an automatic type library and cannot. That single config error stops the whole program being checked, so type errors go silently unreported — and next.config.ts sets ignoreBuildErrors, so the build does not catch them either. Listing `types` explicitly opts out of automatic @types inclusion and restores a real check. Run with: npm run typecheck",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "react", "react-dom", "mapbox-gl", "vimeo__player"],
+    "incremental": false
+  }
+}

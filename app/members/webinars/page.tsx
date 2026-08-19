@@ -39,6 +39,7 @@ interface WebinarEvent {
   speakers: string[]
   booking?: { id: string; status: string } | null
   booking_count: number
+  session?: LiveSession | null
 }
 
 interface WebinarVideo {
@@ -47,6 +48,14 @@ interface WebinarVideo {
   thumbnail_url: string | null
   vimeo_plays: number
   duration_seconds: number
+  event_id: string | null
+}
+
+// Live state for events that run natively on the site (stream_type 'livekit').
+interface LiveSession {
+  event_id: string
+  status: string
+  recording_video_id: string | null
 }
 
 // ─── Helpers ─────────────────────────────────────────
@@ -105,6 +114,12 @@ export default function LiveWebinars() {
 
     // Fetch user's bookings for these events
     const eventIds = eventsData.map(e => e.id)
+
+    // Live rooms for any of these events that run natively on the site
+    const { data: sessions } = await supabase
+      .from('webinar_sessions')
+      .select('event_id, status, recording_video_id')
+      .in('event_id', eventIds)
     const { data: bookings } = await supabase
       .from('event_bookings')
       .select('id, event_id, status')
@@ -145,24 +160,56 @@ export default function LiveWebinars() {
       speakers: speakerMap[e.id] || [],
       booking: bookings?.find((b: any) => b.event_id === e.id) || null,
       booking_count: countMap[e.id] || 0,
+      session: sessions?.find((s: any) => s.event_id === e.id) || null,
     }))
 
     setEvents(enriched)
 
-    // Fetch webinar recordings from videos table
+    // Fetch webinar recordings from videos table. event_id is the real link
+    // between a recording and the event that produced it — set by the live
+    // webinar pipeline, and used below in place of the old title guessing.
     const { data: vids } = await supabase
       .from('videos')
-      .select('id, title, thumbnail_url, vimeo_plays, duration_seconds')
+      .select('id, title, thumbnail_url, vimeo_plays, duration_seconds, event_id')
       .eq('category', 'Webinar')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(50)
 
     setVideos(vids || [])
     setLoading(false)
   }, [user])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Re-read the live-room state periodically. Without this a LIVE badge stayed
+  // lit after the host ended the session until someone hard-refreshed, and a
+  // webinar going live never appeared to anyone already sitting on this page.
+  // Only the session rows are re-fetched — the event list rarely changes.
+  const refreshSessions = useCallback(async () => {
+    if (!user || events.length === 0) return
+
+    const { data: sessions } = await supabase
+      .from('webinar_sessions')
+      .select('event_id, status, recording_video_id')
+      .in('event_id', events.map(e => e.id))
+
+    if (!sessions) return
+    setEvents(prev => prev.map(e => ({
+      ...e,
+      session: sessions.find((s: any) => s.event_id === e.id) || null,
+    })))
+  }, [user, events, supabase])
+
+  useEffect(() => {
+    const id = setInterval(refreshSessions, 30000)
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshSessions() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refreshSessions])
 
   // ── Register for webinar ───────────────────────────
 
@@ -253,15 +300,25 @@ export default function LiveWebinars() {
     return events.filter(e => {
       const s = search.toLowerCase()
       const matchesSearch = !s || e.title.toLowerCase().includes(s) || e.speakers.some(sp => sp.toLowerCase().includes(s))
-      const isUpcoming = new Date(e.starts_at) >= now
+      const live = e.session?.status === 'live'
+      const isUpcoming = live || new Date(e.starts_at) >= now
       const matchesStatus = statusFilter === 'all' || (statusFilter === 'upcoming' ? isUpcoming : !isUpcoming)
       const matchesTags = selectedTags.length === 0 || selectedTags.some(t => e.subspecialties?.includes(t))
       return matchesSearch && matchesStatus && matchesTags
     })
   }, [events, search, statusFilter, selectedTags])
 
-  const upcoming = filtered.filter(e => new Date(e.starts_at) >= now).sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
-  const past = filtered.filter(e => new Date(e.starts_at) < now)
+  // A webinar that is live RIGHT NOW has a start time in the past, so
+  // classifying purely on starts_at buried it in "Past Webinars" as a
+  // "recording coming soon" card — with no way in. Live state wins over the
+  // clock.
+  const isLive = (e: WebinarEvent) => e.session?.status === 'live'
+
+  const liveNow = filtered.filter(isLive)
+  const upcoming = filtered
+    .filter(e => !isLive(e) && new Date(e.starts_at) >= now)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
+  const past = filtered.filter(e => !isLive(e) && new Date(e.starts_at) < now)
 
   // ── Loading / empty states ─────────────────────────
 
@@ -326,6 +383,59 @@ export default function LiveWebinars() {
         )}
       </div>
 
+      {/* Live now — pinned above everything, because a webinar in progress is
+          the single most time-critical thing on this page. */}
+      {liveNow.length > 0 && (
+        <div className="space-y-3">
+          {liveNow.map(event => {
+            const registered = !!event.booking && ['approved', 'confirmed'].includes(event.booking.status)
+            return (
+              <div
+                key={event.id}
+                className="rounded-xl border-2 border-red-500/60 bg-gradient-to-r from-red-50 to-white p-4 sm:p-5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600 text-white text-[11px] font-bold tracking-wide">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white wb-live-dot" />
+                    LIVE NOW
+                  </span>
+                  {event.speakers.length > 0 && (
+                    <span className="text-xs text-muted-foreground truncate">
+                      {event.speakers.slice(0, 2).join(', ')}
+                    </span>
+                  )}
+                </div>
+
+                <h2 className="text-lg sm:text-xl font-bold text-foreground mt-2 mb-1">
+                  {event.title}
+                </h2>
+                {event.description_plain && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {event.description_plain}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/webinar/${event.slug}`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-colors"
+                  >
+                    <Play size={15} />
+                    {registered ? 'Join now' : 'Register and join'}
+                  </Link>
+                  <Link
+                    href={`/events/${event.slug}`}
+                    className="text-sm text-muted-foreground hover:text-foreground px-2"
+                  >
+                    Event details
+                  </Link>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Upcoming Webinars */}
       {(statusFilter === 'all' || statusFilter === 'upcoming') && upcoming.length > 0 && (
         <div className="space-y-4">
@@ -368,9 +478,15 @@ export default function LiveWebinars() {
                         <Calendar size={12} />
                         <span>{formatDateTime(event.starts_at)}</span>
                       </div>
-                      <Badge className="text-[10px] bg-gold/10 text-gold border-gold/30" variant="outline">
-                        <Clock size={10} className="mr-1" /> {getCountdown(event.starts_at)}
-                      </Badge>
+                      {event.session?.status === 'live' ? (
+                        <Badge className="text-[10px] bg-red-600 text-white border-red-600" variant="outline">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white wb-live-dot mr-1.5" /> LIVE NOW
+                        </Badge>
+                      ) : (
+                        <Badge className="text-[10px] bg-gold/10 text-gold border-gold/30" variant="outline">
+                          <Clock size={10} className="mr-1" /> {getCountdown(event.starts_at)}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Capacity */}
@@ -390,7 +506,27 @@ export default function LiveWebinars() {
                             <Check size={13} className="text-green-600" /> You&apos;re registered
                           </p>
 
-                          {event.zoom_url && (
+                          {/* Native webinars open on the site; legacy events keep
+                              their Zoom / Vimeo Live links. */}
+                          {event.session ? (
+                            <Link
+                              href={`/webinar/${event.slug}`}
+                              className={`flex items-center justify-center gap-2 w-full py-2 sm:py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                                event.session.status === 'live'
+                                  ? 'bg-gold text-gold-foreground hover:bg-gold/90'
+                                  : 'bg-navy text-navy-foreground hover:bg-navy/90'
+                              }`}
+                            >
+                              {event.session.status === 'live' ? (
+                                <>
+                                  <span className="w-2 h-2 rounded-full bg-red-600 wb-live-dot" />
+                                  Join now — live
+                                </>
+                              ) : (
+                                <><Video size={14} /> Open webinar room</>
+                              )}
+                            </Link>
+                          ) : event.zoom_url ? (
                             <a
                               href={event.zoom_url}
                               target="_blank"
@@ -399,9 +535,9 @@ export default function LiveWebinars() {
                             >
                               <ExternalLink size={14} /> Join on Zoom
                             </a>
-                          )}
+                          ) : null}
 
-                          {(event.zoom_meeting_id || event.zoom_passcode) && (
+                          {!event.session && (event.zoom_meeting_id || event.zoom_passcode) && (
                             <div className="space-y-1.5">
                               {event.zoom_meeting_id && (
                                 <div className="flex items-center justify-between text-xs">
@@ -422,7 +558,7 @@ export default function LiveWebinars() {
                             </div>
                           )}
 
-                          {event.vimeo_live_embed_url && !event.zoom_url && (
+                          {!event.session && event.vimeo_live_embed_url && !event.zoom_url && (
                             <a
                               href={event.vimeo_live_embed_url}
                               target="_blank"
@@ -491,11 +627,21 @@ export default function LiveWebinars() {
           <h2 className="text-lg font-semibold text-foreground">Past Webinars</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
             {past.map(event => {
-              // Try to find a matching video recording
-              const matchingVideo = videos.find(v =>
-                v.title.toLowerCase().includes(event.title.toLowerCase().slice(0, 20)) ||
-                event.title.toLowerCase().includes(v.title.toLowerCase().slice(0, 20))
-              )
+              // Recordings are linked to their event by videos.event_id, set by
+              // the live webinar pipeline. Legacy recordings uploaded to Vimeo
+              // by hand have no event_id, so those still fall back to matching
+              // on the title.
+              const matchingVideo =
+                videos.find(v => v.event_id === event.id) ??
+                (event.session
+                  ? videos.find(v => v.id === event.session?.recording_video_id)
+                  : undefined) ??
+                videos.find(v =>
+                  !v.event_id && (
+                    v.title.toLowerCase().includes(event.title.toLowerCase().slice(0, 20)) ||
+                    event.title.toLowerCase().includes(v.title.toLowerCase().slice(0, 20))
+                  )
+                )
               const thumbSrc = event.featured_image_url || matchingVideo?.thumbnail_url || ''
 
               return (

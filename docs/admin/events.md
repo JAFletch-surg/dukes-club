@@ -95,6 +95,18 @@ Assign faculty members as speakers or facilitators:
 2. Select a role for each faculty member (e.g. "Speaker", "Faculty").
 3. Faculty must already exist in the [Faculty database](people.md#faculty) — use the "Create Faculty" dialog if they do not.
 
+## Streaming Settings
+
+Shown for **Webinar**, **Online Lecture** and **Hybrid** event types.
+
+* **Dukes' Live (on this site)** — the webinar runs natively on the site. Attendees watch,
+  chat, ask questions and vote in polls without leaving Dukes' Club, and the recording is
+  published to the video library afterwards. See [Live Webinars](live-webinars.md).
+* **Zoom** — enter the join URL, meeting ID and passcode. Registered attendees see these on
+  the webinars page.
+* **Vimeo Live** — enter the Vimeo live event ID and embed URL.
+* **Hybrid** — both Zoom and Vimeo details.
+
 ## Applications and Registration
 
 > **Note:** Application settings are only available for **Practical Workshop** and **In Person Course** event types.
