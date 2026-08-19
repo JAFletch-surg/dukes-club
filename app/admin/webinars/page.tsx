@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Radio, Plus, Loader, X, Copy, CheckCheck, Trash2, ExternalLink,
-  RefreshCw, Users, Video, AlertTriangle, Mail,
+  RefreshCw, Users, Video, AlertTriangle, Mail, BarChart3, ChevronUp, ChevronDown, Save,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { sendEmail } from '@/lib/emails/send-email'
@@ -63,6 +63,7 @@ export default function WebinarsAdmin() {
   const [newEventId, setNewEventId] = useState('')
   const [saving, setSaving] = useState(false)
   const [speakerPanel, setSpeakerPanel] = useState<SessionRow | null>(null)
+  const [pollPanel, setPollPanel] = useState<SessionRow | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
 
   const showToast = (msg: string, type = 'ok') => {
@@ -270,6 +271,12 @@ export default function WebinarsAdmin() {
                     >
                       <Mail size={14} /> Speakers
                     </button>
+                    <button
+                      onClick={() => setPollPanel(session)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', background: '#fff', border: `1.5px solid ${C.muted}`, color: C.fg, borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <BarChart3 size={14} /> Polls
+                    </button>
                     {session.recording_video_id && (
                       <Link
                         href={`/members/videos?v=${session.recording_video_id}`}
@@ -367,6 +374,14 @@ export default function WebinarsAdmin() {
         <SpeakerManager
           session={speakerPanel}
           onClose={() => setSpeakerPanel(null)}
+          onToast={showToast}
+        />
+      )}
+
+      {pollPanel && (
+        <PollManager
+          session={pollPanel}
+          onClose={() => setPollPanel(null)}
           onToast={showToast}
         />
       )}
@@ -601,6 +616,349 @@ function SpeakerManager({
               speaker loses theirs.
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Pre-authoring for polls.
+ *
+ * Polls used to be writable only from the live studio sidebar — 380px wide,
+ * while the webinar was running, which is the wrong moment and the wrong amount
+ * of room to be composing questions. Drafts are already invisible to attendees
+ * (the RLS policy is `status <> 'draft'`), so writing them ahead of time was
+ * always safe; there was just nowhere sensible to do it.
+ *
+ * Editing is restricted to drafts. Once a poll has been launched its wording is
+ * fixed, because votes already cast against the old wording would otherwise
+ * stop meaning anything.
+ */
+function PollManager({
+  session,
+  onClose,
+  onToast,
+}: {
+  session: SessionRow
+  onClose: () => void
+  onToast: (msg: string, type?: string) => void
+}) {
+  const supabase = createClient()
+  const [polls, setPolls] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const emptyForm = {
+    question: '',
+    options: ['', ''],
+    allow_multiple: false,
+    results_visible: true,
+  }
+  const [form, setForm] = useState(emptyForm)
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from('webinar_polls')
+      .select('*')
+      .eq('session_id', session.id)
+      .order('sort_order', { ascending: true })
+    setPolls(data ?? [])
+    setLoading(false)
+  }, [session.id, supabase])
+
+  useEffect(() => { load() }, [load])
+
+  function openNew() {
+    setForm(emptyForm)
+    setEditing('new')
+  }
+
+  function openEdit(poll: any) {
+    setForm({
+      question: poll.question,
+      options: (poll.options ?? []).map((o: any) => o.label),
+      allow_multiple: poll.allow_multiple,
+      results_visible: poll.results_visible,
+    })
+    setEditing(poll.id)
+  }
+
+  async function save() {
+    const clean = form.options.map(o => o.trim()).filter(Boolean)
+    if (!form.question.trim()) { onToast('Give the poll a question.', 'err'); return }
+    if (clean.length < 2) { onToast('A poll needs at least two options.', 'err'); return }
+
+    setSaving(true)
+    const payload = {
+      question: form.question.trim(),
+      options: clean.map((label, i) => ({ id: String.fromCharCode(97 + i), label })),
+      allow_multiple: form.allow_multiple,
+      results_visible: form.results_visible,
+    }
+
+    const { error } =
+      editing === 'new'
+        ? await supabase.from('webinar_polls').insert({
+            ...payload,
+            session_id: session.id,
+            sort_order: polls.reduce((max, p) => Math.max(max, p.sort_order ?? 0), -1) + 1,
+          })
+        : await supabase.from('webinar_polls').update(payload).eq('id', editing)
+
+    setSaving(false)
+    if (error) { onToast(error.message, 'err'); return }
+
+    setEditing(null)
+    onToast(editing === 'new' ? 'Poll added.' : 'Poll updated.')
+    load()
+  }
+
+  async function remove(poll: any) {
+    if (!confirm(`Delete “${poll.question}”?`)) return
+    const { error } = await supabase.from('webinar_polls').delete().eq('id', poll.id)
+    if (error) { onToast(error.message, 'err'); return }
+    onToast('Poll deleted.')
+    load()
+  }
+
+  /** Swap a poll with its neighbour and renumber, so sort_order stays dense. */
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= polls.length) return
+
+    const reordered = [...polls]
+    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+    setPolls(reordered)
+
+    await Promise.all(
+      reordered.map((p, i) =>
+        supabase.from('webinar_polls').update({ sort_order: i }).eq('id', p.id)
+      )
+    )
+    load()
+  }
+
+  const STATUS_TEXT: Record<string, string> = {
+    draft: 'Queued',
+    live: 'Live now',
+    closed: 'Closed',
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', zIndex: 50, display: 'grid', placeItems: 'center', padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#fff', borderRadius: 16, maxWidth: 640, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #EEE', position: 'sticky', top: 0, background: '#fff', borderRadius: '16px 16px 0 0' }}>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: C.fg }}>Polls</h2>
+            <p style={{ fontSize: 12.5, color: C.secondary }}>{session.event?.title}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.secondary }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ padding: '20px 22px' }}>
+          <p style={{ fontSize: 13, color: C.secondary, marginBottom: 16, lineHeight: 1.55 }}>
+            Prepare polls here before the webinar. They stay hidden from attendees until you
+            press <strong>Launch</strong> in the host studio, so you can queue up as many as you
+            like and fire each one when the talk reaches it.
+          </p>
+
+          {loading ? (
+            <div style={{ display: 'grid', placeItems: 'center', padding: 40 }}>
+              <Loader className="animate-spin" size={24} style={{ color: C.secondary }} />
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
+              {polls.map((poll, i) => (
+                <div key={poll.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 2 }}>
+                      <button
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0}
+                        aria-label="Move up"
+                        style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? C.muted : C.secondary, padding: 0, lineHeight: 0 }}
+                      >
+                        <ChevronUp size={15} />
+                      </button>
+                      <button
+                        onClick={() => move(i, 1)}
+                        disabled={i === polls.length - 1}
+                        aria-label="Move down"
+                        style={{ background: 'none', border: 'none', cursor: i === polls.length - 1 ? 'default' : 'pointer', color: i === polls.length - 1 ? C.muted : C.secondary, padding: 0, lineHeight: 0 }}
+                      >
+                        <ChevronDown size={15} />
+                      </button>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+                        <span style={S.badge(
+                          poll.status === 'live' ? '#FDECEC' : poll.status === 'closed' ? '#EFEFF1' : '#E8EEF7',
+                          poll.status === 'live' ? C.destructive : poll.status === 'closed' ? C.secondary : C.navy
+                        )}>
+                          {STATUS_TEXT[poll.status]}
+                        </span>
+                        {poll.allow_multiple && <span style={S.badge('#F2F2F4', C.secondary)}>Multiple answers</span>}
+                        {!poll.results_visible && <span style={S.badge('#F2F2F4', C.secondary)}>Results hidden</span>}
+                      </div>
+
+                      <p style={{ fontSize: 14, fontWeight: 600, color: C.fg, marginBottom: 3 }}>
+                        {poll.question}
+                      </p>
+                      <p style={{ fontSize: 12, color: C.secondary }}>
+                        {(poll.options ?? []).map((o: any) => o.label).join(' · ')}
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {poll.status === 'draft' && (
+                        <button
+                          onClick={() => openEdit(poll)}
+                          style={{ padding: '6px 12px', background: '#fff', border: `1.5px solid ${C.muted}`, borderRadius: 8, fontSize: 12, fontWeight: 600, color: C.fg, cursor: 'pointer' }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <button
+                        onClick={() => remove(poll)}
+                        aria-label="Delete poll"
+                        style={{ padding: 6, background: '#fff', border: `1.5px solid ${C.muted}`, borderRadius: 8, color: C.destructive, cursor: 'pointer' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {poll.status !== 'draft' && (
+                    <p style={{ fontSize: 11.5, color: C.secondary, marginTop: 8, paddingTop: 8, borderTop: '1px solid #F0F0F2' }}>
+                      Already shown to attendees, so the wording is locked — votes cast against
+                      it would stop matching otherwise.
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              {polls.length === 0 && (
+                <p style={{ fontSize: 13.5, color: C.secondary, textAlign: 'center', padding: '24px 0' }}>
+                  No polls yet.
+                </p>
+              )}
+            </div>
+          )}
+
+          {editing ? (
+            <div style={{ borderTop: '1px solid #EEE', paddingTop: 18 }}>
+              <label style={S.label}>Question</label>
+              <input
+                style={S.input}
+                value={form.question}
+                onChange={e => setForm({ ...form, question: e.target.value })}
+                placeholder="Which anastomotic technique do you prefer?"
+              />
+
+              <label style={{ ...S.label, marginTop: 14 }}>Options</label>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {form.options.map((opt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      style={S.input}
+                      value={opt}
+                      onChange={e => setForm({
+                        ...form,
+                        options: form.options.map((o, j) => (j === i ? e.target.value : o)),
+                      })}
+                      placeholder={`Option ${i + 1}`}
+                    />
+                    {form.options.length > 2 && (
+                      <button
+                        onClick={() => setForm({ ...form, options: form.options.filter((_, j) => j !== i) })}
+                        aria-label="Remove option"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.secondary, flexShrink: 0 }}
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {form.options.length < 8 && (
+                <button
+                  onClick={() => setForm({ ...form, options: [...form.options, ''] })}
+                  style={{ marginTop: 8, background: 'none', border: 'none', padding: 0, fontSize: 12.5, fontWeight: 600, color: C.primary, cursor: 'pointer' }}
+                >
+                  + Add option
+                </button>
+              )}
+
+              <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: C.fg, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.allow_multiple}
+                    onChange={e => setForm({ ...form, allow_multiple: e.target.checked })}
+                    style={{ accentColor: C.navy, width: 15, height: 15, marginTop: 2 }}
+                  />
+                  <span>
+                    Allow multiple answers
+                    <span style={{ display: 'block', fontSize: 11.5, color: C.secondary }}>
+                      Attendees can tick more than one option.
+                    </span>
+                  </span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: C.fg, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.results_visible}
+                    onChange={e => setForm({ ...form, results_visible: e.target.checked })}
+                    style={{ accentColor: C.navy, width: 15, height: 15, marginTop: 2 }}
+                  />
+                  <span>
+                    Show results to attendees
+                    <span style={{ display: 'block', fontSize: 11.5, color: C.secondary }}>
+                      Turn this off for a teaching question — seeing the distribution first
+                      sways the room. You can reveal the results from the studio afterwards.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+                <button
+                  onClick={() => setEditing(null)}
+                  style={{ padding: '9px 16px', background: 'none', border: 'none', fontSize: 13.5, fontWeight: 600, color: C.secondary, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', background: C.navy, color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}
+                >
+                  {saving ? <Loader className="animate-spin" size={14} /> : <Save size={14} />}
+                  {editing === 'new' ? 'Add poll' : 'Save changes'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={openNew}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', padding: '11px 0', background: '#fff', border: `1.5px dashed ${C.muted}`, borderRadius: 10, fontSize: 13.5, fontWeight: 600, color: C.fg, cursor: 'pointer' }}
+            >
+              <Plus size={15} /> New poll
+            </button>
+          )}
         </div>
       </div>
     </div>

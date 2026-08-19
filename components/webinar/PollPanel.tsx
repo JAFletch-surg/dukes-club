@@ -90,7 +90,7 @@ function PollCard({
   return (
     <div className="wb-panel-enter rounded-lg bg-white ring-1 ring-slate-200 p-3.5">
       <div className="flex items-start gap-2 mb-2.5">
-        <p className="text-[15px] font-semibold leading-snug text-slate-100 flex-1">
+        <p className="text-[15px] font-semibold leading-snug text-slate-900 flex-1">
           {poll.question}
         </p>
         {isOpen && (
@@ -106,6 +106,10 @@ function PollCard({
           const pct = voters > 0 ? Math.round((count / voters) * 100) : 0
           const picked = myVote?.includes(option.id) || selected.includes(option.id)
 
+          // Before results are shown this is a choice button; afterwards it is
+          // a bar chart. The bar sits BELOW the label rather than washing
+          // behind it, so it can carry a full-strength blue without dragging
+          // the text contrast down with it.
           return (
             <button
               key={option.id}
@@ -113,31 +117,37 @@ function PollCard({
               disabled={!enabled || !isOpen || hasVoted}
               onClick={() => toggle(option.id)}
               className={cn(
-                'relative w-full text-left rounded-md overflow-hidden ring-1 transition-colors',
-                picked ? 'ring-amber-500' : 'ring-slate-200',
+                'w-full text-left rounded-md px-3 py-2 ring-1 transition-colors',
+                picked ? 'ring-primary' : 'ring-slate-200',
                 isOpen && !hasVoted && enabled && 'hover:ring-slate-300 cursor-pointer',
                 (!isOpen || hasVoted) && 'cursor-default'
               )}
             >
-              {showResults && (
-                <div
-                  className={cn(
-                    'wb-bar absolute inset-y-0 left-0',
-                    picked ? 'bg-amber-200' : 'bg-slate-100'
-                  )}
-                  style={{ width: `${pct}%` }}
-                />
-              )}
-
-              <div className="relative flex items-center gap-2 px-3 py-2">
-                {picked && <Check size={12} className="text-amber-700 shrink-0" />}
+              <div className="flex items-center gap-2">
+                {picked && <Check size={12} className="text-primary shrink-0" />}
                 <span className="text-[13px] text-slate-700 flex-1">{option.label}</span>
                 {showResults && (
-                  <span className="text-[12px] font-semibold text-slate-900/70 shrink-0 tabular-nums">
+                  <span className="text-[12px] font-semibold text-slate-900 shrink-0 tabular-nums">
                     {pct}%
                   </span>
                 )}
               </div>
+
+              {showResults && (
+                <div className="mt-1.5 h-1.5 rounded-full bg-accent overflow-hidden">
+                  <div
+                    className={cn(
+                      'wb-bar h-full rounded-full',
+                      // One hue for every option — bar length already encodes
+                      // the magnitude, so a different colour per option would
+                      // only re-say it. The deeper step marks your own answer,
+                      // which is a property of the entity, not of its rank.
+                      picked ? 'bg-primary' : 'bg-chart-1'
+                    )}
+                    style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%` }}
+                  />
+                </div>
+              )}
             </button>
           )
         })}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { SupabaseClient } from '@supabase/supabase-js'
 import { getSupabase, resolveSpeakerToken } from '../_shared'
 
 export const runtime = 'nodejs'
@@ -60,14 +61,54 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false }),
   ])
 
+  const polls = pollsRes.data ?? []
+
   return NextResponse.json({
     speaker: { id: speaker.id, name: speaker.name, role: speaker.role },
     session: sessionRes.data,
     questions: questionsRes.data ?? [],
     chat: chatRes.data ?? [],
-    polls: pollsRes.data ?? [],
+    polls,
+    results: await pollResults(supabase, polls.map((p: any) => p.id)),
     resources: resourcesRes.data ?? [],
   })
+}
+
+/**
+ * Per-poll tallies for the speaker's sidebar.
+ *
+ * The speaker previously received no results at all, so every bar read 0% —
+ * they could see that a poll was running but never its outcome.
+ *
+ * This route is service-role, so it could read anything; it deliberately
+ * returns only counts, never who voted for what. That keeps the same guarantee
+ * members get from the webinar_poll_results SECURITY DEFINER function, which
+ * exists precisely so a tally never exposes an individual vote.
+ */
+async function pollResults(
+  supabase: SupabaseClient,
+  pollIds: string[]
+): Promise<Record<string, { counts: Record<string, number>; voters: number; myVote: null }>> {
+  if (pollIds.length === 0) return {}
+
+  const { data: votes } = await supabase
+    .from('webinar_poll_votes')
+    .select('poll_id, option_ids')
+    .in('poll_id', pollIds)
+
+  const out: Record<string, { counts: Record<string, number>; voters: number; myVote: null }> = {}
+  for (const id of pollIds) out[id] = { counts: {}, voters: 0, myVote: null }
+
+  for (const vote of votes ?? []) {
+    const bucket = out[vote.poll_id]
+    if (!bucket) continue
+    bucket.voters += 1
+    for (const optionId of vote.option_ids ?? []) {
+      bucket.counts[optionId] = (bucket.counts[optionId] ?? 0) + 1
+    }
+  }
+
+  return out
 }
 
 export async function POST(request: NextRequest) {

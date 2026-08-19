@@ -23,6 +23,8 @@ interface SpeakerState {
   questions: any[]
   chat: any[]
   polls: any[]
+  /** poll id → { counts, voters } so the speaker sees the outcome, not zeros */
+  results: Record<string, { counts: Record<string, number>; voters: number; myVote: null }>
   resources: any[]
   speaker: { id: string; name: string; role: string }
 }
@@ -209,7 +211,7 @@ export function SpeakerRoom({ slug }: { slug: string }) {
       polls={
         <PollPanel
           polls={state?.polls ?? []}
-          results={{}}
+          results={state?.results ?? {}}
           enabled={false}
           readOnly
           onVote={async () => ({ error: null })}

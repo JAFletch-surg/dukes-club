@@ -11,9 +11,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react'
 import {
-  Loader2, Radio, Square, Circle, Plus, X, Play, Check,
+  Loader2, Radio, Square, Circle, Plus, X, Play, Check, Eye,
   AlertTriangle, Link2,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useWebinarRealtime } from '@/lib/use-webinar-realtime'
 import { elapsedSince, attachmentKind, MAX_WEBINAR_UPLOAD, type WebinarSession } from '@/lib/webinars'
@@ -446,7 +447,8 @@ function HostPollPanel({
       session_id: sessionId,
       question: question.trim(),
       options: clean.map((label, i) => ({ id: String.fromCharCode(97 + i), label })),
-      sort_order: polls.length,
+      // Max + 1 rather than polls.length, which collides after a delete.
+      sort_order: polls.reduce((max, p) => Math.max(max, p.sort_order ?? 0), -1) + 1,
     })
     setSaving(false)
 
@@ -460,7 +462,7 @@ function HostPollPanel({
 
   async function setStatus(pollId: string, status: 'live' | 'closed') {
     const patch: Record<string, any> = { status }
-    if (status === 'live') patch.launched_at = new Date().toISOString()
+    if (status === 'live') { patch.launched_at = new Date().toISOString(); patch.closed_at = null }
     if (status === 'closed') patch.closed_at = new Date().toISOString()
 
     const { error } = await supabase.from('webinar_polls').update(patch).eq('id', pollId)
@@ -469,57 +471,146 @@ function HostPollPanel({
     onToast(status === 'live' ? 'Poll is live for attendees.' : 'Poll closed.')
   }
 
-  return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 min-h-0">
-        {polls.map(poll => (
-          <div key={poll.id} className="rounded-lg bg-white ring-1 ring-slate-200 p-3">
-            <p className="text-[14.5px] font-semibold leading-snug mb-2">{poll.question}</p>
+  /** Reveal a poll whose results were deliberately hidden while people voted. */
+  async function reveal(pollId: string) {
+    const { error } = await supabase
+      .from('webinar_polls')
+      .update({ results_visible: true })
+      .eq('id', pollId)
+    if (error) { onToast(error.message, 'err'); return }
+    await onChanged()
+    onToast('Results revealed to attendees.')
+  }
 
-            <div className="space-y-1 mb-2.5">
-              {poll.options.map((o: any) => {
-                const count = results[poll.id]?.counts[o.id] ?? 0
-                const voters = results[poll.id]?.voters ?? 0
-                const pct = voters ? Math.round((count / voters) * 100) : 0
-                return (
-                  <div key={o.id} className="relative rounded-md overflow-hidden ring-1 ring-slate-200">
-                    <div className="wb-bar absolute inset-y-0 left-0 bg-gold/25" style={{ width: `${pct}%` }} />
-                    <div className="relative flex items-center gap-2 px-2.5 py-1.5">
-                      <span className="text-[12.5px] flex-1">{o.label}</span>
-                      <span className="text-[11.5px] tabular-nums text-slate-500">
-                        {count} · {pct}%
-                      </span>
-                    </div>
+  // Run-of-show order: what to fire next, what is running, what is done.
+  const queued = polls.filter(p => p.status === 'draft')
+  const liveNow = polls.filter(p => p.status === 'live')
+  const closed = polls.filter(p => p.status === 'closed')
+
+  const card = (poll: any) => {
+    const voters = results[poll.id]?.voters ?? 0
+    const showBars = poll.status !== 'draft'
+
+    return (
+      <div
+        key={poll.id}
+        className={cn(
+          'rounded-lg bg-white ring-1 p-3',
+          poll.status === 'live' ? 'ring-primary/40 shadow-sm' : 'ring-slate-200'
+        )}
+      >
+        <p className="text-[14.5px] font-semibold leading-snug mb-2">{poll.question}</p>
+
+        {showBars && (
+          <div className="space-y-1.5 mb-2.5">
+            {poll.options.map((o: any) => {
+              const count = results[poll.id]?.counts[o.id] ?? 0
+              const pct = voters ? Math.round((count / voters) * 100) : 0
+              return (
+                <div key={o.id}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12.5px] text-slate-700 flex-1">{o.label}</span>
+                    <span className="text-[11.5px] tabular-nums text-slate-900 font-medium">
+                      {count} · {pct}%
+                    </span>
                   </div>
-                )
-              })}
-            </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-accent overflow-hidden">
+                    <div
+                      className="wb-bar h-full rounded-full bg-chart-1"
+                      style={{ width: `${Math.max(pct, pct > 0 ? 2 : 0)}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
-            <div className="flex items-center gap-2">
-              {poll.status === 'draft' && (
+        {poll.status === 'draft' && (
+          <p className="text-[11.5px] text-slate-400 mb-2.5">
+            {poll.options.length} options
+            {poll.allow_multiple && ' · multiple answers'}
+            {!poll.results_visible && ' · results hidden until revealed'}
+          </p>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {poll.status === 'draft' && (
+            <button
+              type="button"
+              onClick={() => setStatus(poll.id, 'live')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white text-[11.5px] font-bold hover:bg-primary/90"
+            >
+              <Play size={10} /> Launch
+            </button>
+          )}
+
+          {poll.status === 'live' && (
+            <>
+              <button
+                type="button"
+                onClick={() => setStatus(poll.id, 'closed')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-[11.5px] font-semibold hover:bg-slate-200"
+              >
+                <Square size={10} /> Close
+              </button>
+              {!poll.results_visible && (
                 <button
                   type="button"
-                  onClick={() => setStatus(poll.id, 'live')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gold text-gold-foreground text-[11.5px] font-bold hover:bg-gold/90"
-                >
-                  <Play size={10} /> Launch
-                </button>
-              )}
-              {poll.status === 'live' && (
-                <button
-                  type="button"
-                  onClick={() => setStatus(poll.id, 'closed')}
+                  onClick={() => reveal(poll.id)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-[11.5px] font-semibold hover:bg-slate-200"
                 >
-                  <Square size={10} /> Close
+                  <Eye size={10} /> Reveal
                 </button>
               )}
-              <span className="ml-auto text-[11px] text-slate-400">
-                {results[poll.id]?.voters ?? 0} responses · {poll.status}
-              </span>
-            </div>
-          </div>
-        ))}
+            </>
+          )}
+
+          {poll.status === 'closed' && (
+            <button
+              type="button"
+              onClick={() => setStatus(poll.id, 'live')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-[11.5px] font-semibold hover:bg-slate-200"
+            >
+              <Play size={10} /> Reopen
+            </button>
+          )}
+
+          <span className="ml-auto text-[11px] text-slate-400">
+            {poll.status === 'draft'
+              ? 'Not yet shown'
+              : `${voters} response${voters === 1 ? '' : 's'}`}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  const group = (label: string, items: any[]) =>
+    items.length > 0 && (
+      <div className="space-y-2">
+        <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-slate-400 px-0.5">
+          {label}
+        </p>
+        {items.map(card)}
+      </div>
+    )
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 min-h-0">
+        {group('Live now', liveNow)}
+        {group(`Queued${queued.length > 1 ? ` · ${queued.length}` : ''}`, queued)}
+        {group('Closed', closed)}
+
+        {polls.length === 0 && !creating && (
+          <p className="text-[12.5px] text-slate-400 text-center px-4 py-6 leading-relaxed">
+            No polls yet. Prepare them in advance under
+            <br />
+            <span className="text-slate-500">Admin → Live Webinars → Polls</span>, or add a
+            quick one below.
+          </p>
+        )}
 
         {creating ? (
           <div className="rounded-lg bg-white ring-1 ring-slate-200 p-3 space-y-2">
