@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Montserrat, IBM_Plex_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
@@ -12,6 +13,34 @@ export const metadata: Metadata = {
 }
 
 /**
+ * Fonts are self-hosted through next/font rather than linked from
+ * fonts.googleapis.com.
+ *
+ * The three <link rel="stylesheet"> tags that used to live in <head> were
+ * render-blocking requests to two third-party origins, on every page view,
+ * before anything could paint. next/font inlines the @font-face rules, serves
+ * the files from this origin, and generates a size-adjusted local fallback so
+ * the swap from fallback to webfont does not shift the layout.
+ *
+ * Cormorant Garamond is NOT loaded here. Nothing on the public site uses
+ * font-serif — every usage is under /admin or /members — so it is loaded in
+ * those layouts instead and never costs a marketing visitor anything.
+ */
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-montserrat',
+  display: 'swap',
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-ibm-plex-mono',
+  display: 'swap',
+})
+
+/**
  * Deliberately static: no cookies(), no headers(), nothing async.
  *
  * Reading auth here would opt EVERY route in the app out of static generation
@@ -22,14 +51,7 @@ export const metadata: Metadata = {
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" className={`${montserrat.variable} ${ibmPlexMono.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Analytics />

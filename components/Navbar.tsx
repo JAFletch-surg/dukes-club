@@ -1,7 +1,9 @@
 'use client'
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
+import logoWhite from "@/public/images/logo-white.png";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogIn } from "lucide-react";
 import { useAuth } from "@/lib/use-auth";
@@ -24,7 +26,11 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-navy/95 backdrop-blur-md border-b border-navy-foreground/10">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         <Link href="/" className="flex items-center">
-          <img src="/images/logo-white.png" alt="The Dukes' Club" className="h-10" />
+          {/* Static import so the intrinsic size ships in the markup: the bare
+              <img> had a height but no width, so its box was 0px wide until the
+              file decoded and then snapped open — a layout shift in the header
+              of every page. */}
+          <Image src={logoWhite} alt="The Dukes' Club" className="h-10 w-auto" priority sizes="140px" />
         </Link>
 
         {/* Desktop Nav */}

@@ -1,7 +1,16 @@
 import { redirect } from 'next/navigation'
+import { Cormorant_Garamond } from 'next/font/google'
 import { AuthProvider } from '@/lib/auth-provider'
 import { getAuthUser, getProfile } from '@/lib/supabase/auth'
 import MembersLayoutClient from './members-layout-client'
+
+/** Used by the feedback page's headings; see app/admin/layout.tsx. */
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-cormorant-garamond',
+  display: 'swap',
+})
 
 /**
  * Server shell for the members portal — mirrors app/admin/layout.tsx.
@@ -30,7 +39,9 @@ export default async function MembersLayout({ children }: { children: React.Reac
 
   return (
     <AuthProvider initialUser={user} initialProfile={profile}>
-      <MembersLayoutClient>{children}</MembersLayoutClient>
+      <div className={cormorant.variable}>
+        <MembersLayoutClient>{children}</MembersLayoutClient>
+      </div>
     </AuthProvider>
   )
 }

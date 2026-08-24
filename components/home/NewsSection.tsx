@@ -78,6 +78,11 @@ const NewsSection = () => {
           </div>
         </div>
 
+        {/* Reserve the loaded grid's height. These posts are fetched from
+            Supabase after hydration, so without a floor here the spinner's
+            small box is replaced by a ~420px grid and everything below the
+            fold jumps — a layout shift charged against the whole page. */}
+        <div className="md:min-h-[420px]">
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader className="animate-spin text-muted-foreground" size={24} />
@@ -96,7 +101,7 @@ const NewsSection = () => {
               >
                 <div className="relative h-48 overflow-hidden bg-navy">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img src={item.imageUrl} alt={item.title} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Newspaper className="text-navy-foreground/40 group-hover:text-gold transition-colors" size={48} />
@@ -118,7 +123,7 @@ const NewsSection = () => {
                     {item.authorName && (
                       <div className="flex items-center gap-2">
                         {item.authorPhoto
-                          ? <img src={item.authorPhoto} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          ? <img src={item.authorPhoto} alt="" loading="lazy" decoding="async" className="w-5 h-5 rounded-full object-cover" />
                           : <User size={12} className="text-muted-foreground" />
                         }
                         <span className="text-xs text-muted-foreground">{item.authorName}</span>
@@ -136,6 +141,7 @@ const NewsSection = () => {
             ))}
           </div>
         )}
+        </div>
       </div>
     </section>
   );

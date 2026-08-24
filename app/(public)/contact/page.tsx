@@ -1,5 +1,7 @@
 'use client'
 import { useState } from "react";
+import Image from "next/image";
+import logoContact from "@/public/images/logo-contact.png";
 
 
 import { Input } from "@/components/ui/input";
@@ -119,10 +121,11 @@ const ContactPage = () => {
             <div className="lg:col-span-2">
               <AnimatedSection>
                 <div className="flex justify-center mb-10">
-                  <img
-                    src="/images/logo-contact.png"
+                  <Image
+                    src={logoContact}
                     alt="Dukes' Club"
-                    className="h-32"
+                    className="h-32 w-auto"
+                    sizes="320px"
                   />
                 </div>
                 <p className="text-foreground/70 leading-relaxed mb-8">

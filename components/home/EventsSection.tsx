@@ -1,8 +1,17 @@
 'use client'
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 import { ArrowRight, CalendarDays, MapPin, PoundSterling } from "lucide-react";
+
+// Static imports rather than string paths: next/image then knows each file's
+// intrinsic size and serves a card-sized WebP off a srcset. These sources were
+// 2000x1545 PNGs weighing 1.4-2.4MB each, and the mobile card renders them into
+// a 96px-wide box.
+import awrYellow from "@/public/images/events/awr-yellow.png";
+import ibdYellow from "@/public/images/events/ibd-yellow.png";
+import robot from "@/public/images/events/robot.png";
 
 
 
@@ -17,7 +26,7 @@ const upcomingEvents = [
     price: "Free",
     description:
       "Lecture-based course on complex herniae, intestinal failure, and abdominal wall management.",
-    image: "/images/events/awr-yellow.png",
+    image: awrYellow,
   },
   {
     title: "ACPGBI 2026: Advanced IBD Surgery Course",
@@ -28,7 +37,7 @@ const upcomingEvents = [
     price: "£250",
     description:
       "Hands on wet lab workshops on Ileo-anal Pouch and formation of Kono-S anastomosis. Expert consultant faculty.",
-    image: "/images/events/ibd-yellow.png",
+    image: ibdYellow,
   },
   {
     title: "Robotic Cadaveric CME Course",
@@ -39,7 +48,7 @@ const upcomingEvents = [
     price: "£450 (£300 members)",
     description:
       "Hands-on cadaveric training with evening Zoom masterclass.",
-    image: "/images/events/robot.png",
+    image: robot,
   },
 ];
 
@@ -74,8 +83,8 @@ const EventsSection = () => {
             <Link key={event.title} href={`/events/${event.slug}`} className="block group">
               {/* Mobile: compact horizontal card */}
               <div className="md:hidden flex rounded-lg border-2 border-navy-foreground overflow-hidden bg-navy hover:border-gold/40 transition-colors">
-                <div className="w-24 shrink-0 overflow-hidden">
-                  <img src={event.image} alt={event.title} className="w-full h-full object-cover" />
+                <div className="relative w-24 shrink-0 overflow-hidden">
+                  <Image src={event.image} alt={event.title} fill className="object-cover" sizes="96px" />
                 </div>
                 <div className="flex-1 min-w-0 p-3 flex flex-col justify-center gap-1">
                   <span className="text-[10px] font-semibold text-gold uppercase tracking-wide">{event.tag}</span>
@@ -92,8 +101,8 @@ const EventsSection = () => {
               </div>
               {/* Desktop: vertical card */}
               <div className="hidden md:flex md:flex-col rounded-lg border-2 border-navy-foreground overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-navy h-full">
-                <div className="aspect-[4/3] overflow-hidden shrink-0">
-                  <img src={event.image} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <div className="relative aspect-[4/3] overflow-hidden shrink-0">
+                  <Image src={event.image} alt={event.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" sizes="(min-width: 768px) 33vw, 96px" />
                 </div>
                 <div className="p-6 flex flex-col flex-1">
                   <h3 className="text-lg font-sans font-semibold text-navy-foreground mb-3">{event.title}</h3>

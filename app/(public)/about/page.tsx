@@ -104,6 +104,8 @@ const CommitteeCard = ({
         src="/images/card-bg.png"
         alt=""
         aria-hidden="true"
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 w-full h-full object-cover opacity-[0.12] pointer-events-none select-none"
       />
       {/* Dark gradient overlay at bottom */}
@@ -275,6 +277,8 @@ const RegionalRepCard = ({
         src="/images/card-bg.png"
         alt=""
         aria-hidden="true"
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 w-full h-full object-cover opacity-[0.12] pointer-events-none select-none"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/80 to-transparent pointer-events-none" />
