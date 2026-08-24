@@ -22,8 +22,22 @@ export interface Profile {
   created_at: string | null
 }
 
+/**
+ * The auth user as this app actually consumes it: across every useAuth()
+ * caller only .id and .email are ever read, and both are JWT claims. Keeping
+ * the type this narrow is what lets the protected layouts seed the provider
+ * from a locally-verified token instead of calling the Auth service.
+ *
+ * onAuthStateChange replaces this with the full supabase-js User on the
+ * client moments after hydration; User structurally satisfies AuthUser.
+ */
+export interface AuthUser {
+  id: string
+  email?: string | null
+}
+
 interface AuthContextType {
-  user: User | null
+  user: AuthUser | null
   profile: Profile | null
   loading: boolean
   signOut: () => Promise<void>
@@ -56,21 +70,26 @@ export function useAuth() {
 
 // ─── Provider ────────────────────────────────────────────────────────
 //
-// Accepts an optional initialUser from the server (via getUser() in a
-// Server Component like the root layout). This eliminates the loading
-// flash on first render — the client hydrates with the server-validated
-// user immediately, then onAuthStateChange keeps it in sync.
+// Accepts an optional initialUser/initialProfile from the server. The
+// protected layouts (app/members, app/admin) pass them, taken from the
+// verified JWT claims plus one profile query, so the members portal hydrates
+// with no loading flash.
+//
+// The (public) layout deliberately passes neither: seeding it would require
+// reading cookies above the marketing pages, which opts them out of static
+// generation. There the client resolves auth after hydration, and Navbar
+// holds its logged-out state until then.
 //
 // See: https://supabase.com/docs/guides/auth/server-side/nextjs
 
 interface AuthProviderProps {
-  initialUser?: User | null
+  initialUser?: AuthUser | null
   initialProfile?: Profile | null
   children: React.ReactNode
 }
 
 export function AuthProvider({ initialUser = null, initialProfile = null, children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(initialUser)
+  const [user, setUser] = useState<AuthUser | null>(initialUser)
   const [profile, setProfile] = useState<Profile | null>(initialProfile)
   const [loading, setLoading] = useState(!initialUser)
 

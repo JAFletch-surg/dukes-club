@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import { AuthProvider } from '@/lib/auth-provider'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -13,25 +11,16 @@ export const metadata: Metadata = {
   // is unset — setting it makes them silently disappear from the output.
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Fetch the authenticated user server-side so the client hydrates
-  // immediately without a loading flash. This follows the Supabase
-  // recommendation to always use getUser() on the server.
-  // See: https://supabase.com/docs/guides/auth/server-side/nextjs
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // If we have a user, fetch their profile so the client has it immediately
-  let profile = null
-  if (user) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-    profile = data
-  }
-
+/**
+ * Deliberately static: no cookies(), no headers(), nothing async.
+ *
+ * Reading auth here would opt EVERY route in the app out of static generation
+ * — including the marketing pages, which have no server data at all and were
+ * being server-rendered on every visit as a result. <AuthProvider> now lives
+ * in the route-group layouts that actually consume it: (public), members and
+ * admin. See lib/supabase/auth.ts.
+ */
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -42,9 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-sans antialiased">
-        <AuthProvider initialUser={user} initialProfile={profile}>
-          {children}
-        </AuthProvider>
+        {children}
         <Analytics />
         <SpeedInsights />
       </body>

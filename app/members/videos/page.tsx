@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
+import { authedFetch } from "@/lib/authed-fetch";
 import VimeoPlayer from "@/components/members/VimeoPlayer";
 
 const defaultCategories = ["All", "Operative", "Complications", "Webinar", "Education", "Lecture"];
@@ -459,7 +460,7 @@ const VideoArchive = () => {
     loadVideos();
 
     // Fetch watch progress for all videos
-    fetch('/api/videos/progress')
+    authedFetch('/api/videos/progress')
       .then(r => r.json())
       .then((rows: Array<{ video_id: string; watched_seconds: number; duration_seconds: number; completed: boolean }>) => {
         if (Array.isArray(rows)) {
