@@ -220,6 +220,38 @@ CREATE POLICY "event_faculty_delete_admin"
   USING (is_admin());
 
 -- ═══════════════════════════════════════════════════════════════════
+-- TABLE: event_sponsors
+-- ═══════════════════════════════════════════════════════════════════
+
+ALTER TABLE event_sponsors ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "event_sponsors_select_public" ON event_sponsors;
+DROP POLICY IF EXISTS "event_sponsors_insert_admin" ON event_sponsors;
+DROP POLICY IF EXISTS "event_sponsors_update_admin" ON event_sponsors;
+DROP POLICY IF EXISTS "event_sponsors_delete_admin" ON event_sponsors;
+
+CREATE POLICY "event_sponsors_select_public"
+  ON event_sponsors FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "event_sponsors_insert_admin"
+  ON event_sponsors FOR INSERT
+  TO authenticated
+  WITH CHECK (is_admin());
+
+CREATE POLICY "event_sponsors_update_admin"
+  ON event_sponsors FOR UPDATE
+  TO authenticated
+  USING (is_admin())
+  WITH CHECK (is_admin());
+
+CREATE POLICY "event_sponsors_delete_admin"
+  ON event_sponsors FOR DELETE
+  TO authenticated
+  USING (is_admin());
+
+-- ═══════════════════════════════════════════════════════════════════
 -- TABLE: event_bookings
 -- ═══════════════════════════════════════════════════════════════════
 

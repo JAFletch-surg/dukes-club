@@ -70,6 +70,18 @@ A tag-free copy of the description is stored separately and is what the event ca
 * **Capacity** — Maximum number of attendees.
 * **This price is a refundable deposit** — Tick when the fee is a deposit refunded on attendance rather than a charge. Cards, the calendar and the event page then read "£150 refundable deposit", and the event page's price box adds a *Fully refundable deposit* line.
 
+### Sponsors
+
+Attach the companies backing an event so the thanks do not have to be typed into the description.
+
+* Search the **Sponsors** box by name or tier and pick one — the list comes from [Admin → Sponsors](organisation.md#sponsors), where the logo, website and tier are set up once and reused across events.
+* Give each one a label: *Sponsor*, *Course Sponsor*, *Headline Sponsor*, *Supported by*, *Exhibitor* or *Prize Sponsor*.
+* The event page lists them under **With thanks to** in the order you add them, each logo linking to the sponsor's website.
+* Can't find a company? Add it on the sponsors page first, then come back to the event.
+* Sponsors marked inactive stay on the event but are hidden from the public page until they are active again.
+
+> **Setup:** Sponsors on events need the `event_sponsors` table. Run `supabase/add-event-sponsors.sql` once against the database. Until it is run the event still saves, and the admin tells you the sponsors did not.
+
 ### Featured Image
 
 Choose from the **stock image library** (surgical theatre, conference room, laparoscopic setup, etc.) or upload a custom image.

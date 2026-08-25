@@ -43,6 +43,7 @@ const EventDetailPage = () => {
   const supabase = createClient();
   const [event, setEvent] = useState<any>(null);
   const [faculty, setFaculty] = useState<any[]>([]);
+  const [sponsors, setSponsors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [existingBooking, setExistingBooking] = useState<any>(null);
   const [applying, setApplying] = useState(false);
@@ -112,6 +113,30 @@ const EventDetailPage = () => {
                 institution: f?.hospital || '',
                 photo_url: f?.photo_url || '',
               };
+            }));
+          }
+        }
+
+        // Sponsors, the same two-step. The table arrives with
+        // supabase/add-event-sponsors.sql, so a failure here just means no
+        // sponsor block rather than a broken page.
+        const { data: esData } = await supabase
+          .from('event_sponsors')
+          .select('sponsor_id, role, sort_order')
+          .eq('event_id', eventData.id)
+          .order('sort_order');
+
+        if (esData && esData.length > 0) {
+          const { data: sponsorRows } = await supabase
+            .from('sponsors')
+            .select('id, name, logo_url, website_url')
+            .in('id', esData.map((es: any) => es.sponsor_id));
+
+          if (sponsorRows) {
+            setSponsors(esData.flatMap((es: any) => {
+              const sponsor = sponsorRows.find((sr: any) => sr.id === es.sponsor_id);
+              // An inactive sponsor is hidden by RLS, so skip what came back empty.
+              return sponsor ? [{ ...sponsor, role: es.role || 'Sponsor' }] : [];
             }));
           }
         }
@@ -751,6 +776,47 @@ const EventDetailPage = () => {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sponsors — attached in the admin event form */}
+                  {sponsors.length > 0 && (
+                    <div className="mt-6 rounded-lg border-2 border-navy-foreground/20 bg-navy-foreground/5 p-6">
+                      <h3 className="text-sm font-semibold text-navy-foreground uppercase tracking-wider mb-4">With thanks to</h3>
+                      <div className="space-y-4">
+                        {sponsors.map((sponsor) => {
+                          const inner = (
+                            <>
+                              {sponsor.logo_url ? (
+                                /* Logos are drawn for light backgrounds, so give
+                                   each one a white plate rather than dropping it
+                                   straight onto the navy. */
+                                <div className="bg-white rounded-md p-2 flex items-center justify-center">
+                                  <img src={sponsor.logo_url} alt={sponsor.name} className="max-h-10 w-auto object-contain" loading="lazy" />
+                                </div>
+                              ) : (
+                                <p className="text-base font-semibold text-navy-foreground">{sponsor.name}</p>
+                              )}
+                              <p className="text-xs text-navy-foreground/60 mt-2">
+                                {sponsor.role}{sponsor.logo_url && ` · ${sponsor.name}`}
+                              </p>
+                            </>
+                          );
+                          return sponsor.website_url ? (
+                            <a
+                              key={sponsor.id}
+                              href={sponsor.website_url}
+                              target="_blank"
+                              rel="noopener noreferrer sponsored"
+                              className="block group"
+                            >
+                              <div className="transition-opacity group-hover:opacity-80">{inner}</div>
+                            </a>
+                          ) : (
+                            <div key={sponsor.id}>{inner}</div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

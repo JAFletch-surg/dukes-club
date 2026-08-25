@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
+import { SponsorPicker, SponsorLogo, type SponsorOption } from '@/components/admin/sponsor-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 import { ImageField } from '@/components/admin/image-field'
 import { RichTextField } from '@/components/admin/rich-text-field'
@@ -15,6 +16,7 @@ import { EVENT_SUMMARY_MAX_LENGTH, formatEventPrice } from '@/lib/event-display'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
+const SPONSOR_ROLES = ['Sponsor', 'Course Sponsor', 'Headline Sponsor', 'Supported by', 'Exhibitor', 'Prize Sponsor']
 const STREAM_TYPES = ['livekit', 'zoom', 'vimeo_live', 'hybrid']
 const ACCESS_LEVELS = ['public', 'registered', 'members_only', 'invite_only']
 const SUBSPECIALTIES = [
@@ -98,6 +100,7 @@ const S = {
 export default function EventsAdmin() {
   const { data: events, loading, create, update, remove } = useSupabaseTable<any>('events', 'starts_at', false)
   const [faculty, setFaculty] = useState<any[]>([])
+  const [sponsors, setSponsors] = useState<SponsorOption[]>([])
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -110,9 +113,11 @@ export default function EventsAdmin() {
   useEffect(() => {
     const supabase = createClient()
     supabase.from('faculty').select('id, full_name, position_title, hospital, photo_url').order('full_name').then(({ data }: any) => setFaculty(data || []))
+    supabase.from('sponsors').select('id, name, logo_url, tier, website_url').order('sort_order').then(({ data }: any) => setSponsors(data || []))
   }, [])
 
   const [eventFacultyMap, setEventFacultyMap] = useState<Record<string, { faculty_id: string; role: string }[]>>({})
+  const [eventSponsorMap, setEventSponsorMap] = useState<Record<string, { sponsor_id: string; role: string }[]>>({})
 
   // Load event_faculty ONCE on mount — managed locally after that
   useEffect(() => {
@@ -124,6 +129,18 @@ export default function EventsAdmin() {
         map[ef.event_id].push({ faculty_id: ef.faculty_id, role: ef.role || 'Faculty' })
       })
       setEventFacultyMap(map)
+    })
+
+    // event_sponsors arrives with supabase/add-event-sponsors.sql; until that
+    // has been run the table is absent, which must not break the whole page.
+    supabase.from('event_sponsors').select('event_id, sponsor_id, role').order('sort_order').then(({ data, error }: any) => {
+      if (error) return
+      const map: Record<string, { sponsor_id: string; role: string }[]> = {}
+      ;(data || []).forEach((es: any) => {
+        if (!map[es.event_id]) map[es.event_id] = []
+        map[es.event_id].push({ sponsor_id: es.sponsor_id, role: es.role || 'Sponsor' })
+      })
+      setEventSponsorMap(map)
     })
   }, [])
 
@@ -137,6 +154,7 @@ export default function EventsAdmin() {
     is_featured: false, booking_url: '', access_level: 'public',
     featured_image_url: '',
     assigned_faculty: [] as { faculty_id: string; role: string }[],
+    assigned_sponsors: [] as { sponsor_id: string; role: string }[],
     stream_type: 'zoom', zoom_url: '', zoom_meeting_id: '', zoom_passcode: '',
     vimeo_live_id: '', vimeo_live_embed_url: '',
     subspecialties: [] as string[],
@@ -173,6 +191,7 @@ export default function EventsAdmin() {
       booking_url: e.booking_url || '', access_level: e.access_level || 'public',
       featured_image_url: e.featured_image_url || '',
       assigned_faculty: eventFacultyMap[e.id] || [],
+      assigned_sponsors: eventSponsorMap[e.id] || [],
       stream_type: e.stream_type || 'zoom',
       zoom_url: e.zoom_url || '', zoom_meeting_id: e.zoom_meeting_id || '',
       zoom_passcode: e.zoom_passcode || '',
@@ -292,8 +311,31 @@ export default function EventsAdmin() {
         if (insErr) console.error('INSERT event_faculty error:', insErr)
       }
 
-      // Update local map
+      // Sync event_sponsors the same way. A missing table means the
+      // migration has not been run yet — say so rather than failing the save,
+      // which has already gone through by this point.
+      const { error: sponsorDelErr } = await supabase.from('event_sponsors').delete().eq('event_id', eventId)
+      if (sponsorDelErr) {
+        console.error('DELETE event_sponsors error:', sponsorDelErr)
+        if (form.assigned_sponsors.length > 0) showToast('Saved, but sponsors were not — run supabase/add-event-sponsors.sql', 'error')
+      } else if (form.assigned_sponsors.length > 0) {
+        const { error: sponsorInsErr } = await supabase.from('event_sponsors').insert(
+          form.assigned_sponsors.map((sp, i) => ({
+            event_id: eventId,
+            sponsor_id: sp.sponsor_id,
+            role: sp.role || 'Sponsor',
+            sort_order: i,
+          }))
+        )
+        if (sponsorInsErr) {
+          console.error('INSERT event_sponsors error:', sponsorInsErr)
+          showToast('Saved, but sponsors were not — run supabase/add-event-sponsors.sql', 'error')
+        }
+      }
+
+      // Update local maps
       setEventFacultyMap(prev => ({ ...prev, [eventId]: form.assigned_faculty }))
+      setEventSponsorMap(prev => ({ ...prev, [eventId]: form.assigned_sponsors }))
       setEditing(null)
     } catch (err: any) {
       showToast(err.message, 'error')
@@ -630,6 +672,42 @@ export default function EventsAdmin() {
                     showChips={false}
                   />
                   <p style={S.hint}>Search by name, hospital, or role. Can&apos;t find someone? Use the search to add a new faculty member inline.</p>
+                </div>
+              </div>
+
+              {/* Sponsors — pulled from Admin → Sponsors */}
+              <div style={S.section}>
+                <p style={S.sectionTitle}>SPONSORS</p>
+                {form.assigned_sponsors.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {form.assigned_sponsors.map((sp, i) => {
+                      const sponsor = sponsors.find(x => x.id === sp.sponsor_id)
+                      return (
+                        <div key={sp.sponsor_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fff', border: '1px solid #E4E4E8', borderRadius: 8 }}>
+                          <SponsorLogo sponsor={sponsor} />
+                          <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{sponsor?.name || 'Unknown sponsor'}</span>
+                          <select value={sp.role} onChange={(e) => { const updated = [...form.assigned_sponsors]; updated[i] = { ...updated[i], role: e.target.value }; setForm({ ...form, assigned_sponsors: updated }) }}
+                            style={{ padding: '4px 8px', border: '1px solid #D1D1D6', borderRadius: 6, fontSize: 12, color: '#504F58' }}>
+                            {SPONSOR_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                          <button type="button" onClick={() => setForm({ ...form, assigned_sponsors: form.assigned_sponsors.filter((_, j) => j !== i) })}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div>
+                  <label style={S.label}>Add Sponsor</label>
+                  <SponsorPicker
+                    sponsors={sponsors}
+                    selectedIds={form.assigned_sponsors.map(sp => sp.sponsor_id)}
+                    onAdd={(id) => {
+                      if (form.assigned_sponsors.some(sp => sp.sponsor_id === id)) { showToast('Already added', 'error'); return }
+                      setForm({ ...form, assigned_sponsors: [...form.assigned_sponsors, { sponsor_id: id, role: 'Sponsor' }] })
+                    }}
+                  />
+                  <p style={S.hint}>Logos and websites come from <Link href="/admin/sponsors" target="_blank" style={{ color: '#7C3AED', fontWeight: 600 }}>Admin → Sponsors</Link>. The event page shows them under &ldquo;With thanks to&rdquo;, in the order listed here.</p>
                 </div>
               </div>
 
