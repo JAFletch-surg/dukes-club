@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, ExternalLink, MapPin } from 'lucide-react'
+import { formatEventPrice } from '@/lib/event-display'
 
 // ── Types ────────────────────────────────────────
 interface DukesEvent {
@@ -14,6 +15,7 @@ interface DukesEvent {
   location: string
   event_type: string
   price_pence: number | null
+  price_is_refundable_deposit?: boolean | null
 }
 
 interface CalendarDate {
@@ -57,11 +59,6 @@ function isInRange(date: Date, start: Date, end: Date | null) {
   const s = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime()
   const e = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime()
   return d >= s && d <= e
-}
-
-function formatPrice(pence: number | null) {
-  if (!pence || pence === 0) return 'Free'
-  return `£${(pence / 100).toFixed(pence % 100 === 0 ? 0 : 2)}`
 }
 
 // ── Category styles ──────────────────────────────
@@ -305,7 +302,7 @@ export default function EventsCalendar({ events, calendarDates, isLoggedIn = fal
                       <span>{ev.event_type}</span>
                       <span>·</span>
                       <span className="flex items-center gap-0.5"><MapPin size={9} />{ev.location?.split(',')[0]}</span>
-                      {ev.price_pence != null && <><span>·</span><span>{formatPrice(ev.price_pence)}</span></>}
+                      {ev.price_pence != null && <><span>·</span><span>{formatEventPrice(ev)}</span></>}
                     </div>
                   </div>
                 </Link>

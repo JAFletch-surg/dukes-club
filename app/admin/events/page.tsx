@@ -6,14 +6,17 @@ import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
+import { SponsorPicker, SponsorLogo, type SponsorOption } from '@/components/admin/sponsor-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 import { ImageField } from '@/components/admin/image-field'
 import { RichTextField } from '@/components/admin/rich-text-field'
 import { isStreamingEvent } from '@/lib/events'
 import { richTextToHtml, htmlToPlainText } from '@/lib/rich-text'
+import { EVENT_SUMMARY_MAX_LENGTH, formatEventPrice } from '@/lib/event-display'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
+const SPONSOR_ROLES = ['Sponsor', 'Course Sponsor', 'Headline Sponsor', 'Supported by', 'Exhibitor', 'Prize Sponsor']
 const STREAM_TYPES = ['livekit', 'zoom', 'vimeo_live', 'hybrid']
 const ACCESS_LEVELS = ['public', 'registered', 'members_only', 'invite_only']
 const SUBSPECIALTIES = [
@@ -32,6 +35,14 @@ const BRAND_IMAGES = [
 ]
 
 const isStreamingType = isStreamingEvent
+
+/* Columns the form writes that only exist once their migration has been run.
+   Ordered so the retry loop peels them off one save attempt at a time. */
+const PENDING_MIGRATIONS = [
+  { column: 'description_html', file: 'supabase/add-event-description-html.sql' },
+  { column: 'summary', file: 'supabase/add-event-summary-and-deposit.sql' },
+  { column: 'price_is_refundable_deposit', file: 'supabase/add-event-summary-and-deposit.sql' },
+]
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -89,6 +100,7 @@ const S = {
 export default function EventsAdmin() {
   const { data: events, loading, create, update, remove } = useSupabaseTable<any>('events', 'starts_at', false)
   const [faculty, setFaculty] = useState<any[]>([])
+  const [sponsors, setSponsors] = useState<SponsorOption[]>([])
   const [editing, setEditing] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -101,9 +113,11 @@ export default function EventsAdmin() {
   useEffect(() => {
     const supabase = createClient()
     supabase.from('faculty').select('id, full_name, position_title, hospital, photo_url').order('full_name').then(({ data }: any) => setFaculty(data || []))
+    supabase.from('sponsors').select('id, name, logo_url, tier, website_url').order('sort_order').then(({ data }: any) => setSponsors(data || []))
   }, [])
 
   const [eventFacultyMap, setEventFacultyMap] = useState<Record<string, { faculty_id: string; role: string }[]>>({})
+  const [eventSponsorMap, setEventSponsorMap] = useState<Record<string, { sponsor_id: string; role: string }[]>>({})
 
   // Load event_faculty ONCE on mount — managed locally after that
   useEffect(() => {
@@ -116,17 +130,31 @@ export default function EventsAdmin() {
       })
       setEventFacultyMap(map)
     })
+
+    // event_sponsors arrives with supabase/add-event-sponsors.sql; until that
+    // has been run the table is absent, which must not break the whole page.
+    supabase.from('event_sponsors').select('event_id, sponsor_id, role').order('sort_order').then(({ data, error }: any) => {
+      if (error) return
+      const map: Record<string, { sponsor_id: string; role: string }[]> = {}
+      ;(data || []).forEach((es: any) => {
+        if (!map[es.event_id]) map[es.event_id] = []
+        map[es.event_id].push({ sponsor_id: es.sponsor_id, role: es.role || 'Sponsor' })
+      })
+      setEventSponsorMap(map)
+    })
   }, [])
 
   const isApplicationType = (t: string) => ['Practical Workshop', 'In Person Course'].includes(t)
 
   const emptyForm = {
     title: '', slug: '', starts_at: '', ends_at: '', location: '', address: '',
+    summary: '',
     description: '', event_type: 'In Person Course', capacity: 30,
-    price_pence: 0, member_price_pence: '', status: 'draft',
+    price_pence: 0, member_price_pence: '', price_is_refundable_deposit: false, status: 'draft',
     is_featured: false, booking_url: '', access_level: 'public',
     featured_image_url: '',
     assigned_faculty: [] as { faculty_id: string; role: string }[],
+    assigned_sponsors: [] as { sponsor_id: string; role: string }[],
     stream_type: 'zoom', zoom_url: '', zoom_meeting_id: '', zoom_passcode: '',
     vimeo_live_id: '', vimeo_live_embed_url: '',
     subspecialties: [] as string[],
@@ -151,16 +179,19 @@ export default function EventsAdmin() {
       starts_at: e.starts_at?.slice(0, 16) || '',
       ends_at: e.ends_at?.slice(0, 16) || '',
       location: e.location || '', address: e.address || '',
+      summary: e.summary || '',
       // Prefer the HTML source so formatting survives a round-trip; fall
       // back to the plain text for events written before HTML was allowed.
       description: e.description_html || e.description_plain || '',
       event_type: e.event_type || 'In Person Course',
       capacity: e.capacity || 30, price_pence: e.price_pence || 0,
       member_price_pence: e.member_price_pence ?? '',
+      price_is_refundable_deposit: e.price_is_refundable_deposit || false,
       status: e.status || 'draft', is_featured: e.is_featured || false,
       booking_url: e.booking_url || '', access_level: e.access_level || 'public',
       featured_image_url: e.featured_image_url || '',
       assigned_faculty: eventFacultyMap[e.id] || [],
+      assigned_sponsors: eventSponsorMap[e.id] || [],
       stream_type: e.stream_type || 'zoom',
       zoom_url: e.zoom_url || '', zoom_meeting_id: e.zoom_meeting_id || '',
       zoom_passcode: e.zoom_passcode || '',
@@ -194,6 +225,8 @@ export default function EventsAdmin() {
         ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
         location: form.location || null,
         address: form.address || null,
+        // The one-liner the event tiles show instead of the full description.
+        summary: form.summary.trim() || null,
         // description_html drives the event page; description_plain stays in
         // step for listing cards, search and the webinar previews.
         description_html: descriptionHtml || null,
@@ -202,6 +235,7 @@ export default function EventsAdmin() {
         capacity: form.capacity || null,
         price_pence: form.price_pence || 0,
         member_price_pence: form.member_price_pence ? Number(form.member_price_pence) : null,
+        price_is_refundable_deposit: form.price_is_refundable_deposit,
         status: form.status,
         is_featured: form.is_featured,
         booking_url: form.booking_url || null,
@@ -238,19 +272,28 @@ export default function EventsAdmin() {
         return editing!
       }
 
+      // Each of these columns arrives with a migration in supabase/. Until it
+      // has been applied PostgREST rejects the whole write, so drop the column
+      // it names and try again rather than locking admins out of editing.
+      const body = { ...payload }
+      const dropped: string[] = []
       let eventId: string
-      try {
-        eventId = await persist(payload)
+      for (;;) {
+        try {
+          eventId = await persist(body)
+          break
+        } catch (err: any) {
+          const message = err?.message || ''
+          const missing = PENDING_MIGRATIONS.find(m => m.column in body && message.includes(m.column))
+          if (!missing) throw err
+          delete body[missing.column]
+          dropped.push(missing.file)
+        }
+      }
+      if (dropped.length > 0) {
+        showToast(`Saved, but some fields were dropped — run ${[...new Set(dropped)].join(' and ')}`, 'error')
+      } else {
         showToast(editing === 'new' ? 'Event created' : 'Event updated')
-      } catch (err: any) {
-        // description_html arrives with supabase/add-event-description-html.sql.
-        // Until that has been applied, fall back to saving the plain copy so
-        // admins are not locked out of editing events entirely.
-        if (!/description_html/.test(err?.message || '')) throw err
-        const withoutHtml = { ...payload }
-        delete withoutHtml.description_html
-        eventId = await persist(withoutHtml)
-        showToast('Saved, but formatting was dropped — run supabase/add-event-description-html.sql', 'error')
       }
 
       // Sync event_faculty junction table
@@ -268,8 +311,31 @@ export default function EventsAdmin() {
         if (insErr) console.error('INSERT event_faculty error:', insErr)
       }
 
-      // Update local map
+      // Sync event_sponsors the same way. A missing table means the
+      // migration has not been run yet — say so rather than failing the save,
+      // which has already gone through by this point.
+      const { error: sponsorDelErr } = await supabase.from('event_sponsors').delete().eq('event_id', eventId)
+      if (sponsorDelErr) {
+        console.error('DELETE event_sponsors error:', sponsorDelErr)
+        if (form.assigned_sponsors.length > 0) showToast('Saved, but sponsors were not — run supabase/add-event-sponsors.sql', 'error')
+      } else if (form.assigned_sponsors.length > 0) {
+        const { error: sponsorInsErr } = await supabase.from('event_sponsors').insert(
+          form.assigned_sponsors.map((sp, i) => ({
+            event_id: eventId,
+            sponsor_id: sp.sponsor_id,
+            role: sp.role || 'Sponsor',
+            sort_order: i,
+          }))
+        )
+        if (sponsorInsErr) {
+          console.error('INSERT event_sponsors error:', sponsorInsErr)
+          showToast('Saved, but sponsors were not — run supabase/add-event-sponsors.sql', 'error')
+        }
+      }
+
+      // Update local maps
       setEventFacultyMap(prev => ({ ...prev, [eventId]: form.assigned_faculty }))
+      setEventSponsorMap(prev => ({ ...prev, [eventId]: form.assigned_sponsors }))
       setEditing(null)
     } catch (err: any) {
       showToast(err.message, 'error')
@@ -366,7 +432,7 @@ export default function EventsAdmin() {
                   </td>
                   <td style={{ padding: '14px 16px', color: '#504F58', fontSize: 13, maxWidth: 180 }}>{getFacultyNames(e.id)}</td>
                   <td style={{ padding: '14px 16px' }}>
-                    {e.price_pence === 0 ? <span style={S.badge('#f0fdf4', '#16a34a')}>Free</span> : `£${(e.price_pence / 100).toFixed(2)}`}
+                    {e.price_pence === 0 ? <span style={S.badge('#f0fdf4', '#16a34a')}>Free</span> : formatEventPrice(e)}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span style={S.badge(
@@ -438,7 +504,7 @@ export default function EventsAdmin() {
                   <div className="flex items-center gap-2 mt-1 text-xs text-[#504F58]">
                     <span>{fmtDate(e.starts_at)}</span>
                     <span>·</span>
-                    <span>{e.price_pence === 0 ? 'Free' : `£${(e.price_pence / 100).toFixed(2)}`}</span>
+                    <span>{formatEventPrice(e)}</span>
                   </div>
                 </div>
               </div>
@@ -511,11 +577,28 @@ export default function EventsAdmin() {
                 <div><label style={S.label}>Address</label><input style={S.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" /></div>
               </div>
 
+              <div>
+                <label style={S.label}>Card Summary</label>
+                <input
+                  style={S.input}
+                  value={form.summary}
+                  maxLength={EVENT_SUMMARY_MAX_LENGTH}
+                  onChange={(e) => setForm({ ...form, summary: e.target.value })}
+                  placeholder="One line for the event tiles — e.g. Hands-on pelvic floor skills stations with case-based MDT discussion."
+                />
+                <p style={S.hint}>
+                  Shown on the events listing and cards instead of the full description.
+                  {' '}{form.summary.length}/{EVENT_SUMMARY_MAX_LENGTH} characters
+                  {!form.summary.trim() && ' — leave blank to fall back to the opening of the description'}
+                </p>
+              </div>
+
               <RichTextField
                 label="Description"
                 value={form.description}
+                uploadFolder="events"
                 onChange={(v) => setForm({ ...form, description: v })}
-                placeholder={'What is this event about, who is it for, what will delegates take away?\n\nLeave a blank line for a new paragraph, or drop in HTML:\n<ul>\n  <li>Hands-on cadaveric stations</li>\n  <li>Faculty-led case discussion</li>\n</ul>'}
+                placeholder={'What is this event about, who is it for, what will delegates take away?\n\nLeave a blank line for a new paragraph, drop in HTML, or use Picture / PDF above to add a photo or the programme:\n<ul>\n  <li>Hands-on cadaveric stations</li>\n  <li>Faculty-led case discussion</li>\n</ul>'}
                 minHeight={180}
               />
 
@@ -592,6 +675,42 @@ export default function EventsAdmin() {
                 </div>
               </div>
 
+              {/* Sponsors — pulled from Admin → Sponsors */}
+              <div style={S.section}>
+                <p style={S.sectionTitle}>SPONSORS</p>
+                {form.assigned_sponsors.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {form.assigned_sponsors.map((sp, i) => {
+                      const sponsor = sponsors.find(x => x.id === sp.sponsor_id)
+                      return (
+                        <div key={sp.sponsor_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fff', border: '1px solid #E4E4E8', borderRadius: 8 }}>
+                          <SponsorLogo sponsor={sponsor} />
+                          <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{sponsor?.name || 'Unknown sponsor'}</span>
+                          <select value={sp.role} onChange={(e) => { const updated = [...form.assigned_sponsors]; updated[i] = { ...updated[i], role: e.target.value }; setForm({ ...form, assigned_sponsors: updated }) }}
+                            style={{ padding: '4px 8px', border: '1px solid #D1D1D6', borderRadius: 6, fontSize: 12, color: '#504F58' }}>
+                            {SPONSOR_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                          <button type="button" onClick={() => setForm({ ...form, assigned_sponsors: form.assigned_sponsors.filter((_, j) => j !== i) })}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4 }}><X size={14} /></button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div>
+                  <label style={S.label}>Add Sponsor</label>
+                  <SponsorPicker
+                    sponsors={sponsors}
+                    selectedIds={form.assigned_sponsors.map(sp => sp.sponsor_id)}
+                    onAdd={(id) => {
+                      if (form.assigned_sponsors.some(sp => sp.sponsor_id === id)) { showToast('Already added', 'error'); return }
+                      setForm({ ...form, assigned_sponsors: [...form.assigned_sponsors, { sponsor_id: id, role: 'Sponsor' }] })
+                    }}
+                  />
+                  <p style={S.hint}>Logos and websites come from <Link href="/admin/sponsors" target="_blank" style={{ color: '#7C3AED', fontWeight: 600 }}>Admin → Sponsors</Link>. The event page shows them under &ldquo;With thanks to&rdquo;, in the order listed here.</p>
+                </div>
+              </div>
+
               {isStreamingType(form.event_type) && (
                 <div style={S.section}>
                   <p style={S.sectionTitle}>STREAMING SETTINGS</p>
@@ -638,6 +757,16 @@ export default function EventsAdmin() {
                 <div className="col-span-2 sm:col-span-1"><label style={S.label}>Booking URL</label><input style={S.input} value={form.booking_url} onChange={(e) => setForm({ ...form, booking_url: e.target.value })} placeholder="https://..." /></div>
               </div>
 
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14, fontWeight: 600, color: '#181820', cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.price_is_refundable_deposit} onChange={(e) => setForm({ ...form, price_is_refundable_deposit: e.target.checked })} style={{ width: 18, height: 18, marginTop: 1 }} />
+                <span>
+                  This price is a refundable deposit
+                  <span style={{ ...S.hint, display: 'block', fontWeight: 400, marginTop: 2 }}>
+                    Cards and the event page read &ldquo;{formatEventPrice({ price_pence: form.price_pence, price_is_refundable_deposit: form.price_is_refundable_deposit })}&rdquo; — refunded on attendance
+                  </span>
+                </span>
+              </label>
+
               {/* APPLICATION SETTINGS — shown for workshops & courses */}
               {isApplicationType(form.event_type) && (
                 <div style={S.section}>
@@ -665,6 +794,7 @@ export default function EventsAdmin() {
 
                       <RichTextField
                         label="Eligibility Criteria"
+                        uploadFolder="events"
                         value={form.eligibility_criteria}
                         onChange={(v) => setForm({ ...form, eligibility_criteria: v })}
                         placeholder={"Describe who is eligible to apply, e.g. 'Open to ST3+ colorectal trainees registered with ISCP'"}
@@ -721,6 +851,7 @@ export default function EventsAdmin() {
                       <RichTextField
                         label="Confirmation Message"
                         optional
+                        uploadFolder="events"
                         value={form.confirmation_message}
                         onChange={(v) => setForm({ ...form, confirmation_message: v })}
                         placeholder="Shown to applicants after approval, e.g. venue directions, what to bring"
