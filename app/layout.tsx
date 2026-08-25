@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
+import { Montserrat, IBM_Plex_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import { AuthProvider } from '@/lib/auth-provider'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -13,38 +12,48 @@ export const metadata: Metadata = {
   // is unset — setting it makes them silently disappear from the output.
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Fetch the authenticated user server-side so the client hydrates
-  // immediately without a loading flash. This follows the Supabase
-  // recommendation to always use getUser() on the server.
-  // See: https://supabase.com/docs/guides/auth/server-side/nextjs
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+/**
+ * Fonts are self-hosted through next/font rather than linked from
+ * fonts.googleapis.com.
+ *
+ * The three <link rel="stylesheet"> tags that used to live in <head> were
+ * render-blocking requests to two third-party origins, on every page view,
+ * before anything could paint. next/font inlines the @font-face rules, serves
+ * the files from this origin, and generates a size-adjusted local fallback so
+ * the swap from fallback to webfont does not shift the layout.
+ *
+ * Cormorant Garamond is NOT loaded here. Nothing on the public site uses
+ * font-serif — every usage is under /admin or /members — so it is loaded in
+ * those layouts instead and never costs a marketing visitor anything.
+ */
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-montserrat',
+  display: 'swap',
+})
 
-  // If we have a user, fetch their profile so the client has it immediately
-  let profile = null
-  if (user) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-    profile = data
-  }
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-ibm-plex-mono',
+  display: 'swap',
+})
 
+/**
+ * Deliberately static: no cookies(), no headers(), nothing async.
+ *
+ * Reading auth here would opt EVERY route in the app out of static generation
+ * — including the marketing pages, which have no server data at all and were
+ * being server-rendered on every visit as a result. <AuthProvider> now lives
+ * in the route-group layouts that actually consume it: (public), members and
+ * admin. See lib/supabase/auth.ts.
+ */
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" className={`${montserrat.variable} ${ibmPlexMono.variable}`}>
       <body className="font-sans antialiased">
-        <AuthProvider initialUser={user} initialProfile={profile}>
-          {children}
-        </AuthProvider>
+        {children}
         <Analytics />
         <SpeedInsights />
       </body>

@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { bearerClient } from '@/lib/supabase/bearer'
+
+/**
+ * Bearer-authenticated, like every other route under /api.
+ *
+ * This was the one route reading the session from cookies, which meant it
+ * depended on middleware running on /api to refresh an expiring token. The
+ * player posts here every 10 seconds while a video plays, so matching it in
+ * middleware would have billed a second invocation and a second auth check
+ * per ping. The client sends its access token instead; RLS still scopes every
+ * row to that user.
+ */
 
 // ── POST — save / update watch progress ─────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const authed = await bearerClient(request)
 
-    if (!user) {
+    if (!authed) {
       return NextResponse.json(
         { error: 'Not authenticated — please log in again' },
         { status: 401 }
       )
     }
+    const { supabase, userId } = authed
 
     const body: {
       video_id: string
@@ -37,7 +48,7 @@ export async function POST(request: NextRequest) {
       const { data: existing } = await supabase
         .from('video_watch_progress')
         .select('completed')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('video_id', body.video_id)
         .maybeSingle()
 
@@ -50,7 +61,7 @@ export async function POST(request: NextRequest) {
             duration_seconds: durationSeconds,
             last_watched_at: now,
           })
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('video_id', body.video_id)
           .select()
           .single()
@@ -67,7 +78,7 @@ export async function POST(request: NextRequest) {
       .from('video_watch_progress')
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           video_id: body.video_id,
           watched_seconds: watchedSeconds,
           duration_seconds: durationSeconds,
@@ -112,22 +123,22 @@ function formatDbError(message: string): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const authed = await bearerClient(request)
 
-    if (!user) {
+    if (!authed) {
       return NextResponse.json(
         { error: 'Not authenticated — please log in again' },
         { status: 401 }
       )
     }
+    const { supabase, userId } = authed
 
     const videoId = request.nextUrl.searchParams.get('video_id')
 
     let query = supabase
       .from('video_watch_progress')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
 
     if (videoId) {
       query = query.eq('video_id', videoId)

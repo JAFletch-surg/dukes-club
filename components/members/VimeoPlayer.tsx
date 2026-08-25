@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import Player from '@vimeo/player'
 import { AlertTriangle, X } from 'lucide-react'
+import { authedFetch } from '@/lib/authed-fetch'
 
 interface VimeoPlayerProps {
   vimeoId: string
@@ -36,7 +37,7 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
   const saveProgress = useCallback(
     async (seconds: number, completed: boolean) => {
       try {
-        const res = await fetch('/api/videos/progress', {
+        const res = await authedFetch('/api/videos/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -110,7 +111,7 @@ export default function VimeoPlayer({ vimeoId, videoId, embedHash }: VimeoPlayer
       }).catch(() => {})
 
       // Resume from saved position
-      fetch(`/api/videos/progress?video_id=${videoId}`)
+      authedFetch(`/api/videos/progress?video_id=${videoId}`)
         .then(r => {
           if (!r.ok) {
             return r.json().catch(() => ({})).then(body => {

@@ -24,6 +24,7 @@ const TIER_CONFIG: Record<string, { order: number; logoHeight: string; textSize:
 
 const SponsorsSection = () => {
   const [sponsors, setSponsors] = useState<Sponsor[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const supabase = createClient()
@@ -34,9 +35,15 @@ const SponsorsSection = () => {
       .order('sort_order', { ascending: true })
       .then(({ data }: { data: Sponsor[] | null }) => {
         if (data) setSponsors(data)
+        setLoading(false)
       })
   }, [])
 
+  // While the fetch is in flight, hold the space this section will occupy.
+  // Returning null and then appearing pushed the footer down after first paint,
+  // which is a layout shift the whole page is scored on. Once we know there are
+  // no sponsors, collapse for real.
+  if (loading) return <div className="py-16 border-t border-border" aria-hidden="true" />
   if (sponsors.length === 0) return null
 
   // Group by tier, maintaining sort_order within each group
@@ -71,6 +78,8 @@ const SponsorsSection = () => {
                     <img
                       src={sponsor.logo_url}
                       alt={sponsor.name}
+                      loading="lazy"
+                      decoding="async"
                       className={`${config.logoHeight} max-w-[200px] object-contain`}
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'

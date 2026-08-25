@@ -1,7 +1,11 @@
 'use client'
 import Link from "next/link";
+import Image from "next/image";
 
 import { Twitter, Instagram, Linkedin, Mail } from "lucide-react";
+
+import logoWhite from "@/public/images/logo-white.png";
+import footerAbstract from "@/public/images/footer-abstract.jpg";
 
 
 
@@ -10,11 +14,13 @@ const Footer = () => {
     <footer className="relative text-navy-foreground overflow-hidden">
       {/* Abstract background image */}
       <div className="absolute inset-0">
-        <img
-          src="/images/footer-abstract.jpg"
+        <Image
+          src={footerAbstract}
           alt=""
-          className="w-full h-full object-cover"
+          fill
           aria-hidden="true"
+          className="object-cover"
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-navy/80" />
       </div>
@@ -22,7 +28,7 @@ const Footer = () => {
       <div className="relative container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <img src="/images/logo-white.png" alt="The Dukes' Club" className="h-12 mb-4" />
+            <Image src={logoWhite} alt="The Dukes' Club" className="h-12 w-auto mb-4" sizes="168px" />
             <p className="text-sm text-navy-foreground/60">
               The UK's leading colorectal surgery trainee society, supporting the next generation of colorectal surgeons.
             </p>
