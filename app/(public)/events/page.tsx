@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { CalendarDays, MapPin, PoundSterling, Search, ArrowRight, X, SlidersHorizontal, ChevronDown, Star, Loader2, LayoutList, Calendar as CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { eventSummary, formatEventPrice, formatEventPriceWithMember } from "@/lib/event-display";
 import { useAuth } from "@/lib/use-auth";
 import EventsCalendar from "@/components/EventsCalendar";
 
@@ -26,11 +27,6 @@ const eventTypes = ["Conference", "Workshop", "Webinar", "Course", "Masterclass"
 const EVENTS_PER_PAGE = 6;
 type SortOption = "date" | "price" | "dateAdded";
 type ViewMode = "list" | "calendar";
-
-const formatPrice = (pence: number | null) => {
-  if (!pence || pence === 0) return "Free";
-  return `£${(pence / 100).toFixed(pence % 100 === 0 ? 0 : 2)}`;
-};
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -73,11 +69,11 @@ const EventCard = ({ event }: { event: any }) => (
         </div>
         <div className="flex items-center gap-1 text-xs text-navy-foreground/60">
           <PoundSterling size={11} className="text-gold shrink-0" />
-          <span>
-            {formatPrice(event.price_pence)}
-            {event.member_price_pence != null && event.member_price_pence !== event.price_pence && ` (${formatPrice(event.member_price_pence)} members)`}
-          </span>
+          <span>{formatEventPriceWithMember(event)}</span>
         </div>
+        {eventSummary(event) && (
+          <p className="text-xs text-navy-foreground/60 line-clamp-1">{eventSummary(event)}</p>
+        )}
       </div>
       <div className="flex items-center pr-3">
         <ArrowRight size={16} className="text-navy-foreground/30 group-hover:text-gold transition-colors" />
@@ -118,13 +114,10 @@ const EventCard = ({ event }: { event: any }) => (
           </div>
           <div className="flex items-center gap-2 text-sm text-navy-foreground/70">
             <PoundSterling size={14} className="text-gold shrink-0" />
-            <span>
-              {formatPrice(event.price_pence)}
-              {event.member_price_pence != null && event.member_price_pence !== event.price_pence && ` (${formatPrice(event.member_price_pence)} members)`}
-            </span>
+            <span>{formatEventPriceWithMember(event)}</span>
           </div>
         </div>
-        <p className="text-sm text-navy-foreground/70 mb-4 line-clamp-2">{event.description_plain}</p>
+        <p className="text-sm text-navy-foreground/70 mb-4 line-clamp-2">{eventSummary(event)}</p>
         <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors mt-auto">
           Read more <ArrowRight size={14} />
         </span>
@@ -200,6 +193,7 @@ const EventsPage = () => {
       const q = search.toLowerCase();
       result = result.filter((e) =>
         e.title?.toLowerCase().includes(q) ||
+        e.summary?.toLowerCase().includes(q) ||
         e.description_plain?.toLowerCase().includes(q) ||
         e.location?.toLowerCase().includes(q)
       );
@@ -358,6 +352,7 @@ const EventsPage = () => {
                 location: e.location,
                 event_type: e.event_type,
                 price_pence: e.price_pence,
+                price_is_refundable_deposit: e.price_is_refundable_deposit,
               }))}
               calendarDates={calendarDates}
               isLoggedIn={!!user}
@@ -435,7 +430,7 @@ const EventsPage = () => {
                               </span>
                               <span className="flex items-center gap-1">
                                 <PoundSterling size={11} className="text-gold shrink-0" />
-                                {formatPrice(featuredEvent.price_pence)}
+                                {formatEventPrice(featuredEvent)}
                               </span>
                             </div>
                             <span className="inline-flex items-center gap-1 text-sm font-medium text-gold group-hover:text-gold/80 transition-colors">
@@ -473,10 +468,10 @@ const EventsPage = () => {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-navy-foreground/80">
                               <PoundSterling size={14} className="text-gold shrink-0" />
-                              <span>{formatPrice(featuredEvent.price_pence)}</span>
+                              <span>{formatEventPrice(featuredEvent)}</span>
                             </div>
                           </div>
-                          <p className="text-sm text-navy-foreground/70 mb-5">{featuredEvent.description_plain}</p>
+                          <p className="text-sm text-navy-foreground/70 mb-5 line-clamp-3">{eventSummary(featuredEvent)}</p>
                           <div>
                             <Link href={`/events/${featuredEvent.slug}`}>
                               <Button variant="gold" size="lg">Register Now <ArrowRight className="ml-1" size={16} /></Button>

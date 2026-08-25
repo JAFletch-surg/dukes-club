@@ -16,6 +16,7 @@ import { canBookEvent } from "@/lib/membership-gates";
 import { sendEmail } from "@/lib/emails/send-email";
 import { isStreamingEvent, registerForEvent } from "@/lib/events";
 import { richTextToHtml } from "@/lib/rich-text";
+import { eventSummary, formatPrice, isRefundableDeposit, REFUNDABLE_DEPOSIT_LABEL } from "@/lib/event-display";
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -25,11 +26,6 @@ const formatDate = (dateStr: string) => {
 
 const formatTime = (dateStr: string) => {
   return new Date(dateStr).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-};
-
-const formatPrice = (pence: number | null) => {
-  if (!pence || pence === 0) return "Free";
-  return `£${(pence / 100).toFixed(pence % 100 === 0 ? 0 : 2)}`;
 };
 
 const AnimatedSection = ({ children, className, delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) => {
@@ -272,6 +268,10 @@ const EventDetailPage = () => {
   const endTime = event?.ends_at ? formatTime(event.ends_at) : null;
   const price = event ? formatPrice(event.price_pence) : '';
   const memberPrice = event?.member_price_pence != null ? formatPrice(event.member_price_pence) : null;
+  const isDeposit = event ? isRefundableDeposit(event) : false;
+  // Only an admin-written summary earns a line under the title; the
+  // description fallback would just repeat the paragraph below it.
+  const summary = event?.summary?.trim() ? eventSummary(event) : '';
   // Support both legacy flat format and new multi-day format
   const rawTimetable = event?.timetable_data as any[] | null;
   const isMultiDay = rawTimetable && rawTimetable.length > 0 && rawTimetable[0] && 'entries' in rawTimetable[0];
@@ -305,6 +305,9 @@ const EventDetailPage = () => {
             ))}
           </div>
           <h1 className="text-3xl md:text-5xl font-sans font-bold text-navy-foreground animate-fade-in">{event.title}</h1>
+          {summary && (
+            <p className="mt-4 max-w-2xl text-base md:text-lg text-navy-foreground/80 animate-fade-in">{summary}</p>
+          )}
         </div>
       </section>
 
@@ -326,7 +329,10 @@ const EventDetailPage = () => {
             </div>
             <div className="flex items-center gap-2">
               <PoundSterling size={18} className="text-gold" />
-              <span className="text-sm font-medium">{price}{memberPrice && memberPrice !== price && ` / ${memberPrice} members`}</span>
+              <span className="text-sm font-medium">
+                {price}{memberPrice && memberPrice !== price && ` / ${memberPrice} members`}
+                {isDeposit && ` ${REFUNDABLE_DEPOSIT_LABEL}`}
+              </span>
             </div>
             {event.capacity && (
               <div className="flex items-center gap-2">
@@ -396,6 +402,9 @@ const EventDetailPage = () => {
                   <div className="rounded-lg border-2 border-navy-foreground/20 bg-navy-foreground/5 p-6">
                     <div className="mb-6 text-center">
                       <p className="text-3xl font-bold text-navy-foreground">{price}</p>
+                      {isDeposit && (
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gold mt-1">Fully {REFUNDABLE_DEPOSIT_LABEL}</p>
+                      )}
                       {memberPrice && memberPrice !== price && (
                         <p className="text-sm text-gold mt-1">{memberPrice} for Dukes&apos; Club members</p>
                       )}
@@ -816,12 +825,36 @@ const EventDetailPage = () => {
             border-radius: 10px;
           }
           .event-content figure { margin: 1.5em 0; }
+          .event-content figure img { display: block; margin: 0 auto; }
           .event-content figcaption {
             font-size: 0.8em;
             font-style: italic;
             color: hsl(210 40% 98% / 0.55);
             margin-top: 6px;
             text-align: center;
+          }
+          /* Uploaded PDFs and documents render as a file chip rather than a
+             bare link, so a programme reads as something to open. */
+          .event-content .doc-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            border: 1px solid hsl(42 87% 55% / 0.4);
+            background: hsl(210 40% 98% / 0.06);
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin: 0.4em 0;
+            color: hsl(210 40% 98%);
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: background 0.2s, border-color 0.2s;
+          }
+          .event-content .doc-link::before { content: '📄'; font-size: 1.1em; }
+          .event-content .doc-link:hover {
+            background: hsl(42 87% 55% / 0.12);
+            border-color: hsl(42 87% 55% / 0.8);
+            color: hsl(210 40% 98%);
           }
           .event-content table {
             display: block;

@@ -21,6 +21,7 @@ Click **Add Event** to open the event form. Fill in the following sections:
 * **Start / End Date** — When the event runs.
 * **Location** — Venue name (e.g. "Royal College of Surgeons").
 * **Address** — Full address for in-person events.
+* **Card Summary** — One line, up to 160 characters, shown on the event tiles and under the title on the event page. Leave it blank and the tiles fall back to the opening of the description, so fill it in for anything with a long write-up.
 * **Description** — The event write-up shown on the event page. See [Formatting free text](#formatting-free-text).
 * **Status** — Draft, Published, or Archived.
 * **Featured** — Toggle to highlight the event on the homepage.
@@ -31,6 +32,9 @@ Click **Add Event** to open the event form. Fill in the following sections:
 
 * Write normally — a blank line starts a new paragraph, a single line break stays a line break.
 * Drop HTML in wherever you want formatting, either by hand or from the **INSERT** bar (headings, bold, italic, links, bulleted and numbered lists, tables, callouts, dividers). Snippets drop in at the cursor and wrap any text you have selected.
+* **Picture** uploads an image and drops it in at the cursor as a captioned figure — edit the caption text afterwards, or delete the `<figcaption>` line if you do not want one.
+* **PDF** uploads a document (PDF, Word or PowerPoint) and drops in a link to it, which the event page renders as a file chip readers can click to open. Use it for programmes, faculty lists, consent forms and joining instructions.
+* Uploads go to the shared media store, up to 10MB each, and the link keeps working once the event is published.
 * **Preview** shows exactly how the field will render on the public page.
 
 Markup is scrubbed against an allow-list on save: headings, lists, tables, links, images, dividers and YouTube/Vimeo/Google Maps embeds are kept; `<script>`, forms, event handlers such as `onclick`, `javascript:` links and other embeds are removed. Unclosed tags are closed for you.
@@ -38,6 +42,8 @@ Markup is scrubbed against an allow-list on save: headings, lists, tables, links
 A tag-free copy of the description is stored separately and is what the event cards, the webinar list and search use — so the listing previews stay clean however the description is formatted.
 
 > **Setup:** Descriptions need the `description_html` column. Run `supabase/add-event-description-html.sql` once against the database; it also backfills existing descriptions. Until it is run, events still save but formatting is dropped and the admin warns you.
+>
+> **Card Summary** and the refundable-deposit tick box need `supabase/add-event-summary-and-deposit.sql`, which also seeds each existing event's summary from the opening of its description. Same behaviour until it is run: the event saves, those two fields are dropped, and the admin tells you which file to run.
 
 ### Event Types
 
@@ -62,6 +68,7 @@ A tag-free copy of the description is stored separately and is what the event ca
 * **Regular Price** — Standard ticket price.
 * **Member Price** — Discounted price for Dukes' Club members.
 * **Capacity** — Maximum number of attendees.
+* **This price is a refundable deposit** — Tick when the fee is a deposit refunded on attendance rather than a charge. Cards, the calendar and the event page then read "£150 refundable deposit", and the event page's price box adds a *Fully refundable deposit* line.
 
 ### Featured Image
 
