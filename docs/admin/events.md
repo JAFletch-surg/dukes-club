@@ -103,8 +103,22 @@ Select one or more colorectal surgery subspecialties (Cancer, IBD, Robotic, Lapa
 Build a multi-day timetable for the event:
 
 1. Add days as needed.
-2. Enter sessions in CSV format: `time, title` (one per line).
-3. The timetable is parsed and stored automatically.
+2. Add a row per session: a time (or a range, e.g. `10:00 – 12:00`) and the session itself.
+3. In the session box, put the **title on the first line** and one line per talk below it,
+   each starting with `-`:
+
+   ```
+   Session 1 — Excellence in colorectal practice
+   - Tamzin Cumming — Excellence in AIN management
+   - Michael Powar — Setting up your NHS practice
+   ```
+
+   On the event page the title shows in bold and the lines below it as bullet points, with
+   the speaker's name picked out before the dash. A session with no talks is just a title
+   line, as before.
+4. CSV upload takes `time, title` one per line. To hang talks under a session, follow it
+   with rows that have an empty time column (`, - Tamzin Cumming — ...`) or with plain
+   `- ...` lines — both attach to the session above.
 
 ### Faculty
 
