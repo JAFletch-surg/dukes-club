@@ -40,7 +40,6 @@ const Footer = () => {
               <li><Link href="/about" className="hover:text-navy-foreground transition-colors">About Us</Link></li>
               <li><Link href="/events" className="hover:text-navy-foreground transition-colors">Events & Courses</Link></li>
               <li><Link href="/exams" className="hover:text-navy-foreground transition-colors">Exams & Training</Link></li>
-              <li><Link href="/annual-weekend" className="hover:text-navy-foreground transition-colors">Annual Weekend</Link></li>
             </ul>
           </div>
 
