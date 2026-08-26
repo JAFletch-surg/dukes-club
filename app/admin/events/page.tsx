@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Calendar, Plus, Edit, Trash2, Save, Loader, X, Radio, Users, Image, Upload, Search, MessageSquare, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
@@ -13,6 +13,10 @@ import { RichTextField } from '@/components/admin/rich-text-field'
 import { isStreamingEvent } from '@/lib/events'
 import { richTextToHtml, htmlToPlainText } from '@/lib/rich-text'
 import { EVENT_SUMMARY_MAX_LENGTH, formatEventPrice } from '@/lib/event-display'
+import {
+  entryToText, normaliseTimetable, parseEntryText, parseTimetableCSV, serialiseTimetable,
+  type TimetableDay, type TimetableEntry,
+} from '@/lib/timetable'
 
 const EVENT_TYPES = ['Webinar', 'Online Lecture', 'Practical Workshop', 'In Person Course', 'Hybrid', 'Conference']
 const STATUSES = ['draft', 'published', 'archived']
@@ -48,43 +52,6 @@ function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-interface TimetableEntry { time: string; title: string }
-interface TimetableDay { day: string; label: string; entries: TimetableEntry[] }
-
-function parseCSV(text: string): TimetableEntry[] {
-  const lines = text.trim().split('\n')
-  const rows: TimetableEntry[] = []
-  for (const line of lines) {
-    const sep = line.includes('\t') ? '\t' : ','
-    const parts = line.split(sep).map(s => s.trim().replace(/^["']|["']$/g, ''))
-    if (parts.length >= 2) {
-      const time = parts[0]
-      const title = parts.slice(1).join(', ')
-      if (time.toLowerCase() === 'time' || time.toLowerCase() === 'start') continue
-      rows.push({ time, title })
-    }
-  }
-  return rows
-}
-
-/** Convert legacy flat timetable to multi-day format */
-function normaliseTimetable(raw: any, startsAt?: string): TimetableDay[] {
-  if (!Array.isArray(raw) || raw.length === 0) return []
-  // Already multi-day format
-  if (raw[0] && typeof raw[0] === 'object' && 'day' in raw[0] && 'entries' in raw[0]) {
-    return raw as TimetableDay[]
-  }
-  // Legacy flat format — wrap in single day
-  const day = startsAt ? startsAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
-  return [{ day, label: '', entries: raw as TimetableEntry[] }]
-}
-
-/** Flatten multi-day timetable for DB storage (returns null if empty) */
-function serialiseTimetable(days: TimetableDay[]): TimetableDay[] | null {
-  const nonEmpty = days.filter(d => d.entries.length > 0)
-  return nonEmpty.length > 0 ? nonEmpty : null
-}
-
 const S = {
   input: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
   select: { width: '100%', padding: '10px 12px', border: '1.5px solid #D1D1D6', borderRadius: 10, fontSize: 16, color: '#000', background: '#fff', outline: 'none', fontFamily: 'Montserrat, sans-serif' } as React.CSSProperties,
@@ -95,6 +62,37 @@ const S = {
   btn: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: '#0F1F3D', color: '#F5F8FC', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: 'pointer' } as React.CSSProperties,
   section: { background: '#F8FAFC', padding: 16, borderRadius: 12, border: '1px solid #E4E4E8', display: 'flex', flexDirection: 'column' as const, gap: 14 } as React.CSSProperties,
   sectionTitle: { fontSize: 12, fontWeight: 700, color: '#0F1F3D', marginBottom: 0 } as React.CSSProperties,
+}
+
+/* One session box: title on the first line, bullets on the lines below.
+   The textarea keeps its own text so a half-typed bullet is never
+   rewritten under the cursor; the parsed form is pushed up on each
+   keystroke, and outside changes (a CSV import) are adopted whenever
+   the box is not being edited. */
+function SessionField({ entry, onChange }: { entry: TimetableEntry; onChange: (patch: { title: string; items: string[] }) => void }) {
+  const [text, setText] = useState(() => entryToText(entry))
+  const editing = useRef(false)
+
+  useEffect(() => {
+    if (!editing.current) setText(entryToText(entry))
+  }, [entry])
+
+  const rows = Math.min(10, Math.max(1, text.split('\n').length))
+
+  return (
+    <textarea
+      style={{ ...S.textarea, flex: 1, minHeight: 0, padding: '10px 12px', lineHeight: 1.45 }}
+      rows={rows}
+      value={text}
+      onFocus={() => { editing.current = true }}
+      onBlur={() => { editing.current = false; setText(entryToText(entry)) }}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(parseEntryText(e.target.value))
+      }}
+      placeholder={'Session title\n- Speaker — talk title'}
+    />
+  )
 }
 
 export default function EventsAdmin() {
@@ -919,11 +917,11 @@ export default function EventsAdmin() {
                       return { ...prev, timetable_data: days }
                     })
                   }
-                  const updateEntry = (ei: number, field: 'time' | 'title', value: string) => {
+                  const updateEntry = (ei: number, patch: Partial<TimetableEntry>) => {
                     setForm(prev => {
                       const days = [...prev.timetable_data]
                       const entries = [...days[dayIdx].entries]
-                      entries[ei] = { ...entries[ei], [field]: value }
+                      entries[ei] = { ...entries[ei], ...patch }
                       days[dayIdx] = { ...days[dayIdx], entries }
                       return { ...prev, timetable_data: days }
                     })
@@ -964,14 +962,17 @@ export default function EventsAdmin() {
                       }}>
                         <Upload size={18} color="#7C3AED" style={{ marginBottom: 4 }} />
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#7C3AED' }}>Upload CSV for {activeDay.label || `Day ${dayIdx + 1}`}</span>
-                        <span style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Format: <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>09:00, Registration &amp; Coffee</code></span>
+                        <span style={{ fontSize: 11, color: '#aaa', marginTop: 2, textAlign: 'center' }}>
+                          Format: <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>09:00, Registration &amp; Coffee</code>
+                          <br />Bullets: a row with no time, or a line starting <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>-</code>, hangs under the session above.
+                        </span>
                         <input type="file" accept=".csv,.tsv,.txt" style={{ display: 'none' }} onChange={(e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
                           const reader = new FileReader()
                           reader.onload = (ev) => {
                             const text = ev.target?.result as string
-                            const rows = parseCSV(text)
+                            const rows = parseTimetableCSV(text)
                             if (rows.length > 0) {
                               updateDay({ entries: [...activeDay.entries, ...rows] })
                               showToast(`Imported ${rows.length} entries into ${activeDay.label || `Day ${dayIdx + 1}`}`)
@@ -988,17 +989,18 @@ export default function EventsAdmin() {
                       {activeDay.entries.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {activeDay.entries.map((entry, ei) => (
-                            <div key={ei} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <input style={{ ...S.input, maxWidth: 90, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={entry.time}
-                                onChange={(e) => updateEntry(ei, 'time', e.target.value)} placeholder="09:00" />
-                              <input style={{ ...S.input, flex: 1 }} value={entry.title}
-                                onChange={(e) => updateEntry(ei, 'title', e.target.value)} placeholder="Session title" />
+                            <div key={ei} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                              <input style={{ ...S.input, maxWidth: 120, fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }} value={entry.time}
+                                onChange={(e) => updateEntry(ei, { time: e.target.value })} placeholder="09:00 – 10:00" />
+                              <SessionField entry={entry} onChange={(patch) => updateEntry(ei, patch)} />
                               <button type="button" onClick={() => removeEntry(ei)}
-                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0 }}><X size={14} /></button>
+                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#DC2626', padding: 4, flexShrink: 0, marginTop: 10 }}><X size={14} /></button>
                             </div>
                           ))}
                         </div>
                       )}
+
+                      <p style={{ ...S.hint, marginTop: -4 }}>Each session box: title on the first line, then one line per talk (start them with <code style={{ background: '#eee', padding: '1px 4px', borderRadius: 3 }}>-</code>). The title shows in bold, the rest as bullet points.</p>
 
                       {/* Add row */}
                       <button type="button" onClick={() => updateDay({ entries: [...activeDay.entries, { time: '', title: '' }] })}

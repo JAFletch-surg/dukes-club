@@ -17,6 +17,7 @@ import { sendEmail } from "@/lib/emails/send-email";
 import { isStreamingEvent, registerForEvent } from "@/lib/events";
 import { richTextToHtml } from "@/lib/rich-text";
 import { eventSummary, formatPrice, isRefundableDeposit, REFUNDABLE_DEPOSIT_LABEL } from "@/lib/event-display";
+import { normaliseTimetable, splitBulletLead } from "@/lib/timetable";
 
 const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -297,14 +298,8 @@ const EventDetailPage = () => {
   // Only an admin-written summary earns a line under the title; the
   // description fallback would just repeat the paragraph below it.
   const summary = event?.summary?.trim() ? eventSummary(event) : '';
-  // Support both legacy flat format and new multi-day format
-  const rawTimetable = event?.timetable_data as any[] | null;
-  const isMultiDay = rawTimetable && rawTimetable.length > 0 && rawTimetable[0] && 'entries' in rawTimetable[0];
-  const timetableDays = isMultiDay
-    ? (rawTimetable as { day: string; label?: string; entries: { time: string; title: string }[] }[])
-    : rawTimetable && rawTimetable.length > 0
-      ? [{ day: '', label: '', entries: rawTimetable as { time: string; title: string }[] }]
-      : null;
+  // Handles both the legacy flat format and the multi-day format.
+  const timetableDays = normaliseTimetable(event?.timetable_data);
 
   return (
     <div className="min-h-screen bg-background">
@@ -408,8 +403,28 @@ const EventDetailPage = () => {
                         <div className="space-y-0">
                           {dayGroup.entries.map((item, i) => (
                             <div key={i} className={cn("flex items-start gap-4 py-4 border-b border-navy-foreground/10", i === 0 && "border-t")}>
-                              <span className="text-gold font-semibold text-sm w-16 shrink-0 pt-0.5">{item.time}</span>
-                              <span className="text-navy-foreground/80 text-sm">{item.title}</span>
+                              <span className="text-gold font-semibold text-sm w-24 shrink-0 pt-0.5">{item.time}</span>
+                              <div className="min-w-0 flex-1">
+                                {item.title && (
+                                  <p className="text-navy-foreground font-semibold text-sm">{item.title}</p>
+                                )}
+                                {item.items && item.items.length > 0 && (
+                                  <ul className={cn("list-disc pl-5 space-y-1 marker:text-gold", item.title && "mt-2")}>
+                                    {item.items.map((bullet, bi) => {
+                                      /* "Speaker — talk title" reads better with the
+                                         speaker picked out; a plain bullet just runs on. */
+                                      const { lead, rest } = splitBulletLead(bullet);
+                                      return (
+                                        <li key={bi} className="text-navy-foreground/80 text-sm">
+                                          {lead && <span className="font-semibold text-navy-foreground">{lead}</span>}
+                                          {lead && ' — '}
+                                          {rest}
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
