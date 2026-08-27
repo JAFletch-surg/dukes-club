@@ -1,7 +1,8 @@
 'use client'
 import Link from "next/link";
-import { UserPlus, CreditCard, ShieldCheck, ArrowRight } from "lucide-react";
+import { UserPlus, CreditCard, ShieldCheck, ArrowRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
 
 const steps = [
   {
@@ -52,15 +53,28 @@ const HowToJoinSection = () => {
           ))}
         </div>
 
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-6">
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
             Don&apos;t have an ACPGBI number yet? You can still register as a Trainee and access webinars, the question bank, and community features.
           </p>
-          <Link href="/register">
-            <Button variant="gold" size="lg">
-              Register Now <ArrowRight size={16} className="ml-1" />
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 max-w-md sm:max-w-none mx-auto">
+            <Link href="/register" className="sm:w-auto">
+              <Button variant="gold" size="lg" className="w-full">
+                Register Now <ArrowRight size={16} className="ml-1" />
+              </Button>
+            </Link>
+            <a
+              href={ACPGBI_MEMBERSHIP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="sm:w-auto"
+            >
+              <Button variant="navy" size="lg" className="w-full">
+                Get an ACPGBI Membership Number
+                <ExternalLink size={16} className="ml-1" />
+              </Button>
+            </a>
+          </div>
         </div>
       </div>
     </section>
