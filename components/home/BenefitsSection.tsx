@@ -33,8 +33,8 @@ const BenefitsSection = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-12">
           {[
             { value: "500+", label: "Active Members" },
-            { value: "30+", label: "Courses Delivered" },
-            { value: "15", label: "Years Running" },
+            { value: "100+", label: "Courses Delivered" },
+            { value: "28", label: "Years Running" },
             { value: "£50k+", label: "Grants Awarded" },
           ].map((stat) => (
             <div key={stat.label} className="text-center py-4">
