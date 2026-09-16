@@ -102,8 +102,29 @@ If a folder can't be read (deleted on Vimeo, or a temporary Vimeo outage) the ba
    * **Category** — Operative, Complications, Webinar, Education, Lecture, Endoscopy, or Conference.
    * **Tags** — Keyword tags.
    * **Status** — Draft, Published, or Archived.
-   * **Members Only** — Toggle to restrict access to approved members.
+   * **Members Only** — Toggle to restrict the video to Dukes' Club members. See [Who can watch what](#who-can-watch-what).
    * **Published Date**.
+
+### Who can watch what
+
+Every video carries an **access** setting alongside its status:
+
+* **Open to all** — any approved account can watch it, forever.
+* **Members only** — reserved for members. Specifically:
+  * **Full members** (Member, Editor, Admin) — always.
+  * **International members** — always, whatever their role. They register under the international category and have no ACPGBI number to upgrade with, so they are admitted on that category.
+  * **UK trainees** — for **1 month** from the day they registered. After that the video stays in their library **greyed out, with a padlock** and a prompt to join the Dukes' Club. It never silently disappears.
+
+The lock is enforced server-side: the archive listing never sends the Vimeo ID of a video to a browser that is not allowed to play it.
+
+### Batch Changes
+
+Every video in the list has a checkbox, and the header checkbox selects everything currently visible. With one or more selected, a bar appears above the list:
+
+* **Status** — **Publish**, **Draft**, or **Archive** the whole selection. Publishing stamps today's date on anything that has never had a published date.
+* **Access** — **Members only** or **Open to all** for the whole selection.
+
+Batch actions only ever touch videos that are visible under the current filters, so it is safe to filter first and then select all. Filter by status, category, or access to line up exactly the set you want — for example *All statuses + Open to all*, select all, then **Members only**.
 
 ### Faculty Speakers
 
@@ -114,6 +135,7 @@ Link [faculty members](people.md#faculty) to each video using the faculty picker
 * Search by title, description, or speaker name.
 * Filter by status (All / Draft / Published / Archived).
 * Filter by category.
+* Filter by access (All / Members only / Open to all).
 
 ---
 

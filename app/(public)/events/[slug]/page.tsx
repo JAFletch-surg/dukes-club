@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { canBookEvent } from "@/lib/membership-gates";
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button";
 import { sendEmail } from "@/lib/emails/send-email";
 import { isStreamingEvent, registerForEvent } from "@/lib/events";
 import { richTextToHtml } from "@/lib/rich-text";
@@ -515,11 +516,12 @@ const EventDetailPage = () => {
                             <p className="text-xs text-navy-foreground/60 leading-relaxed">
                               In-person courses are available to verified ACPGBI members. Submit your membership number to upgrade.
                             </p>
-                            <Link href="/members/profile">
+                            <Link href="/members/profile" className="block">
                               <Button variant="gold" size="sm" className="w-full">
                                 Add Membership Number
                               </Button>
                             </Link>
+                            <AcpgbiMembershipButton variant="hero" size="sm" className="block" />
                           </div>
                         ) : !showApplyForm ? (
                           <Button variant="gold" size="lg" className="w-full" onClick={() => setShowApplyForm(true)}>

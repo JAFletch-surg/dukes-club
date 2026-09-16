@@ -1,8 +1,8 @@
 'use client'
 import Link from "next/link";
-import { UserPlus, CreditCard, ShieldCheck, ArrowRight, ExternalLink } from "lucide-react";
+import { UserPlus, CreditCard, ShieldCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button";
 
 const steps = [
   {
@@ -63,17 +63,7 @@ const HowToJoinSection = () => {
                 Register Now <ArrowRight size={16} className="ml-1" />
               </Button>
             </Link>
-            <a
-              href={ACPGBI_MEMBERSHIP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sm:w-auto"
-            >
-              <Button variant="navy" size="lg" className="w-full">
-                Get an ACPGBI Membership Number
-                <ExternalLink size={16} className="ml-1" />
-              </Button>
-            </a>
+            <AcpgbiMembershipButton size="lg" className="sm:w-auto" />
           </div>
         </div>
       </div>

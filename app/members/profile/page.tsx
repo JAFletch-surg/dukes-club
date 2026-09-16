@@ -19,6 +19,7 @@ import {
 } from "@/components/digest/digest-preference-fields";
 import { COUNTRIES } from "@/lib/constants/countries";
 import { isValidGmcNumber, normaliseGmcNumber } from "@/lib/registration";
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button";
 
 const regions = [
   "North East", "North West (Mersey)", "North West (North Western)",
@@ -479,17 +480,13 @@ const MemberProfile = () => {
               </div>
 
               {!acpgbiNumber && (
-                <p className="text-xs text-muted-foreground mt-3">
-                  Don&apos;t have an ACPGBI membership?{' '}
-                  <a
-                    href="https://www.acpgbi.org.uk/membership/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-gold hover:text-gold/80 underline"
-                  >
-                    Learn how to join
-                  </a>
-                </p>
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Don&apos;t have an ACPGBI membership number yet? Membership of the Dukes&apos; Club
+                    runs through ACPGBI — apply for one and come back here to submit it.
+                  </p>
+                  <AcpgbiMembershipButton size="sm" className="inline-block" />
+                </div>
               )}
             </CardContent>
           </Card>

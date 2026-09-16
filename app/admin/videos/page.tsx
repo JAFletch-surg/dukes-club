@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw, FolderOpen, AlertTriangle } from 'lucide-react'
+import { Video, Plus, Edit, Trash2, Save, Loader, X, Search, Eye, Clock, Upload, RefreshCw, FolderOpen, AlertTriangle, Lock, Globe, CheckSquare, Square } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { FacultyPicker, type FacultyMember } from '@/components/admin/faculty-picker'
 import { EditFacultyDialog } from '@/components/admin/edit-faculty-dialog'
 import { VimeoFolderManager } from '@/components/admin/vimeo-folder-manager'
+import { VIDEO_TRIAL_MONTHS } from '@/lib/membership-gates'
 
 /* ── Constants ───────────────────────────────────── */
 const VIDEO_CATEGORIES = ['Operative', 'Complications', 'Webinar', 'Education', 'Lecture', 'Endoscopy', 'Conference']
@@ -73,11 +74,67 @@ interface VideoRecord {
   created_at: string
 }
 
+/* ── Bulk-bar button ─────────────────────────────── */
+function BulkButton({
+  onClick, busy, disabled, icon, children,
+}: {
+  onClick: () => void
+  busy?: boolean
+  disabled?: boolean
+  icon?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '7px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+        background: 'rgba(255,255,255,0.12)', color: C.navyFg,
+        border: '1px solid rgba(255,255,255,0.2)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled && !busy ? 0.5 : 1,
+      }}
+    >
+      {busy ? <Loader size={13} className="animate-spin" /> : icon}
+      {children}
+    </button>
+  )
+}
+
+/* ── Row selection checkbox ──────────────────────── */
+function SelectBox({
+  checked, onChange, label,
+}: { checked: boolean; onChange: () => void; label: string }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onChange() }}
+      aria-label={label}
+      aria-pressed={checked}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 2, border: 'none', background: 'none', cursor: 'pointer',
+        color: checked ? C.primary : '#B0B0B8',
+      }}
+    >
+      {checked ? <CheckSquare size={18} /> : <Square size={18} />}
+    </button>
+  )
+}
+
+/* ── Access badge ────────────────────────────────── */
+function AccessBadge({ membersOnly }: { membersOnly: boolean }) {
+  return membersOnly
+    ? <span style={{ ...S.badge('#FFF7ED', '#C2410C'), fontSize: 10 }}>Members only</span>
+    : <span style={{ ...S.badge('#ECFDF5', '#047857'), fontSize: 10 }}>Open to all</span>
+}
+
 /* ═════════════════════════════════════════════════════
    MAIN ADMIN VIDEOS PAGE
    ═════════════════════════════════════════════════════ */
 export default function AdminVideosPage() {
-  const { data: videos, loading, error, refetch, create, update, remove } = useSupabaseTable<VideoRecord>('videos', 'created_at', false)
+  const { data: videos, loading, error, refetch, create, update, updateMany, remove } = useSupabaseTable<VideoRecord>('videos', 'created_at', false)
 
   const [editing, setEditing] = useState<VideoRecord | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -85,9 +142,14 @@ export default function AdminVideosPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
+  const [filterAccess, setFilterAccess] = useState('all')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [showFolders, setShowFolders] = useState(false)
+
+  /* ── Bulk selection ─────────────────────────────── */
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null)
 
   /* ── Faculty state ──────────────────────────────── */
   const [facultyList, setFacultyList] = useState<FacultyMember[]>([])
@@ -263,8 +325,64 @@ export default function AdminVideosPage() {
     const matchSearch = !q || v.title.toLowerCase().includes(q) || (v.vimeo_id || '').includes(q)
     const matchStatus = filterStatus === 'all' || v.status === filterStatus
     const matchCategory = filterCategory === 'all' || v.category === filterCategory
-    return matchSearch && matchStatus && matchCategory
+    const matchAccess = filterAccess === 'all'
+      || (filterAccess === 'members' ? v.is_members_only : !v.is_members_only)
+    return matchSearch && matchStatus && matchCategory && matchAccess
   })
+
+  /* ── Bulk actions ────────────────────────────────── */
+  //
+  // Selection is kept as ids, and every action runs against the ids that are
+  // still visible under the current filters — so narrowing the filters after
+  // selecting can never quietly update a row the admin can no longer see.
+  const visibleIds = filtered.map(v => v.id)
+  const selectedVisible = selectedIds.filter(id => visibleIds.includes(id))
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])
+
+  const toggleSelectAll = () =>
+    setSelectedIds(allVisibleSelected ? [] : visibleIds)
+
+  const clearSelection = () => setSelectedIds([])
+
+  const runBulk = async (label: string, apply: (ids: string[]) => Promise<unknown>) => {
+    if (selectedVisible.length === 0 || bulkBusy) return
+    setBulkBusy(label)
+    try {
+      await apply(selectedVisible)
+      clearSelection()
+    } catch (err: unknown) {
+      alert(`Bulk ${label} failed: ` + (err instanceof Error ? err.message : String(err)))
+    }
+    setBulkBusy(null)
+  }
+
+  const bulkSetStatus = (status: string) => runBulk(status, async ids => {
+    if (status !== 'published') {
+      await updateMany(ids, { status } as Partial<VideoRecord>)
+      return
+    }
+    // Publishing stamps published_at on anything that has never had one —
+    // the members archive sorts on that column, so a null would sink the
+    // video to the bottom of the library.
+    const byId = new Map(videos.map(v => [v.id, v]))
+    const undated = ids.filter(id => !byId.get(id)?.published_at)
+    const dated = ids.filter(id => byId.get(id)?.published_at)
+    if (dated.length) await updateMany(dated, { status } as Partial<VideoRecord>)
+    if (undated.length) {
+      await updateMany(undated, {
+        status,
+        // Date-only, matching what the edit form's date input writes.
+        published_at: new Date().toISOString().slice(0, 10),
+      } as Partial<VideoRecord>)
+    }
+  })
+
+  const bulkSetAccess = (membersOnly: boolean) =>
+    runBulk(membersOnly ? 'members only' : 'open to all', ids =>
+      updateMany(ids, { is_members_only: membersOnly } as Partial<VideoRecord>))
 
   /* ── STATUS BADGE ──────────────────────────────── */
   const StatusBadge = ({ status }: { status: string }) => {
@@ -390,7 +508,47 @@ export default function AdminVideosPage() {
           <option value="all">All categories</option>
           {VIDEO_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        <select value={filterAccess} onChange={e => setFilterAccess(e.target.value)} style={{ ...S.select, width: 170 }}>
+          <option value="all">All access</option>
+          <option value="members">Members only</option>
+          <option value="open">Open to all</option>
+        </select>
       </div>
+
+      {/* ═══ BULK ACTION BAR ═══════════════════════════ */}
+      {selectedVisible.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          padding: '12px 16px', marginBottom: 16, borderRadius: 12,
+          background: C.navy, color: C.navyFg,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700, marginRight: 4 }}>
+            {selectedVisible.length} selected
+          </span>
+
+          <span style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Status</span>
+          <BulkButton onClick={() => bulkSetStatus('published')} busy={bulkBusy === 'published'} disabled={!!bulkBusy}>Publish</BulkButton>
+          <BulkButton onClick={() => bulkSetStatus('draft')} busy={bulkBusy === 'draft'} disabled={!!bulkBusy}>Draft</BulkButton>
+          <BulkButton onClick={() => bulkSetStatus('archived')} busy={bulkBusy === 'archived'} disabled={!!bulkBusy}>Archive</BulkButton>
+
+          <span style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+
+          <span style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Access</span>
+          <BulkButton onClick={() => bulkSetAccess(true)} busy={bulkBusy === 'members only'} disabled={!!bulkBusy} icon={<Lock size={13} />}>Members only</BulkButton>
+          <BulkButton onClick={() => bulkSetAccess(false)} busy={bulkBusy === 'open to all'} disabled={!!bulkBusy} icon={<Globe size={13} />}>Open to all</BulkButton>
+
+          <button
+            onClick={clearSelection}
+            style={{
+              marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
+              background: 'none', border: 'none', color: C.navyFg, opacity: 0.75,
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 4,
+            }}
+          >
+            <X size={14} /> Clear
+          </button>
+        </div>
+      )}
 
       {/* Loading / Error */}
       {loading && (
@@ -409,6 +567,13 @@ export default function AdminVideosPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#F9FAFB', borderBottom: `1px solid ${C.border}` }}>
+                <th style={{ padding: '12px 0 12px 16px', width: 36 }}>
+                  <SelectBox
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAll}
+                    label={allVisibleSelected ? 'Deselect all videos' : 'Select all videos'}
+                  />
+                </th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Video</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Category</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: C.secondary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Tags</th>
@@ -419,7 +584,16 @@ export default function AdminVideosPage() {
             </thead>
             <tbody>
               {filtered.map(v => (
-                <tr key={v.id} style={{ borderBottom: `1px solid #F1F1F3` }}>
+                <tr key={v.id} style={{ borderBottom: `1px solid #F1F1F3`, background: selectedIds.includes(v.id) ? '#F5F9FF' : undefined }}>
+                  {/* Select */}
+                  <td style={{ padding: '14px 0 14px 16px' }}>
+                    <SelectBox
+                      checked={selectedIds.includes(v.id)}
+                      onChange={() => toggleSelect(v.id)}
+                      label={`Select ${v.title}`}
+                    />
+                  </td>
+
                   {/* Video info */}
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -467,10 +641,10 @@ export default function AdminVideosPage() {
 
                   {/* Status */}
                   <td style={{ padding: '14px 16px' }}>
-                    <StatusBadge status={v.status} />
-                    {v.is_members_only && (
-                      <span style={{ ...S.badge('#FFF7ED', '#C2410C'), marginLeft: 6, fontSize: 10 }}>Members</span>
-                    )}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <StatusBadge status={v.status} />
+                      <AccessBadge membersOnly={v.is_members_only} />
+                    </div>
                   </td>
 
                   {/* Views */}
@@ -498,8 +672,8 @@ export default function AdminVideosPage() {
 
               {filtered.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#999' }}>
-                    {search || filterStatus !== 'all' || filterCategory !== 'all'
+                  <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: '#999' }}>
+                    {search || filterStatus !== 'all' || filterCategory !== 'all' || filterAccess !== 'all'
                       ? 'No videos match your filters.'
                       : 'No videos yet. Click "Add Video" to get started.'}
                   </td>
@@ -511,9 +685,33 @@ export default function AdminVideosPage() {
 
         {/* Mobile card list */}
         <div className="md:hidden space-y-3">
+          {filtered.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-2 text-xs font-semibold py-1"
+              style={{ color: C.primary }}
+            >
+              {allVisibleSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+              {allVisibleSelected ? 'Deselect all' : `Select all ${filtered.length}`}
+            </button>
+          )}
           {filtered.map(v => (
-            <div key={v.id} className="bg-white rounded-xl border border-[#E4E4E8] p-3.5 active:bg-gray-50">
+            <div
+              key={v.id}
+              className="rounded-xl border p-3.5 active:bg-gray-50"
+              style={{
+                background: selectedIds.includes(v.id) ? '#F5F9FF' : '#fff',
+                borderColor: selectedIds.includes(v.id) ? C.primary : '#E4E4E8',
+              }}
+            >
               <div className="flex items-start gap-3">
+                <div className="pt-1 shrink-0">
+                  <SelectBox
+                    checked={selectedIds.includes(v.id)}
+                    onChange={() => toggleSelect(v.id)}
+                    label={`Select ${v.title}`}
+                  />
+                </div>
                 <div className="w-16 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: C.navy }}>
                   {v.thumbnail_url ? (
                     <img src={v.thumbnail_url} alt="" className="w-full h-full object-cover" />
@@ -533,7 +731,7 @@ export default function AdminVideosPage() {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <StatusBadge status={v.status} />
                   {v.category && <span style={S.badge('#EEF2FF', '#4338CA')}>{v.category}</span>}
-                  {v.is_members_only && <span style={{ ...S.badge('#FFF7ED', '#C2410C'), fontSize: 10 }}>Members</span>}
+                  <AccessBadge membersOnly={v.is_members_only} />
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => openEdit(v)} className="p-2 rounded-lg bg-[#F3F4F6]" style={{ color: C.primary }}>
@@ -548,7 +746,7 @@ export default function AdminVideosPage() {
           ))}
           {filtered.length === 0 && !loading && (
             <div className="text-center py-12 text-sm" style={{ color: '#999' }}>
-              {search || filterStatus !== 'all' || filterCategory !== 'all'
+              {search || filterStatus !== 'all' || filterCategory !== 'all' || filterAccess !== 'all'
                 ? 'No videos match your filters.'
                 : 'No videos yet. Tap + to get started.'}
             </div>
@@ -731,15 +929,22 @@ export default function AdminVideosPage() {
               </div>
 
               {/* Members only toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={form.is_members_only}
-                  onChange={e => setForm(f => ({ ...f, is_members_only: e.target.checked }))}
-                  style={{ width: 18, height: 18, accentColor: C.primary }}
-                />
-                <span style={{ fontSize: 14, fontWeight: 600, color: C.fg }}>Members Only</span>
-              </label>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.is_members_only}
+                    onChange={e => setForm(f => ({ ...f, is_members_only: e.target.checked }))}
+                    style={{ width: 18, height: 18, accentColor: C.primary }}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.fg }}>Members Only</span>
+                </label>
+                <p style={{ ...S.hint, marginLeft: 28 }}>
+                  Full members and international members always have access. UK trainees get
+                  {' '}{VIDEO_TRIAL_MONTHS} month from sign-up, then the video shows greyed out with a
+                  lock and a prompt to join. Untick to open the video to every approved account.
+                </p>
+              </div>
             </div>
 
             {/* Modal footer */}
