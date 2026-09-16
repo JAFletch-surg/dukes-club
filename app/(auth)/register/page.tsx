@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, ArrowRight, CheckCircle, Clock, ShieldCheck, Globe, MapPin, ExternalLink } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, CheckCircle, Clock, ShieldCheck, Globe, MapPin } from "lucide-react"
 import AuthLayout from "@/components/auth/AuthLayout"
 import { COUNTRIES } from "@/lib/constants/countries"
-import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links"
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button"
 import {
   isApprovedDomain,
   isValidGmcNumber,
@@ -396,17 +396,7 @@ const RegisterPage = () => {
                 <p className="text-xs text-muted-foreground">
                   If you&apos;re a paying ACPGBI member, enter your membership number for full access
                 </p>
-                <a
-                  href={ACPGBI_MEMBERSHIP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block"
-                >
-                  <Button type="button" variant="navy" className="w-full h-11">
-                    Get an ACPGBI Membership Number
-                    <ExternalLink size={16} className="ml-1" />
-                  </Button>
-                </a>
+                <AcpgbiMembershipButton className="block" buttonClassName="h-11" />
               </>
             )}
           </div>

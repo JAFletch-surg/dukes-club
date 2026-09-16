@@ -23,7 +23,7 @@ The library is open to every approved account, but some videos are reserved for 
 * **International members** — the whole library, always.
 * **UK trainees** — the whole library for **1 month** from the day you register. After that the members-only videos lock, and everything else stays open.
 
-A countdown appears at the top of the library while your preview is running, and once it ends a banner tells you how many videos are locked and how to unlock them. To unlock them, add your ACPGBI membership number on your [Profile](member-portal.md#profile).
+A countdown appears at the top of the library while your preview is running, and once it ends a banner tells you how many videos are locked and how to unlock them. Both the banner and the locked video itself offer the two steps side by side: **Join the Dukes' Club**, which takes you to your [Profile](member-portal.md#profile) to submit your ACPGBI number, and **Get an ACPGBI Membership Number**, which opens ACPGBI's own membership page if you do not have one yet.
 
 > **Note:** You must be logged in with an approved account to reach the video library at all.
 

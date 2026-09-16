@@ -16,7 +16,7 @@ import VimeoPlayer from "@/components/members/VimeoPlayer";
 import {
   canAccessVideo, getVideoTrialDaysRemaining, hasFullVideoAccess, VIDEO_TRIAL_MONTHS,
 } from "@/lib/membership-gates";
-import { ACPGBI_MEMBERSHIP_URL } from "@/lib/constants/links";
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button";
 
 const defaultCategories = ["All", "Operative", "Complications", "Webinar", "Education", "Lecture"];
 const sortOptions = ["Newest", "Most Viewed", "Duration"] as const;
@@ -454,13 +454,13 @@ function LockedPlayer({ thumbnailUrl }: { thumbnailUrl: string | null }) {
       className="relative w-full aspect-video rounded-xl overflow-hidden bg-navy bg-cover bg-center"
       style={thumbnailUrl ? { backgroundImage: `url(${thumbnailUrl})` } : undefined}
     >
-      <div className="absolute inset-0 backdrop-grayscale bg-navy/80 flex flex-col items-center justify-center text-center px-6 gap-4">
-        <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
-          <Lock size={24} className="text-white" />
+      <div className="absolute inset-0 backdrop-grayscale bg-navy/80 flex flex-col items-center justify-center text-center px-4 sm:px-6 gap-2.5 sm:gap-4">
+        <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+          <Lock size={20} className="text-white" />
         </div>
         <div>
-          <p className="text-white font-semibold text-base">Members only</p>
-          <p className="text-white/70 text-xs mt-1 max-w-sm">
+          <p className="text-white font-semibold text-sm sm:text-base">Members only</p>
+          <p className="text-white/70 text-[11px] sm:text-xs mt-0.5 max-w-sm">
             This video is part of the members&apos; archive. Join the Dukes&apos; Club to watch it.
           </p>
         </div>
@@ -470,27 +470,25 @@ function LockedPlayer({ thumbnailUrl }: { thumbnailUrl: string | null }) {
   );
 }
 
-/** The "join the Dukes' Club" call to action, used wherever a video locks. */
+/**
+ * The call to action wherever a video locks — both halves of joining, not
+ * just the profile page a member with no number yet has nothing to type into.
+ */
 function JoinPrompt({ tone = "dark" }: { tone?: "dark" | "light" }) {
+  const dark = tone === "dark";
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 w-full max-w-[260px] sm:max-w-none sm:w-auto">
       <a href="/members/profile">
-        <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors">
+        <Button variant="gold" size="sm" className="w-full">
           Join the Dukes&apos; Club
-        </button>
+        </Button>
       </a>
-      <a
-        href={ACPGBI_MEMBERSHIP_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`text-[11px] underline transition-colors ${
-          tone === "dark"
-            ? "text-white/60 hover:text-white"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        Learn about ACPGBI membership
-      </a>
+      {/* The full label does not fit inside the player's aspect-video box. */}
+      <AcpgbiMembershipButton
+        variant={dark ? "hero" : "navy"}
+        size="sm"
+        label={dark ? "Get an ACPGBI Number" : undefined}
+      />
     </div>
   );
 }

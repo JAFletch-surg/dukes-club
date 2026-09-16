@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import EventsCalendar from "@/components/EventsCalendar";
 import FeedbackCtaCard from "@/components/members/feedback/FeedbackCtaCard";
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button";
 import { SITE_FEEDBACK_VERSION } from "@/lib/site-feedback-questions";
 
 const VIDEO_BADGE_THRESHOLDS = [
@@ -297,20 +298,13 @@ const MembersDashboard = () => {
                   <p className="text-xs text-muted-foreground mt-1">
                     Submit your ACPGBI membership number to unlock full access to in-person courses, unlimited question bank, and more.
                   </p>
-                  <div className="flex items-center gap-3 mt-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-3">
                     <Link href="/members/profile">
-                      <Button variant="gold" size="sm">
+                      <Button variant="gold" size="sm" className="w-full">
                         Add Membership Number
                       </Button>
                     </Link>
-                    <a
-                      href="https://www.acpgbi.org.uk/membership/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
-                    >
-                      Learn about ACPGBI membership
-                    </a>
+                    <AcpgbiMembershipButton size="sm" />
                   </div>
                 </>
               ) : (

@@ -19,4 +19,4 @@ nav_order: 2
 > International members keep access to the [members-only videos](videos-and-podcasts.md#who-can-watch-what)
 > rather than losing them at the end of the trainee preview.
 
-> **Tip:** Go to your [Profile](member-portal.md#profile) and enter your ACPGBI membership number under the ACPGBI Membership section. Once verified, you unlock all Full Member features.
+> **Tip:** Go to your [Profile](member-portal.md#profile) and enter your ACPGBI membership number under the ACPGBI Membership section. Once verified, you unlock all Full Member features. No number yet? The same section — and every locked feature that asks for one — has a **Get an ACPGBI Membership Number** button that takes you to ACPGBI to apply.

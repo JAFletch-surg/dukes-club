@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/use-auth";
 import { isQuestionBankTrialExpired, getTrialDaysRemaining } from "@/lib/membership-gates";
+import { AcpgbiMembershipButton } from "@/components/members/acpgbi-membership-button";
 
 type Mode = "study" | "exam";
 type Screen = "setup" | "session" | "results";
@@ -606,20 +607,13 @@ const QuestionBank = () => {
             Your 3-month free trial of the question bank has expired. Submit your ACPGBI membership number to upgrade to Full Member and regain unlimited access.
           </p>
         </div>
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           <a href="/members/profile">
-            <button className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors">
+            <button className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-gold text-gold-foreground text-sm font-bold hover:bg-gold/90 transition-colors">
               Add Membership Number
             </button>
           </a>
-          <a
-            href="https://www.acpgbi.org.uk/membership/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
-          >
-            Learn about ACPGBI membership
-          </a>
+          <AcpgbiMembershipButton buttonClassName="h-12" />
         </div>
       </div>
     );
