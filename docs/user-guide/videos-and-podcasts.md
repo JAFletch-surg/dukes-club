@@ -15,7 +15,17 @@ Access the video library from the member portal. Browse operative videos, lectur
 * **Watch** directly on the page (Vimeo embed).
 * **Track progress** — the system records which videos you have watched.
 
-> **Note:** Videos are members-only content. You must be logged in with an approved account to access the video library.
+### Who can watch what
+
+The library is open to every approved account, but some videos are reserved for Dukes' Club members. A reserved video you cannot watch still appears in the library — greyed out, with a padlock and a link to join.
+
+* **Full members** — the whole library, always.
+* **International members** — the whole library, always.
+* **UK trainees** — the whole library for **1 month** from the day you register. After that the members-only videos lock, and everything else stays open.
+
+A countdown appears at the top of the library while your preview is running, and once it ends a banner tells you how many videos are locked and how to unlock them. To unlock them, add your ACPGBI membership number on your [Profile](member-portal.md#profile).
+
+> **Note:** You must be logged in with an approved account to reach the video library at all.
 
 ## Podcasts
 

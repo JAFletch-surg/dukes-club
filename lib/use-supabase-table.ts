@@ -57,11 +57,29 @@ export function useSupabaseTable<T extends { id: string }>(
     return updatedRow
   }
 
+  /**
+   * Apply the same patch to many rows in one request — what the admin bulk
+   * actions use. Returns the updated rows; an empty id list is a no-op.
+   */
+  const updateMany = async (ids: string[], updates: Partial<T>) => {
+    if (ids.length === 0) return []
+    const { data: updated, error: err } = await supabase
+      .from(table)
+      .update(updates)
+      .in('id', ids)
+      .select('*')
+    if (err) throw new Error(err.message)
+    const rows = (updated as T[]) || []
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    setData((d) => d.map((r) => byId.get(r.id) ?? r))
+    return rows
+  }
+
   const remove = async (id: string) => {
     const { error: err } = await supabase.from(table).delete().eq('id', id)
     if (err) throw new Error(err.message)
     setData((d) => d.filter((r) => r.id !== id))
   }
 
-  return { data, loading, error, refetch: fetchData, create, update, remove }
+  return { data, loading, error, refetch: fetchData, create, update, updateMany, remove }
 }
