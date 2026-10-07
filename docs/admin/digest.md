@@ -15,7 +15,7 @@ content to different people.
 
 ## How the schedule works
 
-A cron job runs the digest once a week. Each run only emails members whose own cadence has come
+A cron job runs the digest every day. Each run only emails members whose own cadence has come
 round, so fortnightly and monthly subscribers are simply skipped on the runs in between:
 
 | Member's setting | Receives the round-up |
@@ -25,9 +25,28 @@ round, so fortnightly and monthly subscribers are simply skipped on the runs in 
 | Monthly | Every fourth run (28 days) |
 | Never | Not at all |
 
-Digests go out on **Thursday mornings at 08:00 UTC** — 9am during British Summer Time, 8am in
+Runs happen **every morning at 08:00 UTC** — 9am during British Summer Time, 8am in
 winter. The exact minute varies: on Vercel's Hobby plan the job may be triggered at any point
 within that hour, so a digest arriving at 08:47 is normal and not a fault.
+
+### The daily limit
+
+Resend's free tier allows 100 emails a day across everything the site sends, so the round-up takes
+at most **80 per day** (UTC), leaving room for booking confirmations, password resets and the like.
+When more members are due than that, the 80 who have waited longest go first and the rest are held
+over to the next day's run. A large list therefore goes out in groups of 80 over consecutive days.
+
+Nobody receives the round-up twice: a member only becomes due again a full cadence after their
+last successful send, and anyone sent a digest in the last 20 hours is skipped regardless. A
+held-over member's news and videos are still counted from their own last digest, so arriving a day
+later loses nothing. After the first week each member settles on their own send day, so roughly the
+same group goes out each day of the week.
+
+The limit counts every round-up sent that day, including **Send now** from the admin page, so
+pressing it after the morning run only sends whatever allowance is left. Set
+`DIGEST_DAILY_LIMIT` to change the figure (for example after upgrading the Resend plan). If more
+than 7 × 80 = 560 weekly subscribers are due, the backlog will grow; raise the limit or the plan
+before that point.
 
 Two rules keep the email from becoming noise:
 
@@ -99,8 +118,9 @@ Three actions:
   schedule is affected.
 * **Check who's due** — a dry run. Reports how many members would be emailed and what each would
   get, without sending anything.
-* **Send now to everyone due** — runs the digest immediately. Members who are not due, and members
-  with nothing new, are still skipped.
+* **Send now to everyone due** — runs the digest immediately, up to whatever is left of today's
+  daily limit. Members who are not due, and members with nothing new, are still skipped; anyone
+  over the limit goes out on the next day's run.
 
 **Recent Sends** logs every attempt, including failures and skips, so you can confirm a run went out
 and see anything that bounced.
@@ -132,9 +152,9 @@ Run these in the Supabase SQL editor, in order:
 3. `supabase/add-digest-curation.sql` — adds `digest_settings`, which holds the per-section
    auto-fill switches.
 
-The schedule itself lives in `vercel.json` (`0 8 * * 4` — Thursdays at 08:00 UTC). Changing that
-line changes the send day; you do not need to touch anything else, because each member's cadence is
-worked out from when they last received a digest rather than from the cron schedule.
+The schedule itself lives in `vercel.json` (`0 8 * * *` — daily at 08:00 UTC). It needs to run
+daily for held-over members to go out the next day; each member's cadence is worked out from when
+they last received a digest rather than from the cron schedule.
 
 Requires `RESEND_API_KEY`, `NEXT_PUBLIC_SITE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET`
 to be set. See the README for the full list.

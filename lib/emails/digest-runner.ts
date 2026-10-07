@@ -22,6 +22,14 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thedukesclub.o
 // Resend accepts up to 100 emails per batch call.
 const BATCH_SIZE = 100
 
+// Resend's free tier allows 100 emails a day across *everything* the site
+// sends, so the digest takes at most this many per UTC day and leaves the rest
+// for account email (bookings, password resets). Members who don't fit stay
+// due — last_sent_at only moves on a successful send — and go out on the next
+// daily run, longest-waiting first. Nobody is sent twice: a sent member is not
+// due again for a full cadence, and the recent-send guard below backs that up.
+const DAILY_LIMIT = Number(process.env.DIGEST_DAILY_LIMIT) || 80
+
 // Belt and braces against a double send: even if last_sent_at failed to write,
 // a member who already got a digest this recently is skipped.
 const RECENT_SEND_HOURS = 20
@@ -65,6 +73,11 @@ export interface RunDigestResult {
   failed: number
   skippedEmpty: number
   skippedRecent: number
+  /** Due, but held over to a later day by the daily limit. */
+  deferred: number
+  /** Digests already sent earlier today (UTC), counted against the limit. */
+  sentToday: number
+  dailyLimit: number
   dryRun?: boolean
   /** Dry runs only: how many members would have been emailed. */
   wouldSend?: number
@@ -131,6 +144,26 @@ async function recentlySent(supabase: SupabaseClient, userIds: string[], now: Da
   }
 
   return seen
+}
+
+/** Digests successfully sent since midnight UTC, i.e. already used from today's allowance. */
+async function countSentToday(supabase: SupabaseClient, now: Date): Promise<number> {
+  const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString()
+  const { count, error } = await supabase
+    .from('digest_sends')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'sent')
+    .gte('sent_at', midnight)
+
+  if (error) throw new Error(`Failed to count today's sends: ${error.message}`)
+  return count ?? 0
+}
+
+/** Oldest last_sent_at first, never-sent members ahead of everyone. */
+function longestWaitingFirst(a: Recipient, b: Recipient): number {
+  const at = a.prefs.last_sent_at ? new Date(a.prefs.last_sent_at).getTime() || 0 : 0
+  const bt = b.prefs.last_sent_at ? new Date(b.prefs.last_sent_at).getTime() || 0 : 0
+  return at - bt
 }
 
 /**
@@ -224,16 +257,27 @@ export async function runDigest(
 
   const pool = await fetchDigestPool(supabase, now)
   const recipients = await loadRecipients(supabase, userIds)
-  const due = recipients.filter((r) => isSubscribed(r.prefs) && (force || isDue(r.prefs, now)))
+  const due = recipients
+    .filter((r) => isSubscribed(r.prefs) && (force || isDue(r.prefs, now)))
+    .sort(longestWaitingFirst)
 
   const guard = dryRun ? new Set<string>() : await recentlySent(supabase, due.map((r) => r.prefs.user_id), now)
+  const sentToday = await countSentToday(supabase, now)
+  const allowance = Math.max(0, DAILY_LIMIT - sentToday)
 
   const outgoing: OutgoingEmail[] = []
   const queued: Array<{ recipient: Recipient; eventCount: number; postCount: number; videoCount: number }> = []
   const skippedEmpty: string[] = []
   let skippedRecent = 0
+  let deferred = 0
 
   for (const recipient of due) {
+    // Today's allowance is spent: everyone left stays due for tomorrow's run.
+    if (outgoing.length >= allowance) {
+      deferred++
+      continue
+    }
+
     if (guard.has(recipient.prefs.user_id)) {
       skippedRecent++
       continue
@@ -290,6 +334,9 @@ export async function runDigest(
       failed: 0,
       skippedEmpty: skippedEmpty.length,
       skippedRecent,
+      deferred,
+      sentToday,
+      dailyLimit: DAILY_LIMIT,
       wouldSend: queued.length,
       recipients: queued.map((q) => ({
         email: q.recipient.email,
@@ -362,5 +409,8 @@ export async function runDigest(
     failed,
     skippedEmpty: skippedEmpty.length,
     skippedRecent,
+    deferred,
+    sentToday,
+    dailyLimit: DAILY_LIMIT,
   }
 }

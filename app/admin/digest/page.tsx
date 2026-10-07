@@ -59,6 +59,9 @@ interface RunResult {
   failed: number
   skippedEmpty: number
   skippedRecent?: number
+  deferred?: number
+  sentToday?: number
+  dailyLimit?: number
   recipients?: Array<{ email: string; frequency: string; eventCount: number; postCount: number; videoCount: number }>
 }
 
@@ -161,8 +164,8 @@ export default function AdminDigestPage() {
         setResult(data)
         setMessage(
           kind === 'dry'
-            ? { kind: 'ok', text: `${data.wouldSend ?? data.recipients?.length ?? 0} member(s) would receive a digest right now.` }
-            : { kind: 'ok', text: `Sent ${data.sent} digest(s). ${data.failed ? `${data.failed} failed.` : ''}` }
+            ? { kind: 'ok', text: `${data.wouldSend ?? data.recipients?.length ?? 0} member(s) would receive a digest right now.${data.deferred ? ` ${data.deferred} more are due but held over to a later day (daily limit ${data.dailyLimit}).` : ''}` }
+            : { kind: 'ok', text: `Sent ${data.sent} digest(s). ${data.failed ? `${data.failed} failed. ` : ''}${data.deferred ? `${data.deferred} held over to tomorrow by the daily limit of ${data.dailyLimit}.` : ''}` }
         )
         if (kind === 'send') loadStats()
       }
@@ -364,6 +367,7 @@ export default function AdminDigestPage() {
                   ['Due now', result.due],
                   [result.dryRun ? 'Would send' : 'Sent', result.dryRun ? (result.recipients?.length ?? 0) : result.sent],
                   ['Skipped (nothing new)', result.skippedEmpty],
+                  ...(result.deferred ? [['Held over (daily limit)', result.deferred] as const] : []),
                   ...(result.failed ? [['Failed', result.failed] as const] : []),
                 ].map(([label, count]) => (
                   <div key={String(label)} className="flex justify-between">
@@ -378,9 +382,11 @@ export default function AdminDigestPage() {
           <div className="bg-white rounded-2xl border border-[#E4E4E8] p-5">
             <h3 className="text-[13px] font-bold text-[#0F1F3D] mb-1">Schedule</h3>
             <p className="text-[13px] text-[#504F58]">
-              A weekly cron runs the digest and sends only to members whose own cadence is up, so
-              fortnightly and monthly subscribers are skipped on the runs in between. Members choose
-              their frequency in their profile or from the link in the email footer.
+              A daily cron runs the digest and sends only to members whose own cadence is up, so
+              fortnightly and monthly subscribers are skipped on the runs in between. At most{' '}
+              {result?.dailyLimit ?? 80} digests go out per day to stay inside the email quota;
+              anyone over the limit is held over to the next day, and nobody is sent twice. Members
+              choose their frequency in their profile or from the link in the email footer.
             </p>
           </div>
         </div>
@@ -394,8 +400,9 @@ export default function AdminDigestPage() {
               <div className="space-y-2 pt-1">
                 <p>
                   This emails every member whose cadence is due
-                  {result?.due ? ` — ${result.due} right now` : ''}. Members who are not due, or who
-                  have nothing new to read, are skipped automatically.
+                  {result?.due ? ` — ${result.due} right now` : ''}, up to today&rsquo;s daily limit.
+                  Anyone over the limit goes out on the next day&rsquo;s run. Members who are not
+                  due, or who have nothing new to read, are skipped automatically.
                 </p>
                 <p className="text-[#8A6100] bg-[#FFFBEB] border border-[#F3E4BF] rounded-lg px-3 py-2">
                   Emails cannot be recalled once sent. If you have not run a test yet, cancel and use
