@@ -9,11 +9,11 @@ export const dynamic = 'force-dynamic'
  * GET /api/digest/cron — the scheduled entry point, wired up in vercel.json.
  *
  * Vercel Cron calls this with `Authorization: Bearer $CRON_SECRET`. Every
- * member whose cadence is up gets a digest; the rest are left alone, so it is
- * safe (and intended) to run this weekly regardless of who is due.
- *
- * The schedule sets the *fastest possible* cadence — a weekly cron means
- * fortnightly subscribers are simply skipped on alternate runs.
+ * member whose cadence is up gets a digest, up to the daily limit in
+ * digest-runner; the rest are left alone, so it is safe (and intended) to run
+ * this daily regardless of who is due. Members held over by the limit are
+ * picked up by the next day's run, so a large list spreads across consecutive
+ * days and then stays spread, each member keeping their own weekly rhythm.
  */
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET || process.env.INTERNAL_API_SECRET

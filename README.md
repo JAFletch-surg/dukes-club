@@ -265,12 +265,14 @@ To enable it on a new environment:
    auto-fill switches.
 4. Set `CRON_SECRET` in the Vercel project settings.
 
-The schedule lives in `vercel.json` — currently `0 8 * * 4`, Thursday mornings at 08:00 UTC (9am
-during British Summer Time, 8am in winter). It sets the *fastest* cadence any member can receive:
-each run emails only the members who are due, so fortnightly and monthly subscribers are skipped in
-between. Changing the day or time is a one-line edit and nothing else needs to change, because each
-member's cadence is measured from when they last received a digest rather than from the cron
-schedule.
+The schedule lives in `vercel.json` — currently `0 8 * * *`, every morning at 08:00 UTC (9am
+during British Summer Time, 8am in winter). Each run emails only the members who are due, so
+fortnightly and monthly subscribers are skipped in between, and member cadences are measured from
+when they last received a digest rather than from the cron schedule.
+
+To stay inside Resend's free-tier quota (100 emails/day), each day sends at most 80 digests
+(`DIGEST_DAILY_LIMIT`). Members over the limit are held over to the next day's run, longest-waiting
+first; nobody is sent the same round-up twice. See `docs/admin/digest.md`.
 
 Two things to know about running this on Vercel's Hobby plan, neither of them a problem here:
 

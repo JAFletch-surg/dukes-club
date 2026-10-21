@@ -10,7 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type DigestFrequency = 'weekly' | 'fortnightly' | 'monthly' | 'never'
 
 // Days between digests. 28 rather than 30 for "monthly" so every cadence lands
-// on a whole number of weekly cron runs — see docs/admin/digest.md.
+// on a whole number of weeks — see docs/admin/digest.md.
 export const FREQUENCY_DAYS: Record<Exclude<DigestFrequency, 'never'>, number> = {
   weekly: 7,
   fortnightly: 14,
