@@ -9,21 +9,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import AuthLayout from "@/components/auth/AuthLayout"
+import ResendVerification from "@/components/auth/ResendVerification"
 
 const LoginForm = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/members'
+  const justVerified = searchParams.get('verified') === 'true'
+  const linkFailed = searchParams.get('error') === 'auth'
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [needsVerification, setNeedsVerification] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setNeedsVerification(false)
 
     if (!email || !password) {
       setError("Please enter both email and password.")
@@ -42,6 +47,7 @@ const LoginForm = () => {
       setIsLoading(false)
       if (authError.message.includes('Email not confirmed')) {
         setError("Please check your inbox and verify your email before signing in.")
+        setNeedsVerification(true)
       } else if (authError.message.includes('Invalid login credentials')) {
         setError("Incorrect email or password. Please try again.")
       } else {
@@ -81,12 +87,32 @@ const LoginForm = () => {
         </p>
       </div>
 
+      {justVerified && !error && (
+        <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+          Your email address has been verified. Sign in below to continue.
+        </div>
+      )}
+
+      {linkFailed && !error && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+          That sign-in link didn&apos;t work — it may have expired or already been used.
+          Sign in with your password, or request a new verification link below if your email isn&apos;t verified yet.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
           <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
             {error}
+            {needsVerification && (
+              <p className="mt-1 text-xs text-destructive/80">
+                Verification links expire after a short while. If yours has stopped working, use the button below to get a new one.
+              </p>
+            )}
           </div>
         )}
+
+        {needsVerification && <ResendVerification email={email} />}
 
         <div className="space-y-2">
           <Label htmlFor="email">Email address</Label>

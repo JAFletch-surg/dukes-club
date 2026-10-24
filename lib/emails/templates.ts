@@ -146,6 +146,37 @@ export function welcomeEmail(params: {
 }
 
 // ─────────────────────────────────────────
+// 1b. Verification Email (re-sent on request)
+// ─────────────────────────────────────────
+export function verificationEmail(params: {
+  name: string
+  confirmUrl: string
+}): { subject: string; html: string } {
+  const { name, confirmUrl } = params
+  const firstName = name.split(' ')[0] || name
+
+  return {
+    subject: 'Verify your Dukes\' Club email address',
+    html: layout(`
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0F1F3D;">
+        Verify your email address
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.7;">
+        Hi ${firstName}, here is a fresh verification link for your Dukes' Club account. Click the button below and you'll be taken straight to the sign-in page.
+      </p>
+      ${button('Verify Email Address', confirmUrl)}
+      <p style="margin:0 0 8px;font-size:14px;color:#888;line-height:1.6;">
+        This link can only be used once and expires after a short while, so please use it soon. If you didn't request it, you can safely ignore this email.
+      </p>
+      <p style="margin:0;font-size:12px;color:#BBB;line-height:1.6;">
+        If the button doesn't work, copy and paste this URL into your browser:<br/>
+        <a href="${confirmUrl}" style="color:#E5A718;word-break:break-all;font-size:11px;">${confirmUrl}</a>
+      </p>
+    `),
+  }
+}
+
+// ─────────────────────────────────────────
 // 2. Account Approval Notification
 // ─────────────────────────────────────────
 export function approvalEmail(params: {

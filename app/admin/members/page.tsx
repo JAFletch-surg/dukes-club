@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock, Globe } from 'lucide-react'
+import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock, Globe, MailCheck } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { sendEmail } from '@/lib/emails/send-email'
 import { useAuth } from '@/lib/use-auth'
+import { confirmMemberEmail } from '@/lib/admin/confirm-email'
 
 const ROLES = ['pending', 'trainee', 'member', 'editor', 'admin', 'super_admin'] as const
 const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const
@@ -85,6 +86,13 @@ export default function MembersAdmin() {
 
       if (error) throw error
 
+      // Approval vouches for the member, so also clear the email-verification
+      // block — the welcome email's link expires and has stranded approved
+      // members at "verify your email before signing in".
+      confirmMemberEmail(member.id).then((res) => {
+        if (!res.success) console.error('Confirm email failed:', res.error)
+      })
+
       if (member.email) {
         sendEmail({
           type: 'approval',
@@ -154,6 +162,20 @@ export default function MembersAdmin() {
       refetch()
     } catch (e: any) {
       showToast(e.message || 'Failed to verify', 'error')
+    }
+    setUpdating(null)
+  }
+
+  // Mark a member's email as verified so Supabase lets them sign in
+  const handleConfirmEmail = async (member: { id: string; full_name?: string | null }) => {
+    setUpdating(member.id)
+    const res = await confirmMemberEmail(member.id)
+    if (res.success) {
+      showToast(res.alreadyVerified
+        ? `${member.full_name || 'Member'}'s email was already verified`
+        : `${member.full_name || 'Member'}'s email marked as verified`)
+    } else {
+      showToast(res.error, 'error')
     }
     setUpdating(null)
   }
@@ -618,6 +640,22 @@ export default function MembersAdmin() {
                         ))}
                       </select>
                       <p className="text-xs text-gray-400 mt-1">Changing to approved/rejected will send an email notification</p>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-xs font-semibold text-gray-700 mb-1">Email verification</p>
+                      <p className="text-xs text-gray-500 mb-2.5">
+                        Can&apos;t sign in and sees &ldquo;verify your email before signing in&rdquo;? Their verification link has expired. This clears that block immediately.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmEmail(member)}
+                        disabled={updating === member.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-100 disabled:opacity-50"
+                      >
+                        {updating === member.id ? <Loader className="animate-spin" size={12} /> : <MailCheck size={12} />}
+                        Mark email as verified
+                      </button>
                     </div>
                   </div>
                 </div>
