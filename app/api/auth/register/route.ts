@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
           gmc_number: storedGmcNumber,
           directory_visible: directoryVisible ?? true,
         },
-        redirectTo: `${SITE_URL}/auth/callback?next=/login?verified=true`,
+        redirectTo: `${SITE_URL}/auth/callback`,
       },
     })
 
@@ -133,8 +133,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // The action_link from generateLink contains the confirmation token.
-    // We need to transform it so it routes through our auth callback.
+    // The action_link from generateLink carries the one-shot confirmation
+    // token. Supabase confirms the address and redirects to /auth/callback,
+    // which hands the (fragment-only) result to /auth/confirm for the member
+    // to see. The token expires after the project's Email OTP window; a
+    // member who misses it can request a new one from the login page.
     const confirmUrl = linkData?.properties?.action_link
 
     // Send branded welcome email with verification link via Resend
