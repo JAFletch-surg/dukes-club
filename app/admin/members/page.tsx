@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock, Globe, MailCheck } from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
+import { Users, Loader, UserCheck, UserX, Search, Edit, X, Save, Shield, ShieldCheck, ChevronDown, Lock, Globe, MailCheck, MailWarning } from 'lucide-react'
 import { useSupabaseTable } from '@/lib/use-supabase-table'
 import { createClient } from '@/lib/supabase/client'
 import { sendEmail } from '@/lib/emails/send-email'
 import { useAuth } from '@/lib/use-auth'
-import { confirmMemberEmail } from '@/lib/admin/confirm-email'
+import { confirmMemberEmail, fetchUnverifiedMemberIds } from '@/lib/admin/confirm-email'
 
 const ROLES = ['pending', 'trainee', 'member', 'editor', 'admin', 'super_admin'] as const
 const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const
@@ -38,6 +38,17 @@ export default function MembersAdmin() {
   const [editForm, setEditForm] = useState<{ role: string; approval_status: string }>({ role: '', approval_status: '' })
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
 
+  // Email confirmation lives in auth.users, not profiles, so it is fetched
+  // separately and overlaid on the list.
+  const [unverifiedIds, setUnverifiedIds] = useState<Set<string>>(new Set())
+  const refreshUnverified = useCallback(() => {
+    fetchUnverifiedMemberIds().then((ids) => setUnverifiedIds(new Set(ids)))
+  }, [])
+  useEffect(() => {
+    if (canManageMembers) refreshUnverified()
+  }, [canManageMembers, refreshUnverified])
+  const isUnverified = (m: { id: string }) => unverifiedIds.has(m.id)
+
   const showToast = (msg: string, type = 'ok') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
@@ -49,6 +60,7 @@ export default function MembersAdmin() {
     if (filter === 'rejected' && m.approval_status !== 'rejected') return false
     if (filter === 'verify' && !(m.role === 'trainee' && m.acpgbi_number)) return false
     if (filter === 'international' && m.member_category !== 'international') return false
+    if (filter === 'unverified' && !unverifiedIds.has(m.id)) return false
     if (search) {
       const q = search.toLowerCase()
       return (m.full_name || '').toLowerCase().includes(q) ||
@@ -69,6 +81,7 @@ export default function MembersAdmin() {
     rejected: members.filter((m: any) => m.approval_status === 'rejected').length,
     verify: members.filter((m: any) => m.role === 'trainee' && m.acpgbi_number).length,
     international: members.filter((m: any) => m.member_category === 'international').length,
+    unverified: members.filter((m: any) => unverifiedIds.has(m.id)).length,
   }
 
   // Quick approve (from pending → approved + trainee role)
@@ -91,6 +104,7 @@ export default function MembersAdmin() {
       // members at "verify your email before signing in".
       confirmMemberEmail(member.id).then((res) => {
         if (!res.success) console.error('Confirm email failed:', res.error)
+        else refreshUnverified()
       })
 
       if (member.email) {
@@ -174,6 +188,7 @@ export default function MembersAdmin() {
       showToast(res.alreadyVerified
         ? `${member.full_name || 'Member'}'s email was already verified`
         : `${member.full_name || 'Member'}'s email marked as verified`)
+      refreshUnverified()
     } else {
       showToast(res.error, 'error')
     }
@@ -271,6 +286,16 @@ export default function MembersAdmin() {
               {counts.pending} pending approval
             </span>
           )}
+          {counts.unverified > 0 && (
+            <button
+              onClick={() => setFilter('unverified')}
+              className="px-3 py-1.5 bg-red-50 text-red-700 rounded-full text-xs font-semibold border border-red-200 hover:bg-red-100 transition-colors"
+              title="These members cannot sign in until their email is verified"
+            >
+              <MailWarning size={12} className="inline mr-1 -mt-0.5" />
+              {counts.unverified} unverified email{counts.unverified !== 1 ? 's' : ''}
+            </button>
+          )}
           {counts.verify > 0 && (
             <button
               onClick={() => setFilter('verify')}
@@ -285,17 +310,17 @@ export default function MembersAdmin() {
 
       {/* Filters & Search */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
-        {(['all', 'pending', 'approved', 'rejected', 'verify', 'international'] as const).map(f => (
+        {(['all', 'pending', 'approved', 'rejected', 'verify', 'international', 'unverified'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               filter === f
-                ? f === 'verify' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-blue-500 bg-blue-50 text-blue-700'
+                ? f === 'verify' ? 'border-amber-500 bg-amber-50 text-amber-700' : f === 'unverified' ? 'border-red-500 bg-red-50 text-red-700' : 'border-blue-500 bg-blue-50 text-blue-700'
                 : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >
-            {f === 'all' ? 'All' : f === 'verify' ? 'Verify ACPGBI' : f === 'international' ? 'International' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
+            {f === 'all' ? 'All' : f === 'verify' ? 'Verify ACPGBI' : f === 'international' ? 'International' : f === 'unverified' ? 'Unverified email' : f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f] || 0})
           </button>
         ))}
         <div className="sm:ml-auto relative w-full sm:w-auto">
@@ -324,6 +349,17 @@ export default function MembersAdmin() {
           >
             <UserCheck size={14} /> Approve All
           </button>
+        </div>
+      )}
+
+      {/* Unverified email banner */}
+      {filter === 'unverified' && counts.unverified > 0 && (
+        <div className="flex gap-3 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg items-center">
+          <MailWarning size={16} className="text-red-700 flex-shrink-0" />
+          <span className="text-sm text-red-800 flex-1">
+            {counts.unverified} member{counts.unverified !== 1 ? 's have' : ' has'} not clicked the verification link in their welcome email, so Supabase will refuse their sign-in.
+            Use <span className="font-semibold">Verify email</span> to clear the block for anyone you have already approved.
+          </span>
         </div>
       )}
 
@@ -382,7 +418,19 @@ export default function MembersAdmin() {
                       <span className="font-medium">{m.full_name || '—'}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{m.email || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span>{m.email || '—'}</span>
+                      {isUnverified(m) && (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-semibold whitespace-nowrap"
+                          title="Email not verified — this member cannot sign in"
+                        >
+                          <MailWarning size={10} /> Unverified
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {m.member_category === 'international' ? (
                       <span className="inline-flex items-center gap-1 text-indigo-700">
@@ -457,6 +505,17 @@ export default function MembersAdmin() {
                           <UserCheck size={12} /> Approve
                         </button>
                       )}
+                      {isUnverified(m) && (
+                        <button
+                          onClick={() => handleConfirmEmail(m)}
+                          disabled={updating === m.id}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-red-300 text-red-700 rounded-md text-xs font-semibold hover:bg-red-50 disabled:opacity-50"
+                          title="Mark email as verified so this member can sign in"
+                        >
+                          {updating === m.id ? <Loader className="animate-spin" size={12} /> : <MailCheck size={12} />}
+                          Verify email
+                        </button>
+                      )}
                       {m.role === 'trainee' && m.acpgbi_number && (
                         <button
                           onClick={() => handleVerifyMembership(m)}
@@ -494,6 +553,11 @@ export default function MembersAdmin() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-slate-800 truncate">{m.full_name || '—'}</p>
                   <p className="text-xs text-gray-500 truncate">{m.email || '—'}</p>
+                  {isUnverified(m) && (
+                    <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-semibold">
+                      <MailWarning size={10} /> Email unverified
+                    </span>
+                  )}
                 </div>
                 <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 flex-shrink-0"><Edit size={15} /></button>
               </div>
@@ -643,9 +707,22 @@ export default function MembersAdmin() {
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">Email verification</p>
+                      <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                        Email verification
+                        {isUnverified(member) ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-semibold">
+                            <MailWarning size={10} /> Unverified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 text-[10px] font-semibold">
+                            <MailCheck size={10} /> Verified
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-gray-500 mb-2.5">
-                        Can&apos;t sign in and sees &ldquo;verify your email before signing in&rdquo;? Their verification link has expired. This clears that block immediately.
+                        {isUnverified(member)
+                          ? 'This member has not clicked the link in their welcome email, so Supabase refuses their sign-in with “verify your email before signing in”. Marking it verified clears that block immediately.'
+                          : 'This member’s email address is confirmed and sign-in is not blocked.'}
                       </p>
                       <button
                         type="button"

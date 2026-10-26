@@ -28,3 +28,23 @@ export async function confirmMemberEmail(userId: string): Promise<ConfirmEmailRe
     return { success: false, error: error instanceof Error ? error.message : 'Network error' }
   }
 }
+
+/** IDs of members whose email is still unconfirmed. Admin only. */
+export async function fetchUnverifiedMemberIds(): Promise<string[]> {
+  try {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return []
+
+    const response = await fetch('/api/admin/members/unverified', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    if (!response.ok) return []
+
+    const result = await response.json()
+    return Array.isArray(result.userIds) ? result.userIds : []
+  } catch (error: unknown) {
+    console.error('fetchUnverifiedMemberIds error:', error)
+    return []
+  }
+}
