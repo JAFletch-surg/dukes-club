@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   BarChart3, Calendar, Newspaper, Video, Globe, UserCheck, Mic,
   GraduationCap, Users, Building2, Menu, Shield, ChevronLeft, Landmark, LogOut, Layout, FileText, X, Mail,
-  MessageSquare, Radio
+  MessageSquare, Radio, Activity
 } from 'lucide-react'
 import { useAuth } from '@/lib/use-auth'
 
@@ -32,6 +32,7 @@ const navSections = [
       { href: '/admin/faculty', label: 'Faculty', icon: GraduationCap },
       { href: '/admin/members', label: 'Members', icon: Users, adminOnly: true },
       { href: '/admin/feedback', label: 'Site Feedback', icon: MessageSquare },
+      { href: '/admin/usage', label: 'Site Usage', icon: Activity, superAdminOnly: true },
     ],
   },
   {
@@ -47,6 +48,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const { profile, signOut, isAdmin } = useAuth()
+  const isSuperAdmin = profile?.role === 'super_admin'
 
   const isActive = (href: string, end?: boolean) => {
     if (end) return pathname === href
@@ -82,7 +84,12 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
               {section.label}
             </p>
             <div className="space-y-0.5">
-              {section.items.filter((item) => !(item as any).adminOnly || isAdmin).map((item) => {
+              {section.items.filter((item) => {
+                const flags = item as { adminOnly?: boolean; superAdminOnly?: boolean }
+                if (flags.superAdminOnly) return isSuperAdmin
+                if (flags.adminOnly) return isAdmin
+                return true
+              }).map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href, (item as any).end)
                 return (

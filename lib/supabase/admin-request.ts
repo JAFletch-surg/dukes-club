@@ -5,12 +5,18 @@ export type AdminRequestAuth =
   | { ok: true; supabase: SupabaseClient; userId: string }
   | { ok: false; response: NextResponse }
 
+const DEFAULT_ROLES = ['admin', 'super_admin']
+
 /**
- * Bearer token → Supabase user → admin / super_admin role check, for API
- * routes called from the admin UI with the member's access token. Returns a
+ * Bearer token → Supabase user → role check, for API routes called from the
+ * admin UI with the member's access token. Allows admin and super_admin by
+ * default; pass `roles` to narrow it (e.g. ['super_admin']). Returns a
  * service-role client on success so the route can reach the Auth admin API.
  */
-export async function requireAdminRequest(request: NextRequest): Promise<AdminRequestAuth> {
+export async function requireAdminRequest(
+  request: NextRequest,
+  roles: readonly string[] = DEFAULT_ROLES
+): Promise<AdminRequestAuth> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -34,8 +40,9 @@ export async function requireAdminRequest(request: NextRequest): Promise<AdminRe
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-    return { ok: false, response: NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 }) }
+  if (!profile || !roles.includes(profile.role)) {
+    const who = roles.length === 1 && roles[0] === 'super_admin' ? 'super admin' : 'admin'
+    return { ok: false, response: NextResponse.json({ error: `Forbidden — ${who} only` }, { status: 403 }) }
   }
 
   return { ok: true, supabase, userId: user.id }
